@@ -21,9 +21,13 @@ Và trả:
 ```json
 {
   "match_id": "...",
-  "created": false
+  "created": false,
+  "already_joined": false
 }
 ```
+
+Nếu user đã join một authoritative match, RPC trả lại chính `match_id` đó với
+`already_joined=true` thay vì tìm hoặc tạo match khác.
 
 `mode` mặc định là `survival` và chỉ nhận 1-32 ký tự chữ, số, `_` hoặc `-`.
 
@@ -43,6 +47,16 @@ Nếu không tìm thấy, server gọi `MatchCreate`. Mutex process-local bảo 
 | Match list limit | `20` |
 
 Capacity được tính bằng player đã join cộng reservation chưa hết hạn. Party lớn hơn capacity bị từ chối.
+
+## Active Match Registry
+
+`modules/game/matchregistry` giữ membership process-local theo `UserID`, `SessionID`
+và `MatchID`. Membership chỉ được thêm sau `MatchJoin` thành công, không phải khi
+RPC mới trả về một match. Nhiều session của cùng user được phép vào cùng một match;
+join sang match khác bị từ chối.
+
+`MatchLeave` xóa session, còn `MatchTerminate` và empty-match shutdown dọn toàn bộ
+membership của match. Registry nằm trong memory và được tạo một lần tại `InitModule`.
 
 ## Match Label
 

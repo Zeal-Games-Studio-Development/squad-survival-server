@@ -10,6 +10,7 @@ import (
 	"sort"
 	"sync"
 
+	"squad-survival-be/modules/game/matchregistry"
 	"squad-survival-be/modules/game/survival"
 
 	"github.com/heroiclabs/nakama-common/api"
@@ -27,14 +28,26 @@ type Request struct {
 }
 
 type Response struct {
-	MatchID string `json:"match_id"`
-	Created bool   `json:"created"`
+	MatchID       string `json:"match_id"`
+	Created       bool   `json:"created"`
+	AlreadyJoined bool   `json:"already_joined"`
 }
 
-func FindOrCreateRPC(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+func NewFindOrCreateRPC(registry *matchregistry.Registry) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule, string) (string, error) {
+	return func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
+		return findOrCreateRPC(ctx, logger, db, nk, payload, registry)
+	}
+}
+
+func findOrCreateRPC(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, payload string, registry *matchregistry.Registry) (string, error) {
 	request, err := parseRequest(payload)
 	if err != nil {
 		return "", err
+	}
+	if userID, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string); ok {
+		if matchID, active := registry.MatchForUser(userID); active {
+			return encodeResponse(Response{MatchID: matchID, AlreadyJoined: true})
+		}
 	}
 
 	matchID, created, err := findOrCreate(ctx, logger, nk, request, 1)
@@ -42,7 +55,11 @@ func FindOrCreateRPC(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk r
 		return "", err
 	}
 
-	response, err := json.Marshal(Response{MatchID: matchID, Created: created})
+	return encodeResponse(Response{MatchID: matchID, Created: created})
+}
+
+func encodeResponse(value Response) (string, error) {
+	response, err := json.Marshal(value)
 	if err != nil {
 		return "", err
 	}

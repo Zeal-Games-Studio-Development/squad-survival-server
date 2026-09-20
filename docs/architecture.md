@@ -4,6 +4,7 @@
 
 | Package | Trách nhiệm |
 | --- | --- |
+| `modules/game/matchregistry` | Active user/session membership theo match |
 | `modules/game/matchmaking` | RPC find-or-create và matchmaker callback |
 | `modules/game/survival` | Nakama authoritative match lifecycle |
 | `modules/game/core/entity` | Player, character, weapon và movement |
@@ -14,6 +15,9 @@
 | `modules/game/core/world` | Tọa độ, spawn và world boundary |
 
 `InitModule` đăng ký match `survival`, RPC `find_or_create_match`, matchmaker callback và RPC `healthcheck`.
+
+Active match registry được tạo một lần tại `InitModule` và dùng chung cho RPC
+matchmaking cùng các survival match handler trong cùng process.
 
 ## Authoritative State
 

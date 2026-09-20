@@ -9,6 +9,7 @@ import (
 	"squad-survival-be/modules/game/core/entity"
 	"squad-survival-be/modules/game/core/spatial"
 	"squad-survival-be/modules/game/core/system"
+	"squad-survival-be/modules/game/matchregistry"
 
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -85,6 +86,51 @@ func TestJoinAndLeaveUpdateCapacityLabel(t *testing.T) {
 	}
 	if dispatcher.broadcastCount != 2 {
 		t.Fatalf("expected one snapshot per join/leave, got %d", dispatcher.broadcastCount)
+	}
+}
+
+func TestJoinAndLeaveUpdateActiveMatchRegistry(t *testing.T) {
+	registry := matchregistry.New()
+	match := &Match{registry: registry}
+	dispatcher := &testDispatcher{}
+	presence := testPresence{userID: "user-1", sessionID: "session-1"}
+	state := &State{
+		MatchID:             "match-1",
+		Mode:                DefaultMode,
+		AllowJoinInProgress: true,
+		Players:             make(map[string]*entity.Player),
+		Presences:           make(map[string]runtime.Presence),
+		Reservations:        make(map[string]int64),
+		SpatialGrid:         spatial.NewGrid(spatialCellSize),
+		random:              rand.New(rand.NewSource(1)),
+	}
+
+	match.MatchJoin(nil, nil, nil, nil, dispatcher, 0, state, []runtime.Presence{presence})
+	if matchID, ok := registry.MatchForUser(presence.userID); !ok || matchID != state.MatchID {
+		t.Fatalf("unexpected active match: %q, %v", matchID, ok)
+	}
+
+	match.MatchLeave(nil, nil, nil, nil, dispatcher, 1, state, []runtime.Presence{presence})
+	if _, ok := registry.MatchForUser(presence.userID); ok {
+		t.Fatal("expected leave to remove active match membership")
+	}
+}
+
+func TestJoinAttemptRejectsUserActiveInAnotherMatch(t *testing.T) {
+	registry := matchregistry.New()
+	registry.Add("user-1", "session-1", "match-1")
+	match := &Match{registry: registry}
+	state := &State{
+		MatchID:             "match-2",
+		AllowJoinInProgress: true,
+		Players:             make(map[string]*entity.Player),
+		Reservations:        make(map[string]int64),
+	}
+	presence := testPresence{userID: "user-1", sessionID: "session-2"}
+
+	_, allowed, reason := match.MatchJoinAttempt(nil, nil, nil, nil, nil, 0, state, presence, nil)
+	if allowed || reason != "user is already in another match" {
+		t.Fatalf("expected duplicate match rejection, got allowed=%v reason=%q", allowed, reason)
 	}
 }
 

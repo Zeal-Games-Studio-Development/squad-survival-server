@@ -12,6 +12,7 @@ import (
 	"squad-survival-be/modules/game/core/spatial"
 	"squad-survival-be/modules/game/core/system"
 	"squad-survival-be/modules/game/core/world"
+	"squad-survival-be/modules/game/matchregistry"
 
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -28,9 +29,12 @@ const (
 	spatialCellSize       = 20.0
 )
 
-type Match struct{}
+type Match struct {
+	registry *matchregistry.Registry
+}
 
 type State struct {
+	MatchID             string
 	Mode                string
 	AllowJoinInProgress bool
 	Players             map[string]*entity.Player
@@ -50,12 +54,15 @@ type Label struct {
 	Joinable    bool   `json:"joinable"`
 }
 
-func NewMatch(_ context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule) (runtime.Match, error) {
-	return &Match{}, nil
+func NewMatchHandler(registry *matchregistry.Registry) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule) (runtime.Match, error) {
+	return func(_ context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule) (runtime.Match, error) {
+		return &Match{registry: registry}, nil
+	}
 }
 
-func (m *Match) MatchInit(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
+func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
 	state := &State{
+		MatchID:             matchIDFromContext(ctx),
 		Mode:                stringParam(params, "mode", DefaultMode),
 		AllowJoinInProgress: boolParam(params, "allow_join_in_progress", true),
 		Players:             make(map[string]*entity.Player),
@@ -69,12 +76,15 @@ func (m *Match) MatchInit(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	return state, tickRate, state.label()
 }
 
-func (m *Match) MatchJoinAttempt(_ context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, tick int64, rawState interface{}, presence runtime.Presence, _ map[string]string) (interface{}, bool, string) {
+func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, tick int64, rawState interface{}, presence runtime.Presence, _ map[string]string) (interface{}, bool, string) {
 	state := rawState.(*State)
 	state.expireReservations(tick)
 
 	if _, exists := state.Players[presence.GetSessionId()]; exists {
 		return state, true, ""
+	}
+	if state.MatchID != "" && !m.registry.CanJoin(presence.GetUserId(), state.MatchID) {
+		return state, false, "user is already in another match"
 	}
 	if !state.AllowJoinInProgress && len(state.Players) > 0 {
 		return state, false, "match already started"
@@ -99,6 +109,15 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		if _, exists := state.Players[presence.GetSessionId()]; exists {
 			continue
 		}
+		if state.MatchID != "" && !m.registry.Add(presence.GetUserId(), presence.GetSessionId(), state.MatchID) {
+			if logger != nil {
+				logger.Error("Could not register active match membership: user_id=%s session_id=%s match_id=%s", presence.GetUserId(), presence.GetSessionId(), state.MatchID)
+			}
+			if err = dispatcher.MatchKick([]runtime.Presence{presence}); err != nil && logger != nil {
+				logger.Error("Could not kick duplicate match presence: session_id=%s error=%v", presence.GetSessionId(), err)
+			}
+			continue
+		}
 		player := entity.NewPlayer(
 			presence.GetUserId(),
 			presence.GetSessionId(),
@@ -107,6 +126,7 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 			state.random,
 		)
 		if err = state.SpatialGrid.Insert(player); err != nil {
+			m.registry.RemoveSession(presence.GetSessionId())
 			if logger != nil {
 				logger.Error("Could not insert player into spatial grid: session_id=%s error=%v", presence.GetSessionId(), err)
 			}
@@ -160,6 +180,7 @@ func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, 
 		}
 		delete(state.Players, presence.GetSessionId())
 		delete(state.Presences, presence.GetSessionId())
+		m.registry.RemoveSession(presence.GetSessionId())
 	}
 	state.updateLabel(dispatcher)
 	if len(state.Players) != playerCount {
@@ -211,6 +232,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 		state.EmptyTicks++
 		if state.EmptyTicks >= emptyMatchTTLSeconds*tickRate {
 			logger.Info("Stopping empty survival match")
+			m.registry.RemoveMatch(state.MatchID)
 			return nil
 		}
 	} else {
@@ -220,7 +242,12 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	return state
 }
 
-func (m *Match) MatchTerminate(_ context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, _ int64, _ interface{}, _ int) interface{} {
+func (m *Match) MatchTerminate(ctx context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, _ int64, rawState interface{}, _ int) interface{} {
+	matchID := matchIDFromContext(ctx)
+	if state, ok := rawState.(*State); ok && state.MatchID != "" {
+		matchID = state.MatchID
+	}
+	m.registry.RemoveMatch(matchID)
 	return nil
 }
 
@@ -370,4 +397,12 @@ func boolParam(params map[string]interface{}, key string, fallback bool) bool {
 		return value
 	}
 	return fallback
+}
+
+func matchIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	matchID, _ := ctx.Value(runtime.RUNTIME_CTX_MATCH_ID).(string)
+	return matchID
 }
