@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"squad-survival-be/modules/economy"
 	"squad-survival-be/modules/game/matchmaking"
 	"squad-survival-be/modules/game/matchregistry"
 	"squad-survival-be/modules/game/survival"
@@ -12,6 +13,14 @@ import (
 )
 
 func InitModule(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, initializer runtime.Initializer) error {
+	economyService, err := economy.NewService(economy.DefaultCurrencies())
+	if err != nil {
+		return err
+	}
+	if err := economy.Register(initializer, economyService); err != nil {
+		return err
+	}
+
 	registry := matchregistry.New()
 	if err := initializer.RegisterMatch(survival.ModuleName, survival.NewMatchHandler(registry)); err != nil {
 		return err

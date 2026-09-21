@@ -1,0 +1,12 @@
+{
+  "currencies": [
+    {
+      "id": "gold",
+      "init_value": 1000
+    },
+    {
+      "id": "gem",
+      "init_value": 50
+    }
+  ]
+}
