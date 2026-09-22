@@ -84,7 +84,7 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 		return state, true, ""
 	}
 	if state.MatchID != "" && !m.registry.CanJoin(presence.GetUserId(), state.MatchID) {
-		return state, false, "user is already in another match"
+		return state, false, "already in another match"
 	}
 	if !state.AllowJoinInProgress && len(state.Players) > 0 {
 		return state, false, "match already started"
