@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	GridSize      = 5
+	GridSize      = 3
 	GridCenter    = GridSize / 2
-	MaxCharacters = GridSize * GridSize
+	MaxCharacters = 5
 	SlotSpacing   = 1.5
 	Compact       = "compact"
 )
