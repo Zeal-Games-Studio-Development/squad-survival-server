@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package game.core.system;
+
+option go_package = "squad-survival-be/modules/game/core/system;system";
+
+import "modules/game/core/system/vector.proto";
+
+message PlayerMovementSnapshot {
+  int64 tick = 1;
+  repeated PlayerMovement players = 2;
+  PlayerMovement self = 3;
+}
+
+message PlayerMovement {
+  string session_id = 1;
+  Vector2 position = 2;
+  Vector2 facing = 3;
+  Vector2 direction = 4;
+  repeated CharacterMovement characters = 5;
+}
+
+message CharacterMovement {
+  string character_id = 1;
+  Vector2 position = 2;
+}

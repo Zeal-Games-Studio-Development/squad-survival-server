@@ -53,6 +53,7 @@ func (p *Player) AddCharacter(character *Character) error {
 		return err
 	}
 	character.Position = character.TargetPosition
+	p.MarkRosterChanged()
 	return nil
 }
 
@@ -62,6 +63,7 @@ func (p *Player) RemoveCharacterAt(index int) bool {
 	}
 	p.Characters = append(p.Characters[:index], p.Characters[index+1:]...)
 	_ = AssignCharacterTargets(p)
+	p.MarkRosterChanged()
 	return true
 }
 
@@ -88,6 +90,7 @@ func (p *Player) RemoveDeadCharacters() int {
 	p.Characters = survivors
 	if removed > 0 {
 		_ = AssignCharacterTargets(p)
+		p.MarkRosterChanged()
 	}
 	return removed
 }

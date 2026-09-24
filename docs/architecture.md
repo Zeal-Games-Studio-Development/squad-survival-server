@@ -39,7 +39,7 @@ flowchart TD
     F --> G[Step attacks and projectiles]
     G --> H[Apply damage and remove dead characters]
     H --> I[Broadcast reliable combat events]
-    I --> J[Broadcast unreliable detection snapshots]
+    I --> J[Broadcast unreliable player and projectile movement snapshots]
 ```
 
 Invalid opcode hoặc malformed movement payload bị bỏ qua và không dừng match.

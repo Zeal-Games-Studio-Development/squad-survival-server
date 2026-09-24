@@ -871,7 +871,7 @@ var File_modules_game_core_system_combat_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\n" +
-	"%modules/game/core/system/combat.proto\x12\x10game.core.system\x1a(modules/game/core/system/detection.proto\"]\n" +
+	"%modules/game/core/system/combat.proto\x12\x10game.core.system\x1a%modules/game/core/system/vector.proto\"]\n" +
 	"\x10CombatEventBatch\x12\x12\n" +
 	"\x04tick\x18\x01 \x01(\x03R\x04tick\x125\n" +
 	"\x06events\x18\x02 \x03(\v2\x1d.game.core.system.CombatEventR\x06events\"\xea\x03\n" +
@@ -1000,7 +1000,7 @@ func file_modules_game_core_system_combat_proto_init() {
 	if File_modules_game_core_system_combat_proto != nil {
 		return
 	}
-	file_modules_game_core_system_detection_proto_init()
+	file_modules_game_core_system_vector_proto_init()
 	file_modules_game_core_system_combat_proto_msgTypes[1].OneofWrappers = []any{
 		(*CombatEvent_AttackStarted)(nil),
 		(*CombatEvent_DamageApplied)(nil),

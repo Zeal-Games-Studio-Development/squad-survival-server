@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package game.core.system;
+
+option go_package = "squad-survival-be/modules/game/core/system;system";
+
+message PlayerRosterBatch {
+  int64 tick = 1;
+  repeated PlayerRoster players = 2;
+}
+
+message PlayerRoster {
+  string user_id = 1;
+  string session_id = 2;
+  string display_name = 3;
+  uint64 roster_version = 4;
+  repeated CharacterRoster characters = 5;
+}
+
+message CharacterRoster {
+  string character_id = 1;
+  double health = 2;
+  double max_health = 3;
+  double damage = 4;
+  double move_speed = 5;
+  double attack_speed = 6;
+  double attack_range = 7;
+  double regen_rate = 8;
+  double damage_ratio = 9;
+  string weapon_type = 10;
+  string range_class = 11;
+  string weapon_name = 12;
+}

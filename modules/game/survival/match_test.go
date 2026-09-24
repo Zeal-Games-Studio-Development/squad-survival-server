@@ -84,8 +84,17 @@ func TestJoinAndLeaveUpdateCapacityLabel(t *testing.T) {
 	if state.SpatialGrid.Remove(presence.sessionID) {
 		t.Fatal("expected leaving player to be absent from spatial grid")
 	}
-	if dispatcher.broadcastCount != 2 {
-		t.Fatalf("expected one snapshot per join/leave, got %d", dispatcher.broadcastCount)
+	stateSnapshots, rosters := 0, 0
+	for _, broadcast := range dispatcher.broadcasts {
+		switch broadcast.opCode {
+		case system.OpStateSnapshot:
+			stateSnapshots++
+		case system.OpPlayerRosterBatch:
+			rosters++
+		}
+	}
+	if stateSnapshots != 2 || rosters != 1 {
+		t.Fatalf("unexpected join/leave broadcasts: state=%d roster=%d", stateSnapshots, rosters)
 	}
 }
 
@@ -129,7 +138,7 @@ func TestJoinAttemptRejectsUserActiveInAnotherMatch(t *testing.T) {
 	presence := testPresence{userID: "user-1", sessionID: "session-2"}
 
 	_, allowed, reason := match.MatchJoinAttempt(nil, nil, nil, nil, nil, 0, state, presence, nil)
-	if allowed || reason != "user is already in another match" {
+	if allowed || reason != "already in another match" {
 		t.Fatalf("expected duplicate match rejection, got allowed=%v reason=%q", allowed, reason)
 	}
 }
@@ -288,7 +297,7 @@ func TestMatchLoopMovesPlayerBetweenSpatialCells(t *testing.T) {
 	}
 }
 
-func TestMatchLoopSendsPersonalizedDetectionSnapshots(t *testing.T) {
+func TestMatchLoopSendsPersonalizedPlayerMovementSnapshots(t *testing.T) {
 	match := &Match{}
 	dispatcher := &testDispatcher{}
 	random := rand.New(rand.NewSource(1))
@@ -325,21 +334,21 @@ func TestMatchLoopSendsPersonalizedDetectionSnapshots(t *testing.T) {
 		data:         mustMarshalMovementInput(t, &entity.MovementInput{X: 1, Sequence: 1}),
 	}
 	match.MatchLoop(nil, nil, nil, nil, dispatcher, 9, state, []runtime.MatchData{movement})
-	detectionBroadcasts := make([]testBroadcast, 0, 3)
+	movementBroadcasts := make([]testBroadcast, 0, 3)
 	for _, broadcast := range dispatcher.broadcasts {
-		if broadcast.opCode == system.OpPlayerDetectionSnapshot {
-			detectionBroadcasts = append(detectionBroadcasts, broadcast)
+		if broadcast.opCode == system.OpPlayerMovementSnapshot {
+			movementBroadcasts = append(movementBroadcasts, broadcast)
 		}
 	}
-	if len(detectionBroadcasts) != 3 {
-		t.Fatalf("expected one detection snapshot per player, got %d", len(detectionBroadcasts))
+	if len(movementBroadcasts) != 3 {
+		t.Fatalf("expected one player movement snapshot per player, got %d", len(movementBroadcasts))
 	}
 	want := map[string][]string{
 		playerA.SessionID: {playerB.SessionID},
 		playerB.SessionID: {playerA.SessionID, playerC.SessionID},
 		playerC.SessionID: {},
 	}
-	for _, broadcast := range detectionBroadcasts {
+	for _, broadcast := range movementBroadcasts {
 		if broadcast.reliable {
 			t.Fatalf("unexpected detection broadcast: opcode=%d reliable=%v", broadcast.opCode, broadcast.reliable)
 		}
@@ -347,7 +356,7 @@ func TestMatchLoopSendsPersonalizedDetectionSnapshots(t *testing.T) {
 			t.Fatalf("expected one recipient, got %d", len(broadcast.presences))
 		}
 		recipient := broadcast.presences[0].GetSessionId()
-		var snapshot system.PlayerDetectionSnapshot
+		var snapshot system.PlayerMovementSnapshot
 		if err := proto.Unmarshal(broadcast.data, &snapshot); err != nil {
 			t.Fatal(err)
 		}
@@ -372,6 +381,98 @@ func TestMatchLoopSendsPersonalizedDetectionSnapshots(t *testing.T) {
 				t.Fatalf("character position was not updated before snapshot: character=%+v player=%+v", detectedA.Characters[0].Position, playerA.Position)
 			}
 		}
+	}
+}
+
+func TestRosterBroadcastsOnEncounterReentryAndVersionChange(t *testing.T) {
+	random := rand.New(rand.NewSource(7))
+	playerA := entity.NewPlayer("user-a", "session-a", "Player A", entity.Vector2{}, random)
+	playerB := entity.NewPlayer("user-b", "session-b", "Player B", entity.Vector2{X: 5}, random)
+	playerC := entity.NewPlayer("user-c", "session-c", "Player C", entity.Vector2{X: 30}, random)
+	state := &State{
+		Players: map[string]*entity.Player{
+			playerA.SessionID: playerA, playerB.SessionID: playerB, playerC.SessionID: playerC,
+		},
+		Presences: map[string]runtime.Presence{
+			playerA.SessionID: testPresence{userID: playerA.UserID, sessionID: playerA.SessionID},
+			playerB.SessionID: testPresence{userID: playerB.UserID, sessionID: playerB.SessionID},
+			playerC.SessionID: testPresence{userID: playerC.UserID, sessionID: playerC.SessionID},
+		},
+		RosterVersions: map[string]map[string]uint64{
+			playerA.SessionID: {playerA.SessionID: playerA.RosterVersion},
+			playerB.SessionID: {playerB.SessionID: playerB.RosterVersion},
+			playerC.SessionID: {playerC.SessionID: playerC.RosterVersion},
+		},
+	}
+	nearby := map[string][]*entity.Player{
+		playerA.SessionID: {playerB},
+		playerB.SessionID: {playerA},
+		playerC.SessionID: {},
+	}
+	dispatcher := &testDispatcher{}
+
+	state.broadcastRosterUpdates(nil, dispatcher, 1, nearby)
+	assertRosterRecipients(t, dispatcher.broadcasts, map[string][]string{
+		playerA.SessionID: {playerB.SessionID},
+		playerB.SessionID: {playerA.SessionID},
+	})
+
+	dispatcher.broadcasts = nil
+	state.broadcastRosterUpdates(nil, dispatcher, 2, nearby)
+	if len(dispatcher.broadcasts) != 0 {
+		t.Fatalf("expected no unchanged roster broadcasts, got %d", len(dispatcher.broadcasts))
+	}
+
+	state.broadcastRosterUpdates(nil, dispatcher, 3, map[string][]*entity.Player{
+		playerA.SessionID: {}, playerB.SessionID: {}, playerC.SessionID: {},
+	})
+	playerB.Characters[0].Health = 37
+	dispatcher.broadcasts = nil
+	state.broadcastRosterUpdates(nil, dispatcher, 4, nearby)
+	assertRosterRecipients(t, dispatcher.broadcasts, map[string][]string{
+		playerA.SessionID: {playerB.SessionID},
+		playerB.SessionID: {playerA.SessionID},
+	})
+	for _, broadcast := range dispatcher.broadcasts {
+		if broadcast.presences[0].GetSessionId() != playerA.SessionID {
+			continue
+		}
+		var batch system.PlayerRosterBatch
+		if err := proto.Unmarshal(broadcast.data, &batch); err != nil {
+			t.Fatal(err)
+		}
+		if len(batch.Players) != 1 || batch.Players[0].Characters[0].Health != 37 {
+			t.Fatalf("expected current health on re-entry, got %+v", &batch)
+		}
+	}
+
+	if err := playerB.AddCharacter(entity.NewCharacter()); err != nil {
+		t.Fatal(err)
+	}
+	dispatcher.broadcasts = nil
+	state.broadcastRosterUpdates(nil, dispatcher, 5, nearby)
+	assertRosterRecipients(t, dispatcher.broadcasts, map[string][]string{
+		playerA.SessionID: {playerB.SessionID},
+		playerB.SessionID: {playerB.SessionID},
+	})
+	for _, broadcast := range dispatcher.broadcasts {
+		if len(broadcast.presences) != 1 || broadcast.presences[0].GetSessionId() == playerC.SessionID {
+			t.Fatalf("outside observer received roster update: %+v", broadcast)
+		}
+	}
+}
+
+func TestRemoveRosterTrackingCleansObserverAndTarget(t *testing.T) {
+	state := &State{RosterVersions: map[string]map[string]uint64{
+		"session-a": {"session-a": 1, "session-b": 1},
+		"session-b": {"session-a": 1, "session-b": 1},
+	}}
+	state.removeRosterTracking("session-b")
+	if _, ok := state.RosterVersions["session-b"]; ok {
+		t.Fatal("expected observer roster cache to be removed")
+	}
+	if _, ok := state.RosterVersions["session-a"]["session-b"]; ok {
+		t.Fatal("expected target roster cache to be removed")
 	}
 }
 
@@ -417,7 +518,8 @@ func TestMatchLoopSendsReliableCombatEventsToRelevantViewers(t *testing.T) {
 
 	match.MatchLoop(nil, nil, nil, nil, dispatcher, 1, state, nil)
 	combatRecipients := make(map[string]bool)
-	detectionCount := 0
+	movementCount := 0
+	projectileMovementCount := 0
 	for _, broadcast := range dispatcher.broadcasts {
 		switch broadcast.opCode {
 		case system.OpCombatEventBatch:
@@ -433,15 +535,17 @@ func TestMatchLoopSendsReliableCombatEventsToRelevantViewers(t *testing.T) {
 			if batch.Tick != 1 || len(batch.Events) != 2 {
 				t.Fatalf("unexpected combat batch for %s: %+v", recipient, &batch)
 			}
-		case system.OpPlayerDetectionSnapshot:
-			detectionCount++
+		case system.OpPlayerMovementSnapshot:
+			movementCount++
+		case system.OpProjectileMovementSnapshot:
+			projectileMovementCount++
 		}
 	}
 	if !combatRecipients[playerA.SessionID] || !combatRecipients[playerB.SessionID] || combatRecipients[playerC.SessionID] {
 		t.Fatalf("unexpected combat recipients: %+v", combatRecipients)
 	}
-	if detectionCount != 3 {
-		t.Fatalf("expected three detection snapshots, got %d", detectionCount)
+	if movementCount != 3 || projectileMovementCount != 3 {
+		t.Fatalf("unexpected movement snapshots: players=%d projectiles=%d", movementCount, projectileMovementCount)
 	}
 }
 
@@ -452,6 +556,38 @@ func mustMarshalMovementInput(t *testing.T, input *entity.MovementInput) []byte 
 		t.Fatal(err)
 	}
 	return data
+}
+
+func assertRosterRecipients(t *testing.T, broadcasts []testBroadcast, expected map[string][]string) {
+	t.Helper()
+	actual := make(map[string][]string, len(broadcasts))
+	for _, broadcast := range broadcasts {
+		if broadcast.opCode != system.OpPlayerRosterBatch || !broadcast.reliable || len(broadcast.presences) != 1 {
+			t.Fatalf("unexpected roster broadcast: %+v", broadcast)
+		}
+		var batch system.PlayerRosterBatch
+		if err := proto.Unmarshal(broadcast.data, &batch); err != nil {
+			t.Fatal(err)
+		}
+		recipient := broadcast.presences[0].GetSessionId()
+		for _, player := range batch.Players {
+			actual[recipient] = append(actual[recipient], player.SessionId)
+		}
+	}
+	if len(actual) != len(expected) {
+		t.Fatalf("unexpected roster recipients: got=%v want=%v", actual, expected)
+	}
+	for recipient, want := range expected {
+		got := actual[recipient]
+		if len(got) != len(want) {
+			t.Fatalf("recipient %s: got=%v want=%v", recipient, got, want)
+		}
+		for index := range want {
+			if got[index] != want[index] {
+				t.Fatalf("recipient %s: got=%v want=%v", recipient, got, want)
+			}
+		}
+	}
 }
 
 func assertStateSnapshot(t *testing.T, dispatcher *testDispatcher, tick int64, playerCount int) {

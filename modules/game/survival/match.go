@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"math/rand"
+	"sort"
 	"time"
 
 	"squad-survival-be/modules/game/core/combat"
@@ -42,6 +43,7 @@ type State struct {
 	Reservations        map[string]int64
 	SpatialGrid         *spatial.Grid
 	Combat              *combat.Simulation
+	RosterVersions      map[string]map[string]uint64
 	EmptyTicks          int64
 	random              *rand.Rand
 }
@@ -70,6 +72,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		Reservations:        make(map[string]int64),
 		SpatialGrid:         spatial.NewGrid(spatialCellSize),
 		Combat:              combat.NewSimulation(),
+		RosterVersions:      make(map[string]map[string]uint64),
 		random:              rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	logger.Info("Survival match initialized: mode=%s max_players=%d", state.Mode, MaxPlayers)
@@ -134,6 +137,7 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		}
 		state.Players[presence.GetSessionId()] = player
 		state.Presences[presence.GetSessionId()] = presence
+		state.sendInitialRoster(logger, dispatcher, tick, presence, player)
 	}
 	state.EmptyTicks = 0
 	state.updateLabel(dispatcher)
@@ -180,6 +184,7 @@ func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, 
 		}
 		delete(state.Players, presence.GetSessionId())
 		delete(state.Presences, presence.GetSessionId())
+		state.removeRosterTracking(presence.GetSessionId())
 		m.registry.RemoveSession(presence.GetSessionId())
 	}
 	state.updateLabel(dispatcher)
@@ -221,12 +226,14 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 		}
 	}
 	nearbyPlayers := state.queryNearbyPlayers()
+	state.broadcastRosterUpdates(logger, dispatcher, tick, nearbyPlayers)
 	if state.Combat == nil {
 		state.Combat = combat.NewSimulation()
 	}
 	combatEvents := state.Combat.Step(state.Players, tick, state.random)
 	state.broadcastCombatEvents(logger, dispatcher, tick, combatEvents, nearbyPlayers)
-	state.broadcastDetectionSnapshots(logger, dispatcher, tick, nearbyPlayers, state.Combat.Projectiles())
+	state.broadcastPlayerMovementSnapshots(logger, dispatcher, tick, nearbyPlayers)
+	state.broadcastProjectileMovementSnapshots(logger, dispatcher, tick, nearbyPlayers, state.Combat.Projectiles())
 
 	if len(state.Players) == 0 && len(state.Reservations) == 0 {
 		state.EmptyTicks++
@@ -354,23 +361,120 @@ func relevantProjectiles(player *entity.Player, nearby []*entity.Player, project
 	return relevant
 }
 
-func (s *State) broadcastDetectionSnapshots(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, nearbyPlayers map[string][]*entity.Player, projectiles []*combat.Projectile) {
+func (s *State) broadcastPlayerMovementSnapshots(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, nearbyPlayers map[string][]*entity.Player) {
 	for sessionID, player := range s.Players {
 		presence, ok := s.Presences[sessionID]
 		if !ok {
 			if logger != nil {
-				logger.Error("Could not send detection snapshot: presence not found for session_id=%s", sessionID)
+				logger.Error("Could not send player movement snapshot: presence not found for session_id=%s", sessionID)
 			}
 			continue
 		}
 
-		payload, err := system.EncodePlayerDetectionSnapshot(tick, player, nearbyPlayers[sessionID], relevantProjectiles(player, nearbyPlayers[sessionID], projectiles))
+		payload, err := system.EncodePlayerMovementSnapshot(tick, player, nearbyPlayers[sessionID])
 		if err == nil {
-			err = dispatcher.BroadcastMessage(system.OpPlayerDetectionSnapshot, payload, []runtime.Presence{presence}, nil, false)
+			err = dispatcher.BroadcastMessage(system.OpPlayerMovementSnapshot, payload, []runtime.Presence{presence}, nil, false)
 		}
 		if err != nil && logger != nil {
-			logger.Error("Could not send detection snapshot: session_id=%s error=%v", sessionID, err)
+			logger.Error("Could not send player movement snapshot: session_id=%s error=%v", sessionID, err)
 		}
+	}
+}
+
+func (s *State) broadcastProjectileMovementSnapshots(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, nearbyPlayers map[string][]*entity.Player, projectiles []*combat.Projectile) {
+	for sessionID, player := range s.Players {
+		presence, ok := s.Presences[sessionID]
+		if !ok {
+			if logger != nil {
+				logger.Error("Could not send projectile movement snapshot: presence not found for session_id=%s", sessionID)
+			}
+			continue
+		}
+		payload, err := system.EncodeProjectileMovementSnapshot(tick, relevantProjectiles(player, nearbyPlayers[sessionID], projectiles))
+		if err == nil {
+			err = dispatcher.BroadcastMessage(system.OpProjectileMovementSnapshot, payload, []runtime.Presence{presence}, nil, false)
+		}
+		if err != nil && logger != nil {
+			logger.Error("Could not send projectile movement snapshot: session_id=%s error=%v", sessionID, err)
+		}
+	}
+}
+
+func (s *State) sendInitialRoster(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, presence runtime.Presence, player *entity.Player) {
+	payload, err := system.EncodePlayerRosterBatch(tick, []*entity.Player{player})
+	if err == nil {
+		err = dispatcher.BroadcastMessage(system.OpPlayerRosterBatch, payload, []runtime.Presence{presence}, nil, true)
+	}
+	if err != nil {
+		if logger != nil {
+			logger.Error("Could not send initial player roster: session_id=%s error=%v", player.SessionID, err)
+		}
+		return
+	}
+	if s.RosterVersions == nil {
+		s.RosterVersions = make(map[string]map[string]uint64)
+	}
+	s.RosterVersions[player.SessionID] = map[string]uint64{player.SessionID: player.RosterVersion}
+}
+
+func (s *State) broadcastRosterUpdates(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, nearbyPlayers map[string][]*entity.Player) {
+	if s.RosterVersions == nil {
+		s.RosterVersions = make(map[string]map[string]uint64)
+	}
+	for observerSessionID, observer := range s.Players {
+		presence, ok := s.Presences[observerSessionID]
+		if !ok {
+			continue
+		}
+		sent := s.RosterVersions[observerSessionID]
+		if sent == nil {
+			sent = make(map[string]uint64)
+			s.RosterVersions[observerSessionID] = sent
+		}
+
+		visible := make(map[string]*entity.Player, len(nearbyPlayers[observerSessionID])+1)
+		visible[observerSessionID] = observer
+		for _, player := range nearbyPlayers[observerSessionID] {
+			if player != nil {
+				visible[player.SessionID] = player
+			}
+		}
+		for targetSessionID := range sent {
+			if _, ok := visible[targetSessionID]; !ok {
+				delete(sent, targetSessionID)
+			}
+		}
+
+		pending := make([]*entity.Player, 0, len(visible))
+		for targetSessionID, player := range visible {
+			if version, ok := sent[targetSessionID]; !ok || version != player.RosterVersion {
+				pending = append(pending, player)
+			}
+		}
+		if len(pending) == 0 {
+			continue
+		}
+		sort.Slice(pending, func(i, j int) bool { return pending[i].SessionID < pending[j].SessionID })
+		payload, err := system.EncodePlayerRosterBatch(tick, pending)
+		if err == nil {
+			err = dispatcher.BroadcastMessage(system.OpPlayerRosterBatch, payload, []runtime.Presence{presence}, nil, true)
+		}
+		if err != nil {
+			if logger != nil {
+				logger.Error("Could not send player roster: session_id=%s error=%v", observerSessionID, err)
+			}
+			continue
+		}
+		for _, player := range pending {
+			sent[player.SessionID] = player.RosterVersion
+		}
+	}
+}
+
+func (s *State) removeRosterTracking(sessionID string) {
+	delete(s.RosterVersions, sessionID)
+	for _, sent := range s.RosterVersions {
+		delete(sent, sessionID)
 	}
 }
 

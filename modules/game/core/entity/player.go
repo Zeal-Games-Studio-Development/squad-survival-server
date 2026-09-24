@@ -30,6 +30,7 @@ type Player struct {
 	Characters            []*Character
 	DetectionRadius       float64
 	Strategy              strategy.Definition
+	RosterVersion         uint64
 	nextCharacterSequence uint64
 }
 
@@ -48,6 +49,7 @@ func NewPlayer(userID, sessionID, displayName string, position Vector2, random *
 		Characters:      []*Character{character},
 		DetectionRadius: DefaultDetectionRadius,
 		Strategy:        definition,
+		RosterVersion:   1,
 	}
 	player.assignCharacterID(character)
 
@@ -128,6 +130,11 @@ func (p *Player) assignCharacterID(character *Character) {
 	}
 	p.nextCharacterSequence++
 	character.ID = p.UserID + ":" + strconv.FormatUint(p.nextCharacterSequence, 10)
+}
+
+// MarkRosterChanged must be called after changing character loadout or static stats.
+func (p *Player) MarkRosterChanged() {
+	p.RosterVersion++
 }
 
 func NormalizeDirection(direction Vector2) Vector2 {

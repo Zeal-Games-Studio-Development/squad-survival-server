@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package game.core.system;
+
+option go_package = "squad-survival-be/modules/game/core/system;system";
+
+import "modules/game/core/system/vector.proto";
+
+message ProjectileMovementSnapshot {
+  int64 tick = 1;
+  repeated ProjectileMovement projectiles = 2;
+}
+
+message ProjectileMovement {
+  string projectile_id = 1;
+  Vector2 position = 2;
+}

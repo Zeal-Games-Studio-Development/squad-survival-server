@@ -112,6 +112,7 @@ func TestAddCharacterEnforcesMaximum(t *testing.T) {
 
 func TestRemoveDeadCharactersCompactsFormation(t *testing.T) {
 	player := newTestPlayer(Vector2{})
+	initialVersion := player.RosterVersion
 	alive := &Character{Health: 1, MoveSpeed: 5}
 	dead := &Character{Health: 0, MoveSpeed: 5}
 	overKilled := &Character{Health: -10, MoveSpeed: 5}
@@ -122,5 +123,8 @@ func TestRemoveDeadCharactersCompactsFormation(t *testing.T) {
 	}
 	if len(player.Characters) != 2 || player.Characters[0] != alive || player.Characters[1] != nil {
 		t.Fatalf("unexpected survivors: %+v", player.Characters)
+	}
+	if player.RosterVersion != initialVersion+1 {
+		t.Fatalf("expected dead character removal to increment roster version, got %d", player.RosterVersion)
 	}
 }

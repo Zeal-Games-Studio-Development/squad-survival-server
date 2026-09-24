@@ -6,14 +6,19 @@
 | --- | --- | --- | --- | --- |
 | `1` | Client → Server | `MovementInput` | Do client chọn | Theo input |
 | `101` | Server → Client | `StateSnapshot` | Reliable | Join/leave |
-| `102` | Server → Client | `PlayerDetectionSnapshot` | Unreliable | Mỗi tick |
+| `102` | Server → Client | `PlayerMovementSnapshot` | Unreliable | Mỗi tick |
 | `103` | Server → Client | `CombatEventBatch` | Reliable | Khi có event |
+| `104` | Server → Client | `PlayerRosterBatch` | Reliable | Join/enter detection/roster changed |
+| `105` | Server → Client | `ProjectileMovementSnapshot` | Unreliable | Mỗi tick |
 
 Contract nằm trong các source schema:
 
 - [`input.proto`](../modules/game/core/entity/input.proto)
 - [`state.proto`](../modules/game/core/system/state.proto)
-- [`detection.proto`](../modules/game/core/system/detection.proto)
+- [`player_movement.proto`](../modules/game/core/system/player_movement.proto)
+- [`roster.proto`](../modules/game/core/system/roster.proto)
+- [`projectile_movement.proto`](../modules/game/core/system/projectile_movement.proto)
+- [`vector.proto`](../modules/game/core/system/vector.proto)
 - [`combat.proto`](../modules/game/core/system/combat.proto)
 
 Không đổi hoặc tái sử dụng field number đã phát hành. Field bị xóa trong tương lai cần được đánh dấu `reserved`.
@@ -28,7 +33,7 @@ sequenceDiagram
     Unity->>NakamaSDK: MovementInput.ToByteArray()
     NakamaSDK->>Match: opcode 1 + bytes
     Match->>Match: proto.Unmarshal + simulation
-    Match->>NakamaSDK: opcode 101/102/103 + proto.Marshal bytes
+    Match->>NakamaSDK: opcode 101/102/103/104/105 + proto.Marshal bytes
     NakamaSDK->>Unity: ReceivedMatchState
     Unity->>Unity: Message.Parser.ParseFrom(state.State)
 ```
@@ -56,10 +61,16 @@ socket.ReceivedMatchState += state => {
             Handle(StateSnapshot.Parser.ParseFrom(state.State));
             break;
         case 102:
-            Handle(PlayerDetectionSnapshot.Parser.ParseFrom(state.State));
+            Handle(PlayerMovementSnapshot.Parser.ParseFrom(state.State));
             break;
         case 103:
             Handle(CombatEventBatch.Parser.ParseFrom(state.State));
+            break;
+        case 104:
+            Handle(PlayerRosterBatch.Parser.ParseFrom(state.State));
+            break;
+        case 105:
+            Handle(ProjectileMovementSnapshot.Parser.ParseFrom(state.State));
             break;
     }
 };
@@ -75,7 +86,7 @@ Project dùng Buf remote plugins:
 buf generate
 ```
 
-Go `.pb.go` được giữ trong backend repo. C# được tạo local tại `clients/unity/Generated/Protobuf` và bị Git ignore vì Unity nằm ở repo riêng; copy `Input.cs`, `State.cs`, `Detection.cs`, `Combat.cs` sang Unity sau khi schema thay đổi.
+Go `.pb.go` được giữ trong backend repo. C# được tạo local tại `clients/unity/Generated/Protobuf` và bị Git ignore vì Unity nằm ở repo riêng; copy `Input.cs`, `State.cs`, `PlayerMovement.cs`, `Roster.cs`, `ProjectileMovement.cs`, `Vector.cs`, `Combat.cs` sang Unity sau khi schema thay đổi.
 
 Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf hoặc `protoc` nếu chỉ sử dụng generated `.cs`.
 
@@ -86,4 +97,4 @@ Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf ho�
 - Embedded `weapons.json` và `strategies.json`.
 - RPC `healthcheck` response.
 
-Realtime opcode `1`, `101`, `102`, `103` đều dùng Protobuf binary.
+Realtime opcode `1`, `101`, `102`, `103`, `104`, `105` đều dùng Protobuf binary.

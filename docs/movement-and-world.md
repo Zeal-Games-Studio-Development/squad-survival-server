@@ -51,12 +51,12 @@ dx² + dy² <= radius²
 
 Kết quả loại chính player, bao gồm boundary và sắp theo khoảng cách rồi `SessionID`. Grid chỉ index tâm player, chưa index từng character hoặc projectile.
 
-## Detection Snapshot
+## Movement Snapshots
 
 Opcode `102` gửi riêng mỗi player ở `10 Hz`, `reliable=false`:
 
 - `self`: authoritative state của chính player.
 - `players`: player khác trong detection radius.
-- `projectiles`: projectile có attacker hoặc target thuộc nhóm player đang nhìn thấy.
+- Projectile correction được gửi riêng bằng opcode `105`, chỉ gồm projectile ID và position.
 
 Snapshot rỗng vẫn được gửi để Unity loại entity đã rời vùng detection.

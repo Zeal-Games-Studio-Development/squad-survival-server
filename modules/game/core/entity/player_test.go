@@ -47,6 +47,7 @@ func TestPlayerUsesSlowestCharacterMoveSpeed(t *testing.T) {
 
 func TestPlayerAssignsStableUniqueCharacterIDs(t *testing.T) {
 	player := newTestPlayer(Vector2{})
+	initialVersion := player.RosterVersion
 	firstID := player.Characters[0].ID
 	second := NewCharacter()
 	if err := player.AddCharacter(second); err != nil {
@@ -55,9 +56,15 @@ func TestPlayerAssignsStableUniqueCharacterIDs(t *testing.T) {
 	if firstID != player.UserID+":1" || second.ID != player.UserID+":2" {
 		t.Fatalf("unexpected character IDs: first=%q second=%q", firstID, second.ID)
 	}
+	if player.RosterVersion != initialVersion+1 {
+		t.Fatalf("expected add to increment roster version, got %d", player.RosterVersion)
+	}
 	player.RemoveCharacterAt(0)
 	if second.ID != player.UserID+":2" {
 		t.Fatalf("character ID changed after compaction: %q", second.ID)
+	}
+	if player.RosterVersion != initialVersion+2 {
+		t.Fatalf("expected remove to increment roster version, got %d", player.RosterVersion)
 	}
 }
 

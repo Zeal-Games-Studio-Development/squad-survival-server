@@ -4,7 +4,7 @@ package game.core.system;
 
 option go_package = "squad-survival-be/modules/game/core/system;system";
 
-import "modules/game/core/system/detection.proto";
+import "modules/game/core/system/vector.proto";
 
 message CombatEventBatch {
   int64 tick = 1;

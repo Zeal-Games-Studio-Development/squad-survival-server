@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package game.core.system;
+
+option go_package = "squad-survival-be/modules/game/core/system;system";
+
+message Vector2 {
+  double x = 1;
+  double y = 2;
+}
