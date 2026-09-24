@@ -29,10 +29,10 @@ func TestAssignCharacterTargetsPrioritizesRangeClass(t *testing.T) {
 	if ranged.TargetPosition != (Vector2{}) {
 		t.Fatalf("expected ranged character at center, got %+v", ranged.TargetPosition)
 	}
-	if firstMelee.TargetPosition != (Vector2{X: strategy.SlotSpacing}) {
+	if firstMelee.TargetPosition != (Vector2{X: strategy.SlotSpacing, Y: strategy.SlotSpacing}) {
 		t.Fatalf("unexpected first melee target: %+v", firstMelee.TargetPosition)
 	}
-	if secondMelee.TargetPosition != (Vector2{Y: strategy.SlotSpacing}) {
+	if secondMelee.TargetPosition != (Vector2{X: strategy.SlotSpacing, Y: -strategy.SlotSpacing}) {
 		t.Fatalf("unexpected second melee target: %+v", secondMelee.TargetPosition)
 	}
 }
@@ -50,7 +50,7 @@ func TestEqualRangeClassKeepsCharacterIndexAndRotatesWithFacing(t *testing.T) {
 	if first.TargetPosition != (Vector2{}) {
 		t.Fatalf("expected first ranged character at center, got %+v", first.TargetPosition)
 	}
-	if second.TargetPosition != (Vector2{Y: strategy.SlotSpacing}) {
+	if second.TargetPosition != (Vector2{X: -strategy.SlotSpacing, Y: strategy.SlotSpacing}) {
 		t.Fatalf("expected formation to rotate with facing, got %+v", second.TargetPosition)
 	}
 }

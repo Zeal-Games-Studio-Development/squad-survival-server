@@ -34,9 +34,9 @@ type Player struct {
 }
 
 func NewPlayer(userID, sessionID, displayName string, position Vector2, random *rand.Rand) *Player {
-	definition, ok := strategy.DefaultDefinition(strategy.Compact)
+	definition, ok := strategy.DefaultDefinition(strategy.DefaultStrategyName)
 	if !ok {
-		panic("default compact strategy not found")
+		panic("default strategy not found: " + strategy.DefaultStrategyName)
 	}
 	character := CreateCharacter(random, DefaultWeaponCatalog())
 	player := &Player{
@@ -50,6 +50,7 @@ func NewPlayer(userID, sessionID, displayName string, position Vector2, random *
 		Strategy:        definition,
 	}
 	player.assignCharacterID(character)
+
 	if err := AssignCharacterTargets(player); err != nil {
 		panic("could not initialize player strategy: " + err.Error())
 	}

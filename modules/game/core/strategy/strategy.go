@@ -15,7 +15,8 @@ const (
 	GridCenter    = GridSize / 2
 	MaxCharacters = 5
 	SlotSpacing   = 1.5
-	Compact       = "compact"
+
+	DefaultStrategyName = "x-type"
 )
 
 type Definition struct {
