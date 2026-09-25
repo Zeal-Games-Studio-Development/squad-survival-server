@@ -1,0 +1,19 @@
+{
+  "parts": [
+    { "type": "hair", "prefix": "r", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26], "exclusive_ids": [] },
+    { "type": "beard", "prefix": "b", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "exclusive_ids": [] },
+    { "type": "axe", "prefix": "ax", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "exclusive_ids": [] },
+    { "type": "arrow", "prefix": "ar", "ids": [1, 2, 3, 4, 5, 6, 7, 8], "exclusive_ids": [] },
+    { "type": "blunt", "prefix": "bl", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9], "exclusive_ids": [] },
+    { "type": "bow", "prefix": "bw", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "exclusive_ids": [] },
+    { "type": "chest", "prefix": "c", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29], "exclusive_ids": [] },
+    { "type": "crossbow", "prefix": "cb", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9], "exclusive_ids": [] },
+    { "type": "eye", "prefix": "e", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18], "exclusive_ids": [] },
+    { "type": "helmet", "prefix": "h", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40], "exclusive_ids": [] },
+    { "type": "shield", "prefix": "sh", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "exclusive_ids": [] },
+    { "type": "spear", "prefix": "sp", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "exclusive_ids": [] },
+    { "type": "staff", "prefix": "st", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], "exclusive_ids": [] },
+    { "type": "sword", "prefix": "sw", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19], "exclusive_ids": [] },
+    { "type": "wand", "prefix": "wn", "ids": [1, 2, 3, 4, 5, 6, 7, 8, 9], "exclusive_ids": [] }
+  ]
+}
