@@ -69,7 +69,7 @@ var (
 	prefixPattern   = regexp.MustCompile(`^[a-z][a-z0-9]*$`)
 )
 
-//go:embed items.json
+//go:embed skins.json
 var defaultCatalogJSON []byte
 
 // ParseCatalog parses and validates an item catalog.

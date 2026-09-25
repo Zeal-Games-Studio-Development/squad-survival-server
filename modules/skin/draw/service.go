@@ -1,4 +1,4 @@
-package skindraw
+package draw
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"time"
 
-	"squad-survival-be/modules/catalog"
+	"squad-survival-be/modules/skin/catalog"
 
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"

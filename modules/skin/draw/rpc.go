@@ -1,4 +1,4 @@
-package skindraw
+package draw
 
 import (
 	"context"

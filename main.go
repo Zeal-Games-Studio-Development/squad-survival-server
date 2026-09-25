@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql"
 
-	"squad-survival-be/modules/catalog"
 	"squad-survival-be/modules/economy"
 	"squad-survival-be/modules/game/matchmaking"
 	"squad-survival-be/modules/game/matchregistry"
 	"squad-survival-be/modules/game/survival"
-	"squad-survival-be/modules/skindraw"
+	skincatalog "squad-survival-be/modules/skin/catalog"
+	skindraw "squad-survival-be/modules/skin/draw"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 )
@@ -22,7 +22,7 @@ func InitModule(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.N
 	if err := economy.Register(initializer, economyService); err != nil {
 		return err
 	}
-	itemCatalog := catalog.DefaultCatalog()
+	itemCatalog := skincatalog.DefaultCatalog()
 	skinDrawService, err := skindraw.NewService(itemCatalog)
 	if err != nil {
 		return err

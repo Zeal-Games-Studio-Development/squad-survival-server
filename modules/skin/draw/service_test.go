@@ -1,4 +1,4 @@
-package skindraw
+package draw
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"squad-survival-be/modules/catalog"
+	skincatalog "squad-survival-be/modules/skin/catalog"
 
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -101,7 +101,7 @@ func cloneWallet(wallet map[string]int64) map[string]int64 {
 	return copy
 }
 
-func testService(t *testing.T, itemCatalog *catalog.Catalog) *Service {
+func testService(t *testing.T, itemCatalog *skincatalog.Catalog) *Service {
 	t.Helper()
 	service, err := NewServiceWithDependencies(itemCatalog, zeroRandom{}, func() time.Time {
 		return time.Unix(1_790_265_600, 0)
@@ -113,7 +113,7 @@ func testService(t *testing.T, itemCatalog *catalog.Catalog) *Service {
 }
 
 func TestDrawSingleAtomicallyChargesAndStoresItem(t *testing.T) {
-	service := testService(t, catalog.DefaultCatalog())
+	service := testService(t, skincatalog.DefaultCatalog())
 	store := newFakeStore(1_000)
 
 	response, err := service.Draw(context.Background(), store, "user-1", Request{RequestID: testRequestID, DrawCount: 1})
@@ -146,7 +146,7 @@ func TestDrawSingleAtomicallyChargesAndStoresItem(t *testing.T) {
 }
 
 func TestDrawTenReturnsUniqueItemsAndUsesDiscount(t *testing.T) {
-	service := testService(t, catalog.DefaultCatalog())
+	service := testService(t, skincatalog.DefaultCatalog())
 	store := newFakeStore(1_000)
 	response, err := service.Draw(context.Background(), store, "user-1", Request{RequestID: testRequestID, DrawCount: 10})
 	if err != nil {
@@ -165,7 +165,7 @@ func TestDrawTenReturnsUniqueItemsAndUsesDiscount(t *testing.T) {
 }
 
 func TestDrawExcludesOwnedAndExclusiveItems(t *testing.T) {
-	itemCatalog, err := catalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[1,2,3],"exclusive_ids":[2]}]}`))
+	itemCatalog, err := skincatalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[1,2,3],"exclusive_ids":[2]}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,14 +183,14 @@ func TestDrawExcludesOwnedAndExclusiveItems(t *testing.T) {
 }
 
 func TestDrawRejectsInsufficientGemsAndPoolWithoutMutation(t *testing.T) {
-	service := testService(t, catalog.DefaultCatalog())
+	service := testService(t, skincatalog.DefaultCatalog())
 	store := newFakeStore(99)
 	_, err := service.Draw(context.Background(), store, "user-1", Request{RequestID: testRequestID, DrawCount: 1})
 	if !errors.Is(err, ErrInsufficientGems) || store.object != nil || store.wallet[GemCurrency] != 99 {
 		t.Fatalf("insufficient gems result: err=%v object=%#v wallet=%#v", err, store.object, store.wallet)
 	}
 
-	smallCatalog, _ := catalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[1,2,3]}]}`))
+	smallCatalog, _ := skincatalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[1,2,3]}]}`))
 	service = testService(t, smallCatalog)
 	store = newFakeStore(1_000)
 	_, err = service.Draw(context.Background(), store, "user-1", Request{RequestID: testRequestID, DrawCount: 10})
@@ -200,7 +200,7 @@ func TestDrawRejectsInsufficientGemsAndPoolWithoutMutation(t *testing.T) {
 }
 
 func TestDrawIsIdempotent(t *testing.T) {
-	service := testService(t, catalog.DefaultCatalog())
+	service := testService(t, skincatalog.DefaultCatalog())
 	store := newFakeStore(1_000)
 	first, err := service.Draw(context.Background(), store, "user-1", Request{RequestID: testRequestID, DrawCount: 1})
 	if err != nil {
@@ -216,7 +216,7 @@ func TestDrawIsIdempotent(t *testing.T) {
 }
 
 func TestDrawRetriesVersionConflict(t *testing.T) {
-	service := testService(t, catalog.DefaultCatalog())
+	service := testService(t, skincatalog.DefaultCatalog())
 	store := newFakeStore(1_000)
 	store.failMultiCount = 1
 	if _, err := service.Draw(context.Background(), store, "user-1", Request{RequestID: testRequestID, DrawCount: 1}); err != nil {
@@ -228,7 +228,7 @@ func TestDrawRetriesVersionConflict(t *testing.T) {
 }
 
 func TestDrawTrimsProcessedRequestHistory(t *testing.T) {
-	service := testService(t, catalog.DefaultCatalog())
+	service := testService(t, skincatalog.DefaultCatalog())
 	store := newFakeStore(1_000)
 	inventory := Inventory{Items: make(map[string]InventoryItem)}
 	for i := 0; i < MaxProcessedRequests; i++ {
@@ -248,7 +248,7 @@ func TestDrawTrimsProcessedRequestHistory(t *testing.T) {
 }
 
 func TestDrawRejectsInvalidRequestAndInventory(t *testing.T) {
-	service := testService(t, catalog.DefaultCatalog())
+	service := testService(t, skincatalog.DefaultCatalog())
 	store := newFakeStore(1_000)
 	invalidRequests := []Request{{RequestID: "not-a-uuid", DrawCount: 1}, {RequestID: testRequestID, DrawCount: 2}}
 	for _, request := range invalidRequests {
