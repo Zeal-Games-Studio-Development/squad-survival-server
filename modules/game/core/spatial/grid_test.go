@@ -93,6 +93,54 @@ func TestRemoveAndLifecycleErrors(t *testing.T) {
 	}
 }
 
+func TestQueryCharacterBoxesFiltersRadiusSortsAndRemoves(t *testing.T) {
+	grid := NewGrid(20)
+	boxes := []*entity.CharacterBox{
+		entity.NewCharacterBox("box:b", entity.Vector2{X: 0.6, Y: 0.8}, entity.WeaponBow),
+		entity.NewCharacterBox("box:a", entity.Vector2{X: -0.6, Y: -0.8}, entity.WeaponSword),
+		entity.NewCharacterBox("box:outside", entity.Vector2{X: 1.01}, entity.WeaponAxe),
+		entity.NewCharacterBox("box:negative", entity.Vector2{X: -0.1}, entity.WeaponWand),
+	}
+	for _, box := range boxes {
+		if err := grid.InsertCharacterBox(box); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := grid.QueryCharacterBoxes(entity.Vector2{}, 1)
+	want := []string{"box:negative", "box:a", "box:b"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d boxes, got %#v", len(want), got)
+	}
+	for i, id := range want {
+		if got[i].ID != id {
+			t.Fatalf("result %d: got %q, want %q", i, got[i].ID, id)
+		}
+	}
+	if !grid.RemoveCharacterBox("box:a") || grid.RemoveCharacterBox("box:a") {
+		t.Fatal("unexpected character box remove result")
+	}
+	if got := grid.QueryCharacterBoxes(entity.Vector2{}, 1); len(got) != 2 {
+		t.Fatalf("removed box remains indexed: %#v", got)
+	}
+}
+
+func TestCharacterBoxLifecycleErrors(t *testing.T) {
+	grid := NewGrid(20)
+	if err := grid.InsertCharacterBox(nil); !errors.Is(err, ErrNilCharacterBox) {
+		t.Fatalf("expected nil box error, got %v", err)
+	}
+	if err := grid.InsertCharacterBox(&entity.CharacterBox{}); !errors.Is(err, ErrEmptyBoxID) {
+		t.Fatalf("expected empty box ID error, got %v", err)
+	}
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
+	if err := grid.InsertCharacterBox(box); err != nil {
+		t.Fatal(err)
+	}
+	if err := grid.InsertCharacterBox(box); !errors.Is(err, ErrBoxExists) {
+		t.Fatalf("expected duplicate box error, got %v", err)
+	}
+}
+
 func player(sessionID string, x, y float64) *entity.Player {
 	return entity.NewPlayer(sessionID, sessionID, sessionID, entity.Vector2{X: x, Y: y}, rand.New(rand.NewSource(1)))
 }

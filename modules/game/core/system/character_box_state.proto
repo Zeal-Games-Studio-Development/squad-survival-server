@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package game.core.system;
+
+option go_package = "squad-survival-be/modules/game/core/system;system";
+
+import "modules/game/core/entity/character_box.proto";
+import "modules/game/core/system/vector.proto";
+
+enum CharacterBoxEventType {
+  CHARACTER_BOX_EVENT_TYPE_UNSPECIFIED = 0;
+  CHARACTER_BOX_EVENT_TYPE_SPAWNED = 1;
+  CHARACTER_BOX_EVENT_TYPE_DESPAWNED = 2;
+}
+
+message CharacterBoxStateBatch {
+  int64 tick = 1;
+  repeated CharacterBoxStateEvent events = 2;
+}
+
+message CharacterBoxStateEvent {
+  CharacterBoxEventType event_type = 1;
+  string box_id = 2;
+  Vector2 position = 3;
+  game.core.entity.CharacterBoxValue value = 4;
+}

@@ -7,4 +7,5 @@ const (
 	OpCombatEventBatch           int64 = 103
 	OpPlayerRosterBatch          int64 = 104
 	OpProjectileMovementSnapshot int64 = 105
+	OpCharacterBoxState          int64 = 106
 )

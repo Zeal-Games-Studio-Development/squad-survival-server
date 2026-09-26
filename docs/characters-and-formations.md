@@ -51,6 +51,10 @@ character.MoveSpeed * 1.5
 
 Character không overshoot và không teleport khi formation/facing đổi. Character đầu tiên khi player spawn được snap vào slot khởi tạo.
 
+## Character Box
+
+Match duy trì 18–24 Character Box tĩnh và mỗi phút bù lại đến một target ngẫu nhiên trong khoảng này. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính 1, server tự động tạo character với đầy đủ weapon stats và consume box; player đã đầy formation không consume box. Spawn/despawn được gửi reliable toàn match qua opcode `106`.
+
 ## Giới Hạn Hiện Tại
 
 - Client chưa có opcode chọn strategy; mọi player dùng `compact`.

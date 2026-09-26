@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"math"
 	"math/rand"
 	"sort"
+	"strconv"
 	"time"
 
 	"squad-survival-be/modules/game/core/combat"
@@ -21,13 +23,18 @@ import (
 
 // Config của mode survival, có thể thay đổi được thông qua params khi tạo match.
 const (
-	ModuleName            = "survival"
-	DefaultMode           = "survival"
-	MaxPlayers            = 32
-	tickRate              = entity.TickRate
-	reservationTTLSeconds = 10
-	emptyMatchTTLSeconds  = 60
-	spatialCellSize       = 20.0
+	ModuleName                  = "survival"
+	DefaultMode                 = "survival"
+	MaxPlayers                  = 32
+	tickRate                    = entity.TickRate
+	reservationTTLSeconds       = 10
+	emptyMatchTTLSeconds        = 60
+	spatialCellSize             = 20.0
+	characterBoxMinCount        = 18
+	characterBoxMaxCount        = 24
+	characterBoxRefillTicks     = 60 * tickRate
+	characterBoxSpawnSeparation = 4.0
+	characterBoxSpawnAttempts   = 100
 )
 
 type Match struct {
@@ -44,6 +51,10 @@ type State struct {
 	SpatialGrid         *spatial.Grid
 	Combat              *combat.Simulation
 	RosterVersions      map[string]map[string]uint64
+	CharacterBoxes      map[string]*entity.CharacterBox
+	WeaponCatalog       []entity.Weapon
+	NextCharacterBoxID  uint64
+	NextBoxRefillTick   int64
 	EmptyTicks          int64
 	random              *rand.Rand
 }
@@ -73,7 +84,15 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		SpatialGrid:         spatial.NewGrid(spatialCellSize),
 		Combat:              combat.NewSimulation(),
 		RosterVersions:      make(map[string]map[string]uint64),
+		CharacterBoxes:      make(map[string]*entity.CharacterBox),
+		WeaponCatalog:       entity.DefaultWeaponCatalog(),
+		NextBoxRefillTick:   characterBoxRefillTicks,
 		random:              rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+	initialBoxTarget := state.randomCharacterBoxTarget()
+	state.spawnCharacterBoxes(initialBoxTarget)
+	if len(state.CharacterBoxes) < initialBoxTarget {
+		logger.Warn("Could not place all initial character boxes: target=%d spawned=%d", initialBoxTarget, len(state.CharacterBoxes))
 	}
 	logger.Info("Survival match initialized: mode=%s max_players=%d", state.Mode, MaxPlayers)
 	return state, tickRate, state.label()
@@ -125,7 +144,7 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 			presence.GetUserId(),
 			presence.GetSessionId(),
 			displayNames[presence.GetUserId()],
-			world.RandomSpawn(state.random),
+			state.randomPlayerSpawn(),
 			state.random,
 		)
 		if err = state.SpatialGrid.Insert(player); err != nil {
@@ -138,6 +157,7 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		state.Players[presence.GetSessionId()] = player
 		state.Presences[presence.GetSessionId()] = presence
 		state.sendInitialRoster(logger, dispatcher, tick, presence, player)
+		state.sendCurrentCharacterBoxes(logger, dispatcher, tick, presence)
 	}
 	state.EmptyTicks = 0
 	state.updateLabel(dispatcher)
@@ -196,6 +216,7 @@ func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, 
 
 func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, rawState interface{}, messages []runtime.MatchData) interface{} {
 	state := rawState.(*State)
+	state.ensureCharacterBoxState(tick)
 	if state.expireReservations(tick) {
 		state.updateLabel(dispatcher)
 	}
@@ -225,6 +246,16 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 			logger.Error("Could not move player in spatial grid: session_id=%s error=%v", player.SessionID, err)
 		}
 	}
+	boxEvents := state.collectCharacterBoxes(logger)
+	if tick >= state.NextBoxRefillTick {
+		target := state.randomCharacterBoxTarget()
+		boxEvents = append(boxEvents, state.spawnCharacterBoxes(target)...)
+		if len(state.CharacterBoxes) < target && logger != nil {
+			logger.Warn("Could not refill all character boxes: target=%d current=%d", target, len(state.CharacterBoxes))
+		}
+		state.NextBoxRefillTick = tick + characterBoxRefillTicks
+	}
+	state.broadcastCharacterBoxEvents(logger, dispatcher, tick, boxEvents, nil)
 	nearbyPlayers := state.queryNearbyPlayers()
 	state.broadcastRosterUpdates(logger, dispatcher, tick, nearbyPlayers)
 	if state.Combat == nil {
@@ -247,6 +278,21 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	}
 
 	return state
+}
+
+func (s *State) ensureCharacterBoxState(tick int64) {
+	if s.CharacterBoxes == nil {
+		s.CharacterBoxes = make(map[string]*entity.CharacterBox)
+	}
+	if len(s.WeaponCatalog) == 0 {
+		s.WeaponCatalog = entity.DefaultWeaponCatalog()
+	}
+	if s.random == nil {
+		s.random = rand.New(rand.NewSource(tick))
+	}
+	if s.NextBoxRefillTick == 0 {
+		s.NextBoxRefillTick = tick + characterBoxRefillTicks
+	}
 }
 
 func (m *Match) MatchTerminate(ctx context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, _ int64, rawState interface{}, _ int) interface{} {
@@ -298,6 +344,160 @@ func (s *State) queryNearbyPlayers() map[string][]*entity.Player {
 		nearbyPlayers[sessionID] = s.SpatialGrid.QueryPlayers(player)
 	}
 	return nearbyPlayers
+}
+
+func (s *State) randomCharacterBoxTarget() int {
+	return characterBoxMinCount + s.random.Intn(characterBoxMaxCount-characterBoxMinCount+1)
+}
+
+func (s *State) spawnCharacterBoxes(target int) []system.CharacterBoxEvent {
+	if target <= len(s.CharacterBoxes) || len(s.WeaponCatalog) == 0 {
+		return nil
+	}
+	events := make([]system.CharacterBoxEvent, 0, target-len(s.CharacterBoxes))
+	for len(s.CharacterBoxes) < target {
+		position, ok := s.randomCharacterBoxSpawn()
+		if !ok {
+			break
+		}
+		s.NextCharacterBoxID++
+		weapon := s.WeaponCatalog[s.random.Intn(len(s.WeaponCatalog))]
+		box := entity.NewCharacterBox("box:"+strconv.FormatUint(s.NextCharacterBoxID, 10), position, weapon.Type)
+		if err := s.SpatialGrid.InsertCharacterBox(box); err != nil {
+			continue
+		}
+		s.CharacterBoxes[box.ID] = box
+		events = append(events, system.SpawnedCharacterBox(box))
+	}
+	return events
+}
+
+func (s *State) randomCharacterBoxSpawn() (entity.Vector2, bool) {
+	for range characterBoxSpawnAttempts {
+		position := world.RandomSpawn(s.random)
+		if len(s.SpatialGrid.QueryCharacterBoxes(position, characterBoxSpawnSeparation)) != 0 {
+			continue
+		}
+		blocked := false
+		for _, player := range s.Players {
+			if player != nil && distanceSquared(position, player.Position) < characterBoxSpawnSeparation*characterBoxSpawnSeparation {
+				blocked = true
+				break
+			}
+		}
+		if !blocked {
+			return position, true
+		}
+	}
+	return entity.Vector2{}, false
+}
+
+func (s *State) randomPlayerSpawn() entity.Vector2 {
+	for range characterBoxSpawnAttempts {
+		position := world.RandomSpawn(s.random)
+		if len(s.SpatialGrid.QueryCharacterBoxes(position, characterBoxSpawnSeparation)) == 0 {
+			return position
+		}
+	}
+	return world.RandomSpawn(s.random)
+}
+
+type boxCollisionCandidate struct {
+	player          *entity.Player
+	distanceSquared float64
+}
+
+func (s *State) collectCharacterBoxes(logger runtime.Logger) []system.CharacterBoxEvent {
+	candidates := make(map[string][]boxCollisionCandidate)
+	for _, player := range s.Players {
+		if player == nil {
+			continue
+		}
+		for _, box := range s.SpatialGrid.QueryCharacterBoxes(player.Position, entity.CharacterBoxCollisionRadius) {
+			candidates[box.ID] = append(candidates[box.ID], boxCollisionCandidate{
+				player: player, distanceSquared: distanceSquared(player.Position, box.Position),
+			})
+		}
+	}
+	boxIDs := make([]string, 0, len(candidates))
+	for boxID := range candidates {
+		boxIDs = append(boxIDs, boxID)
+	}
+	sort.Strings(boxIDs)
+	events := make([]system.CharacterBoxEvent, 0, len(boxIDs))
+	for _, boxID := range boxIDs {
+		box := s.CharacterBoxes[boxID]
+		if box == nil {
+			continue
+		}
+		collisions := candidates[boxID]
+		sort.Slice(collisions, func(i, j int) bool {
+			if collisions[i].distanceSquared == collisions[j].distanceSquared {
+				return collisions[i].player.SessionID < collisions[j].player.SessionID
+			}
+			return collisions[i].distanceSquared < collisions[j].distanceSquared
+		})
+		weapon, ok := s.weaponByType(box.WeaponType())
+		if !ok {
+			if logger != nil {
+				logger.Error("Character box has unknown weapon: box_id=%s weapon_type=%s", box.ID, box.WeaponType())
+			}
+			continue
+		}
+		for _, collision := range collisions {
+			character := entity.NewCharacter()
+			character.ApplyWeapon(weapon)
+			if err := collision.player.AddCharacter(character); err != nil {
+				continue
+			}
+			delete(s.CharacterBoxes, box.ID)
+			s.SpatialGrid.RemoveCharacterBox(box.ID)
+			events = append(events, system.DespawnedCharacterBox(box.ID))
+			break
+		}
+	}
+	return events
+}
+
+func (s *State) weaponByType(weaponType entity.WeaponType) (entity.Weapon, bool) {
+	for _, weapon := range s.WeaponCatalog {
+		if weapon.Type == weaponType {
+			return weapon, true
+		}
+	}
+	return entity.Weapon{}, false
+}
+
+func (s *State) sendCurrentCharacterBoxes(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, presence runtime.Presence) {
+	boxIDs := make([]string, 0, len(s.CharacterBoxes))
+	for boxID := range s.CharacterBoxes {
+		boxIDs = append(boxIDs, boxID)
+	}
+	sort.Strings(boxIDs)
+	events := make([]system.CharacterBoxEvent, 0, len(boxIDs))
+	for _, boxID := range boxIDs {
+		events = append(events, system.SpawnedCharacterBox(s.CharacterBoxes[boxID]))
+	}
+	s.broadcastCharacterBoxEvents(logger, dispatcher, tick, events, []runtime.Presence{presence})
+}
+
+func (s *State) broadcastCharacterBoxEvents(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, events []system.CharacterBoxEvent, presences []runtime.Presence) {
+	if len(events) == 0 {
+		return
+	}
+	payload, err := system.EncodeCharacterBoxStateBatch(tick, events)
+	if err == nil {
+		err = dispatcher.BroadcastMessage(system.OpCharacterBoxState, payload, presences, nil, true)
+	}
+	if err != nil && logger != nil {
+		logger.Error("Could not send character box state: %v", err)
+	}
+}
+
+func distanceSquared(a, b entity.Vector2) float64 {
+	deltaX := b.X - a.X
+	deltaY := b.Y - a.Y
+	return math.FMA(deltaX, deltaX, deltaY*deltaY)
 }
 
 func (s *State) broadcastCombatEvents(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, events []combat.Event, nearbyPlayers map[string][]*entity.Player) {

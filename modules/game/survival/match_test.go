@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"squad-survival-be/modules/game/core/combat"
 	"squad-survival-be/modules/game/core/entity"
 	"squad-survival-be/modules/game/core/spatial"
 	"squad-survival-be/modules/game/core/system"
@@ -546,6 +547,153 @@ func TestMatchLoopSendsReliableCombatEventsToRelevantViewers(t *testing.T) {
 	}
 	if movementCount != 3 || projectileMovementCount != 3 {
 		t.Fatalf("unexpected movement snapshots: players=%d projectiles=%d", movementCount, projectileMovementCount)
+	}
+}
+
+func TestCharacterBoxInitialSpawnIsValid(t *testing.T) {
+	state := characterBoxTestState(7)
+	events := state.spawnCharacterBoxes(24)
+	if len(events) != 24 || len(state.CharacterBoxes) != 24 {
+		t.Fatalf("unexpected box count: events=%d boxes=%d", len(events), len(state.CharacterBoxes))
+	}
+	seen := make(map[string]bool)
+	boxes := make([]*entity.CharacterBox, 0, len(state.CharacterBoxes))
+	for id, box := range state.CharacterBoxes {
+		if seen[id] || box.WeaponType() == "" {
+			t.Fatalf("invalid character box: %#v", box)
+		}
+		seen[id] = true
+		if _, ok := state.weaponByType(box.WeaponType()); !ok {
+			t.Fatalf("box has unknown weapon: %#v", box)
+		}
+		boxes = append(boxes, box)
+	}
+	for i := range boxes {
+		for j := i + 1; j < len(boxes); j++ {
+			if distanceSquared(boxes[i].Position, boxes[j].Position) < characterBoxSpawnSeparation*characterBoxSpawnSeparation {
+				t.Fatalf("boxes overlap: %s and %s", boxes[i].ID, boxes[j].ID)
+			}
+		}
+	}
+}
+
+func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.T) {
+	state := characterBoxTestState(1)
+	far := entity.NewPlayer("user-far", "session-far", "Far", entity.Vector2{X: 0.8}, rand.New(rand.NewSource(2)))
+	near := entity.NewPlayer("user-near", "session-near", "Near", entity.Vector2{X: 0.2}, rand.New(rand.NewSource(3)))
+	state.Players[far.SessionID] = far
+	state.Players[near.SessionID] = near
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
+	state.CharacterBoxes[box.ID] = box
+	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
+		t.Fatal(err)
+	}
+	initialVersion := near.RosterVersion
+	events := state.collectCharacterBoxes(nil)
+	if len(events) != 1 || events[0].ID != box.ID || events[0].Type != system.CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_DESPAWNED {
+		t.Fatalf("unexpected collision events: %#v", events)
+	}
+	if len(far.Characters) != 1 || len(near.Characters) != 2 || near.RosterVersion != initialVersion+1 {
+		t.Fatalf("wrong player received box: far=%d near=%d version=%d", len(far.Characters), len(near.Characters), near.RosterVersion)
+	}
+	awarded := near.Characters[len(near.Characters)-1]
+	weapon, _ := state.weaponByType(entity.WeaponBow)
+	if awarded.Weapon.Type != entity.WeaponBow || awarded.MaxHealth != weapon.Health || awarded.Damage != weapon.Damage {
+		t.Fatalf("character did not receive weapon stats: %#v", awarded)
+	}
+	if _, exists := state.CharacterBoxes[box.ID]; exists || len(state.SpatialGrid.QueryCharacterBoxes(entity.Vector2{}, 1)) != 0 {
+		t.Fatal("consumed box remains in state or spatial grid")
+	}
+
+	dispatcher := &testDispatcher{}
+	state.broadcastCharacterBoxEvents(nil, dispatcher, 9, events, nil)
+	if len(dispatcher.broadcasts) != 1 || dispatcher.broadcasts[0].opCode != system.OpCharacterBoxState || !dispatcher.broadcasts[0].reliable || dispatcher.broadcasts[0].presences != nil {
+		t.Fatalf("despawn was not globally broadcast: %#v", dispatcher.broadcasts)
+	}
+}
+
+func TestCharacterBoxRemainsWhenPlayerIsAtCapacity(t *testing.T) {
+	state := characterBoxTestState(1)
+	player := entity.NewPlayer("user-1", "session-1", "Full", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	for player.CharacterCount() < 5 {
+		if err := player.AddCharacter(entity.NewCharacter()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	state.Players[player.SessionID] = player
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe)
+	state.CharacterBoxes[box.ID] = box
+	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
+		t.Fatal(err)
+	}
+	if events := state.collectCharacterBoxes(nil); len(events) != 0 {
+		t.Fatalf("full player consumed box: %#v", events)
+	}
+	if state.CharacterBoxes[box.ID] == nil {
+		t.Fatal("box was removed for full player")
+	}
+}
+
+func TestCharacterBoxCollisionTieBreaksBySessionID(t *testing.T) {
+	state := characterBoxTestState(1)
+	playerB := entity.NewPlayer("user-b", "session-b", "B", entity.Vector2{X: 0.5}, rand.New(rand.NewSource(2)))
+	playerA := entity.NewPlayer("user-a", "session-a", "A", entity.Vector2{X: -0.5}, rand.New(rand.NewSource(3)))
+	state.Players[playerB.SessionID] = playerB
+	state.Players[playerA.SessionID] = playerA
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponStaff)
+	state.CharacterBoxes[box.ID] = box
+	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
+		t.Fatal(err)
+	}
+	state.collectCharacterBoxes(nil)
+	if len(playerA.Characters) != 2 || len(playerB.Characters) != 1 {
+		t.Fatalf("session ID tie-break failed: player-a=%d player-b=%d", len(playerA.Characters), len(playerB.Characters))
+	}
+}
+
+func TestCharacterBoxRefillAndJoinSnapshot(t *testing.T) {
+	state := characterBoxTestState(4)
+	state.spawnCharacterBoxes(18)
+	dispatcher := &testDispatcher{}
+	presence := testPresence{userID: "user-1", sessionID: "session-1"}
+	state.sendCurrentCharacterBoxes(nil, dispatcher, 10, presence)
+	if len(dispatcher.broadcasts) != 1 || len(dispatcher.broadcasts[0].presences) != 1 || dispatcher.broadcasts[0].presences[0].GetSessionId() != presence.sessionID {
+		t.Fatalf("join snapshot was not targeted: %#v", dispatcher.broadcasts)
+	}
+	var batch system.CharacterBoxStateBatch
+	if err := proto.Unmarshal(dispatcher.broadcasts[0].data, &batch); err != nil {
+		t.Fatal(err)
+	}
+	if len(batch.Events) != 18 {
+		t.Fatalf("join snapshot has %d boxes, want 18", len(batch.Events))
+	}
+
+	state.NextBoxRefillTick = 600
+	dispatcher.broadcasts = nil
+	match := &Match{}
+	match.MatchLoop(nil, nil, nil, nil, dispatcher, 600, state, nil)
+	if len(state.CharacterBoxes) < characterBoxMinCount || len(state.CharacterBoxes) > characterBoxMaxCount {
+		t.Fatalf("refill produced invalid count: %d", len(state.CharacterBoxes))
+	}
+	count := len(state.CharacterBoxes)
+	match.MatchLoop(nil, nil, nil, nil, dispatcher, 601, state, nil)
+	if len(state.CharacterBoxes) != count {
+		t.Fatalf("boxes refilled before next interval: before=%d after=%d", count, len(state.CharacterBoxes))
+	}
+}
+
+func characterBoxTestState(seed int64) *State {
+	return &State{
+		Players:           make(map[string]*entity.Player),
+		Presences:         make(map[string]runtime.Presence),
+		Reservations:      make(map[string]int64),
+		SpatialGrid:       spatial.NewGrid(spatialCellSize),
+		Combat:            combat.NewSimulation(),
+		RosterVersions:    make(map[string]map[string]uint64),
+		CharacterBoxes:    make(map[string]*entity.CharacterBox),
+		WeaponCatalog:     entity.DefaultWeaponCatalog(),
+		NextBoxRefillTick: characterBoxRefillTicks,
+		random:            rand.New(rand.NewSource(seed)),
 	}
 }
 

@@ -9,10 +9,13 @@ import (
 )
 
 var (
-	ErrNilPlayer      = errors.New("player is nil")
-	ErrEmptySessionID = errors.New("player session ID is empty")
-	ErrPlayerExists   = errors.New("player already exists in spatial grid")
-	ErrPlayerNotFound = errors.New("player does not exist in spatial grid")
+	ErrNilPlayer       = errors.New("player is nil")
+	ErrEmptySessionID  = errors.New("player session ID is empty")
+	ErrPlayerExists    = errors.New("player already exists in spatial grid")
+	ErrPlayerNotFound  = errors.New("player does not exist in spatial grid")
+	ErrNilCharacterBox = errors.New("character box is nil")
+	ErrEmptyBoxID      = errors.New("character box ID is empty")
+	ErrBoxExists       = errors.New("character box already exists in spatial grid")
 )
 
 type cell struct {
@@ -21,9 +24,11 @@ type cell struct {
 }
 
 type Grid struct {
-	cellSize  float64
-	cells     map[cell]map[string]*entity.Player
-	locations map[string]cell
+	cellSize     float64
+	cells        map[cell]map[string]*entity.Player
+	locations    map[string]cell
+	boxCells     map[cell]map[string]*entity.CharacterBox
+	boxLocations map[string]cell
 }
 
 func NewGrid(cellSize float64) *Grid {
@@ -31,10 +36,82 @@ func NewGrid(cellSize float64) *Grid {
 		panic("spatial grid cell size must be finite and greater than zero")
 	}
 	return &Grid{
-		cellSize:  cellSize,
-		cells:     make(map[cell]map[string]*entity.Player),
-		locations: make(map[string]cell),
+		cellSize:     cellSize,
+		cells:        make(map[cell]map[string]*entity.Player),
+		locations:    make(map[string]cell),
+		boxCells:     make(map[cell]map[string]*entity.CharacterBox),
+		boxLocations: make(map[string]cell),
 	}
+}
+
+func (g *Grid) InsertCharacterBox(box *entity.CharacterBox) error {
+	if box == nil {
+		return ErrNilCharacterBox
+	}
+	if box.ID == "" {
+		return ErrEmptyBoxID
+	}
+	if _, exists := g.boxLocations[box.ID]; exists {
+		return ErrBoxExists
+	}
+	location := g.cellAt(box.Position)
+	if g.boxCells[location] == nil {
+		g.boxCells[location] = make(map[string]*entity.CharacterBox)
+	}
+	g.boxCells[location][box.ID] = box
+	g.boxLocations[box.ID] = location
+	return nil
+}
+
+func (g *Grid) RemoveCharacterBox(boxID string) bool {
+	location, exists := g.boxLocations[boxID]
+	if !exists {
+		return false
+	}
+	delete(g.boxLocations, boxID)
+	delete(g.boxCells[location], boxID)
+	if len(g.boxCells[location]) == 0 {
+		delete(g.boxCells, location)
+	}
+	return true
+}
+
+// QueryCharacterBoxes returns boxes within radius ordered by distance then ID.
+func (g *Grid) QueryCharacterBoxes(position entity.Vector2, radius float64) []*entity.CharacterBox {
+	if radius < 0 || math.IsNaN(radius) || math.IsInf(radius, 0) {
+		return nil
+	}
+	radiusSquared := radius * radius
+	minCell := g.cellAt(entity.Vector2{X: position.X - radius, Y: position.Y - radius})
+	maxCell := g.cellAt(entity.Vector2{X: position.X + radius, Y: position.Y + radius})
+	type result struct {
+		box             *entity.CharacterBox
+		distanceSquared float64
+	}
+	results := make([]result, 0)
+	for x := minCell.X; x <= maxCell.X; x++ {
+		for y := minCell.Y; y <= maxCell.Y; y++ {
+			for _, box := range g.boxCells[cell{X: x, Y: y}] {
+				deltaX := box.Position.X - position.X
+				deltaY := box.Position.Y - position.Y
+				distanceSquared := deltaX*deltaX + deltaY*deltaY
+				if distanceSquared <= radiusSquared {
+					results = append(results, result{box: box, distanceSquared: distanceSquared})
+				}
+			}
+		}
+	}
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].distanceSquared == results[j].distanceSquared {
+			return results[i].box.ID < results[j].box.ID
+		}
+		return results[i].distanceSquared < results[j].distanceSquared
+	})
+	boxes := make([]*entity.CharacterBox, len(results))
+	for index, result := range results {
+		boxes[index] = result.box
+	}
+	return boxes
 }
 
 func (g *Grid) Insert(player *entity.Player) error {
