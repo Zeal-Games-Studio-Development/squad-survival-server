@@ -65,6 +65,9 @@ func NewPlayer(userID, sessionID, displayName string, position Vector2, random *
 }
 
 func ApplyMovementInput(player *Player, input *MovementInput, tick int64) bool {
+	if player.IsEliminated() {
+		return false
+	}
 	if player.HasSequence && input.Sequence <= player.LastSequence {
 		return false
 	}
@@ -84,6 +87,10 @@ func ApplyMovementInput(player *Player, input *MovementInput, tick int64) bool {
 }
 
 func StepMovement(player *Player, tick int64) {
+	if player.IsEliminated() {
+		player.Direction = Vector2{}
+		return
+	}
 	if player.HasSequence && tick-player.LastInputTick >= InputTimeoutTicks {
 		player.Direction = Vector2{}
 	}
@@ -93,6 +100,20 @@ func StepMovement(player *Player, tick int64) {
 	player.Position.X += player.Direction.X * moveSpeed * deltaSeconds
 	player.Position.Y += player.Direction.Y * moveSpeed * deltaSeconds
 	player.Position = world.ClampToPlayArea(player.Position)
+}
+
+// IsEliminated reports whether the player has no living characters and can no
+// longer perform gameplay actions. The player entity itself remains in-world.
+func (p *Player) IsEliminated() bool {
+	if p == nil {
+		return true
+	}
+	for _, character := range p.Characters {
+		if character != nil && character.Health > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *Player) MinMoveSpeed() float64 {

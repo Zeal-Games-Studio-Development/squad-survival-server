@@ -33,9 +33,9 @@ func TestDiagonalMovementIsNormalized(t *testing.T) {
 func TestPlayerUsesSlowestCharacterMoveSpeed(t *testing.T) {
 	player := newTestPlayer(Vector2{})
 	player.Characters = []*Character{
-		{MoveSpeed: 7},
-		{MoveSpeed: 3},
-		{MoveSpeed: 5},
+		{Health: 1, MoveSpeed: 7},
+		{Health: 1, MoveSpeed: 3},
+		{Health: 1, MoveSpeed: 5},
 	}
 	ApplyMovementInput(player, &MovementInput{X: 1, Sequence: 1}, 0)
 	StepMovement(player, 0)
@@ -71,11 +71,28 @@ func TestPlayerAssignsStableUniqueCharacterIDs(t *testing.T) {
 func TestPlayerWithoutCharactersCannotMove(t *testing.T) {
 	player := newTestPlayer(Vector2{})
 	player.Characters = nil
-	ApplyMovementInput(player, &MovementInput{X: 1, Sequence: 1}, 0)
+	if ApplyMovementInput(player, &MovementInput{X: 1, Sequence: 1}, 0) {
+		t.Fatal("expected eliminated player input to be rejected")
+	}
+	player.Direction = Vector2{X: 1}
 	StepMovement(player, 0)
 
 	if player.Position != (Vector2{}) {
 		t.Fatalf("expected player without characters to remain still, got %+v", player.Position)
+	}
+	if player.Direction != (Vector2{}) {
+		t.Fatalf("expected eliminated player direction to be cleared, got %+v", player.Direction)
+	}
+}
+
+func TestPlayerWithOnlyDeadCharactersIsEliminated(t *testing.T) {
+	player := newTestPlayer(Vector2{})
+	player.Characters[0].Health = 0
+	if !player.IsEliminated() {
+		t.Fatal("expected player with only dead characters to be eliminated")
+	}
+	if ApplyMovementInput(player, &MovementInput{X: 1, Sequence: 1}, 0) {
+		t.Fatal("expected dead-character player input to be rejected before cleanup")
 	}
 }
 

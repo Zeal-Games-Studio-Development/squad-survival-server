@@ -634,6 +634,43 @@ func TestCharacterBoxRemainsWhenPlayerIsAtCapacity(t *testing.T) {
 	}
 }
 
+func TestEliminatedPlayerCannotCollectCharacterBoxButRemainsInWorld(t *testing.T) {
+	state := characterBoxTestState(1)
+	eliminated := entity.NewPlayer("user-dead", "session-dead", "Dead", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	eliminated.Characters[0].Health = 0
+	eliminated.RemoveDeadCharacters()
+	detector := entity.NewPlayer("user-alive", "session-alive", "Alive", entity.Vector2{X: 0.5}, rand.New(rand.NewSource(3)))
+	state.Players[eliminated.SessionID] = eliminated
+	state.Players[detector.SessionID] = detector
+	if err := state.SpatialGrid.Insert(eliminated); err != nil {
+		t.Fatal(err)
+	}
+	if err := state.SpatialGrid.Insert(detector); err != nil {
+		t.Fatal(err)
+	}
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
+	state.CharacterBoxes[box.ID] = box
+	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
+		t.Fatal(err)
+	}
+	// Move the living detector outside box collision while keeping the eliminated
+	// player visible in its detection radius.
+	detector.Position = entity.Vector2{X: 2}
+	if err := state.SpatialGrid.Move(detector); err != nil {
+		t.Fatal(err)
+	}
+	if events := state.collectCharacterBoxes(nil); len(events) != 0 {
+		t.Fatalf("eliminated player collected a box: %#v", events)
+	}
+	if state.CharacterBoxes[box.ID] == nil {
+		t.Fatal("box was consumed by eliminated player")
+	}
+	nearby := state.SpatialGrid.QueryPlayers(detector)
+	if len(nearby) != 1 || nearby[0] != eliminated || state.Players[eliminated.SessionID] == nil {
+		t.Fatalf("eliminated player did not remain in world: nearby=%#v", nearby)
+	}
+}
+
 func TestCharacterBoxCollisionTieBreaksBySessionID(t *testing.T) {
 	state := characterBoxTestState(1)
 	playerB := entity.NewPlayer("user-b", "session-b", "B", entity.Vector2{X: 0.5}, rand.New(rand.NewSource(2)))

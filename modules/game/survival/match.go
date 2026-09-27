@@ -226,7 +226,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 			continue
 		}
 		player, ok := state.Players[message.GetSessionId()]
-		if !ok {
+		if !ok || player.IsEliminated() {
 			continue
 		}
 		input, err := entity.DecodeMovementInput(message.GetData())
@@ -262,6 +262,11 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 		state.Combat = combat.NewSimulation()
 	}
 	combatEvents := state.Combat.Step(state.Players, tick, state.random)
+	for _, player := range state.Players {
+		if player.IsEliminated() {
+			player.Direction = entity.Vector2{}
+		}
+	}
 	state.broadcastCombatEvents(logger, dispatcher, tick, combatEvents, nearbyPlayers)
 	state.broadcastPlayerMovementSnapshots(logger, dispatcher, tick, nearbyPlayers)
 	state.broadcastProjectileMovementSnapshots(logger, dispatcher, tick, nearbyPlayers, state.Combat.Projectiles())
@@ -410,7 +415,7 @@ type boxCollisionCandidate struct {
 func (s *State) collectCharacterBoxes(logger runtime.Logger) []system.CharacterBoxEvent {
 	candidates := make(map[string][]boxCollisionCandidate)
 	for _, player := range s.Players {
-		if player == nil {
+		if player == nil || player.IsEliminated() {
 			continue
 		}
 		for _, box := range s.SpatialGrid.QueryCharacterBoxes(player.Position, entity.CharacterBoxCollisionRadius) {
