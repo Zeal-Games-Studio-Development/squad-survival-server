@@ -13,8 +13,8 @@ func TestQueryPlayersFiltersRadiusSelfAndSorts(t *testing.T) {
 	origin := player("origin", 0, 0)
 	nearB := player("b", 3, 4)
 	nearA := player("a", -3, -4)
-	edge := player("edge", 10, 0)
-	outside := player("outside", 10.01, 0)
+	edge := player("edge", entity.DefaultDetectionRadius, 0)
+	outside := player("outside", entity.DefaultDetectionRadius+0.01, 0)
 	for _, candidate := range []*entity.Player{origin, nearB, nearA, edge, outside} {
 		if err := grid.Insert(candidate); err != nil {
 			t.Fatal(err)

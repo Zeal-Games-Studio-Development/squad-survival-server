@@ -12,7 +12,7 @@ import (
 const (
 	InputTimeoutTicks      = int64(3)
 	TickRate               = 10
-	DefaultDetectionRadius = 10.0
+	DefaultDetectionRadius = 20.0
 )
 
 type Vector2 = world.Vector2

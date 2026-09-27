@@ -265,6 +265,7 @@ func TestMatchLoopMovesPlayerBetweenSpatialCells(t *testing.T) {
 	random := rand.New(rand.NewSource(1))
 	moving := entity.NewPlayer("moving-user", "moving", "Moving", entity.Vector2{X: 19.9}, random)
 	detector := entity.NewPlayer("detector-user", "detector", "Detector", entity.Vector2{X: 30.2}, random)
+	detector.DetectionRadius = 10
 	grid := spatial.NewGrid(spatialCellSize)
 	if err := grid.Insert(moving); err != nil {
 		t.Fatal(err)
@@ -552,8 +553,8 @@ func TestMatchLoopSendsReliableCombatEventsToRelevantViewers(t *testing.T) {
 
 func TestCharacterBoxInitialSpawnIsValid(t *testing.T) {
 	state := characterBoxTestState(7)
-	events := state.spawnCharacterBoxes(24)
-	if len(events) != 24 || len(state.CharacterBoxes) != 24 {
+	events := state.spawnCharacterBoxes(80)
+	if len(events) != 80 || len(state.CharacterBoxes) != 80 {
 		t.Fatalf("unexpected box count: events=%d boxes=%d", len(events), len(state.CharacterBoxes))
 	}
 	seen := make(map[string]bool)
@@ -690,7 +691,7 @@ func TestCharacterBoxCollisionTieBreaksBySessionID(t *testing.T) {
 
 func TestCharacterBoxRefillAndJoinSnapshot(t *testing.T) {
 	state := characterBoxTestState(4)
-	state.spawnCharacterBoxes(18)
+	state.spawnCharacterBoxes(60)
 	dispatcher := &testDispatcher{}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
 	state.sendCurrentCharacterBoxes(nil, dispatcher, 10, presence)
@@ -701,8 +702,8 @@ func TestCharacterBoxRefillAndJoinSnapshot(t *testing.T) {
 	if err := proto.Unmarshal(dispatcher.broadcasts[0].data, &batch); err != nil {
 		t.Fatal(err)
 	}
-	if len(batch.Events) != 18 {
-		t.Fatalf("join snapshot has %d boxes, want 18", len(batch.Events))
+	if len(batch.Events) != 60 {
+		t.Fatalf("join snapshot has %d boxes, want 60", len(batch.Events))
 	}
 
 	state.NextBoxRefillTick = 600

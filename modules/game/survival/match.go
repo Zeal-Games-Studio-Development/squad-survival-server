@@ -30,8 +30,8 @@ const (
 	reservationTTLSeconds       = 10
 	emptyMatchTTLSeconds        = 60
 	spatialCellSize             = 20.0
-	characterBoxMinCount        = 18
-	characterBoxMaxCount        = 24
+	characterBoxMinCount        = 60
+	characterBoxMaxCount        = 80
 	characterBoxRefillTicks     = 60 * tickRate
 	characterBoxSpawnSeparation = 4.0
 	characterBoxSpawnAttempts   = 100
