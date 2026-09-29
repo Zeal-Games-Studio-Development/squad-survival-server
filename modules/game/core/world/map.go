@@ -6,8 +6,8 @@ import (
 )
 
 const (
-	PlayAreaRadius = 750.0
-	SpawnRadius    = 600.0
+	PlayAreaRadius = 500.0
+	SpawnRadius    = 450.0
 )
 
 type Vector2 struct {
