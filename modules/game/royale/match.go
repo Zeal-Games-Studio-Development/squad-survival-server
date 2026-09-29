@@ -1,4 +1,4 @@
-package survival
+package royale
 
 import (
 	"context"
@@ -21,10 +21,10 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
-// Config của mode survival, có thể thay đổi được thông qua params khi tạo match.
+// Config của mode battle royale, có thể thay đổi thông qua params khi tạo match.
 const (
-	ModuleName                  = "survival"
-	DefaultMode                 = "survival"
+	ModuleName                  = "battle-royale"
+	DefaultMode                 = "battle-royale"
 	MaxPlayers                  = 32
 	tickRate                    = entity.TickRate
 	reservationTTLSeconds       = 10
@@ -77,7 +77,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 	state := &State{
 		MatchID:             matchIDFromContext(ctx),
 		Mode:                stringParam(params, "mode", DefaultMode),
-		AllowJoinInProgress: true,
+		AllowJoinInProgress: false,
 		Players:             make(map[string]*entity.Player),
 		Presences:           make(map[string]runtime.Presence),
 		Reservations:        make(map[string]int64),
@@ -94,7 +94,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 	if len(state.CharacterBoxes) < initialBoxTarget {
 		logger.Warn("Could not place all initial character boxes: target=%d spawned=%d", initialBoxTarget, len(state.CharacterBoxes))
 	}
-	logger.Info("Survival match initialized: mode=%s max_players=%d", state.Mode, MaxPlayers)
+	logger.Info("Battle royale match initialized: mode=%s max_players=%d", state.Mode, MaxPlayers)
 	return state, tickRate, state.label()
 }
 
@@ -274,7 +274,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	if len(state.Players) == 0 && len(state.Reservations) == 0 {
 		state.EmptyTicks++
 		if state.EmptyTicks >= emptyMatchTTLSeconds*tickRate {
-			logger.Info("Stopping empty survival match")
+			logger.Info("Stopping empty battle royale match")
 			m.registry.RemoveMatch(state.MatchID)
 			return nil
 		}

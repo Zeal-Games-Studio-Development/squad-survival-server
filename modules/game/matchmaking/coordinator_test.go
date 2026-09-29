@@ -28,6 +28,15 @@ func TestParseRequestDefaults(t *testing.T) {
 	}
 }
 
+func TestModuleNameForMode(t *testing.T) {
+	if got := moduleNameForMode("battle-royale"); got != "battle-royale" {
+		t.Fatalf("battle-royale routed to %q", got)
+	}
+	if got := moduleNameForMode("survival"); got != "survival" {
+		t.Fatalf("survival routed to %q", got)
+	}
+}
+
 func TestFindOrCreateReturnsActiveMatch(t *testing.T) {
 	registry := matchregistry.New()
 	if !registry.Add("user-1", "session-1", "match-1") {

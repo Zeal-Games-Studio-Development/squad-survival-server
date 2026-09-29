@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"squad-survival-be/modules/game/matchregistry"
+	"squad-survival-be/modules/game/royale"
 	"squad-survival-be/modules/game/survival"
 
 	"github.com/heroiclabs/nakama-common/api"
@@ -23,8 +24,7 @@ var (
 )
 
 type Request struct {
-	Mode                string `json:"mode"`
-	AllowJoinInProgress *bool  `json:"allow_join_in_progress,omitempty"`
+	Mode string `json:"mode"`
 }
 
 type Response struct {
@@ -80,27 +80,27 @@ func findOrCreate(ctx context.Context, logger runtime.Logger, nk runtime.NakamaM
 	findOrCreateMutex.Lock()
 	defer findOrCreateMutex.Unlock()
 
-	allowJoin := request.AllowJoinInProgress == nil || *request.AllowJoinInProgress
+	allowJoin := request.Mode != royale.DefaultMode
 	if allowJoin {
 		matches, err := findJoinable(ctx, nk, request, requiredSlots)
 		if err != nil {
 			return "", false, err
 		}
 		if len(matches) > 0 {
-			logger.Info("Backfilling survival match: match_id=%s players=%d", matches[0].GetMatchId(), requiredSlots)
+			logger.Info("Backfilling %s match: match_id=%s players=%d", request.Mode, matches[0].GetMatchId(), requiredSlots)
 			return matches[0].GetMatchId(), false, nil
 		}
 	}
 
-	matchID, err := nk.MatchCreate(ctx, survival.ModuleName, map[string]interface{}{
-		"mode":                   request.Mode,
-		"allow_join_in_progress": allowJoin,
+	moduleName := moduleNameForMode(request.Mode)
+	matchID, err := nk.MatchCreate(ctx, moduleName, map[string]interface{}{
+		"mode": request.Mode,
 	})
 	if err != nil {
 		return "", false, err
 	}
 
-	logger.Info("Created survival match: match_id=%s players=%d", matchID, requiredSlots)
+	logger.Info("Created %s match: match_id=%s players=%d", request.Mode, matchID, requiredSlots)
 	return matchID, true, nil
 }
 
@@ -124,6 +124,13 @@ func findJoinable(ctx context.Context, nk runtime.NakamaModule, request Request,
 
 func matchQuery(request Request) string {
 	return fmt.Sprintf("+label.mode:%s +label.joinable:T +label.max_players:%d", request.Mode, survival.MaxPlayers)
+}
+
+func moduleNameForMode(mode string) string {
+	if mode == royale.DefaultMode {
+		return royale.ModuleName
+	}
+	return survival.ModuleName
 }
 
 func parseRequest(payload string) (Request, error) {

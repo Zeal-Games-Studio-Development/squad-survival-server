@@ -7,6 +7,7 @@ import (
 	"squad-survival-be/modules/economy"
 	"squad-survival-be/modules/game/matchmaking"
 	"squad-survival-be/modules/game/matchregistry"
+	"squad-survival-be/modules/game/royale"
 	"squad-survival-be/modules/game/survival"
 	skincatalog "squad-survival-be/modules/skin/catalog"
 	skindraw "squad-survival-be/modules/skin/draw"
@@ -33,6 +34,9 @@ func InitModule(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.N
 
 	registry := matchregistry.New()
 	if err := initializer.RegisterMatch(survival.ModuleName, survival.NewMatchHandler(registry)); err != nil {
+		return err
+	}
+	if err := initializer.RegisterMatch(royale.ModuleName, royale.NewMatchHandler(registry)); err != nil {
 		return err
 	}
 	if err := initializer.RegisterRpc("find_or_create_match", matchmaking.NewFindOrCreateRPC(registry)); err != nil {

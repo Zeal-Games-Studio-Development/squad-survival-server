@@ -11,8 +11,7 @@ RPC nhận JSON:
 
 ```json
 {
-  "mode": "survival",
-  "allow_join_in_progress": true
+  "mode": "survival"
 }
 ```
 
