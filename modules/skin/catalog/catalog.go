@@ -215,6 +215,14 @@ func (c *Catalog) DrawableItems() []Item {
 	return items
 }
 
+// Items returns all catalog items in declaration order.
+func (c *Catalog) Items() []Item {
+	if c == nil {
+		return nil
+	}
+	return append([]Item(nil), c.items...)
+}
+
 // Len returns the number of concrete items in the catalog.
 func (c *Catalog) Len() int {
 	if c == nil {

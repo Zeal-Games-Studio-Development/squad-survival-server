@@ -19,15 +19,15 @@ func InitModule(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.N
 	if err != nil {
 		return err
 	}
-	if err := economy.Register(initializer, economyService); err != nil {
-		return err
-	}
 	itemCatalog := skincatalog.DefaultCatalog()
 	skinDrawService, err := skindraw.NewService(itemCatalog)
 	if err != nil {
 		return err
 	}
 	if err := skindraw.Register(initializer, skinDrawService); err != nil {
+		return err
+	}
+	if err := economy.Register(initializer, economyService, skinDrawService); err != nil {
 		return err
 	}
 

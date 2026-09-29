@@ -127,6 +127,21 @@ func TestCatalogDrawableItemsExcludeExclusive(t *testing.T) {
 	}
 }
 
+func TestCatalogItemsPreserveOrderAndReturnDefensiveCopy(t *testing.T) {
+	catalog, err := ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[2,1],"exclusive_ids":[2]},{"type":"hair","prefix":"r","ids":[1]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := catalog.Items()
+	if len(items) != 3 || items[0].ID != "h2" || items[1].ID != "h1" || items[2].ID != "r1" || !items[0].Exclusive {
+		t.Fatalf("unexpected catalog items: %#v", items)
+	}
+	items[0].ID = "changed"
+	if unchanged := catalog.Items(); unchanged[0].ID != "h2" {
+		t.Fatalf("catalog items were mutated through returned slice: %#v", unchanged)
+	}
+}
+
 func TestPartReturnsDefensiveIDCopy(t *testing.T) {
 	catalog := DefaultCatalog()
 	definition, _ := catalog.Part(PartHair)

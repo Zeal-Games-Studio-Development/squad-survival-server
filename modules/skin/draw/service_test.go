@@ -145,6 +145,48 @@ func TestDrawSingleAtomicallyChargesAndStoresItem(t *testing.T) {
 	}
 }
 
+func TestInitialStorageWriteIncludesNumericIDOneForEveryPart(t *testing.T) {
+	service := testService(t, skincatalog.DefaultCatalog())
+	write, err := service.InitialStorageWrite("new-user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if write.Collection != InventoryCollection || write.Key != InventoryKey || write.UserID != "new-user" || write.Version != "*" {
+		t.Fatalf("unexpected initial storage target: %#v", write)
+	}
+	if write.PermissionRead != 1 || write.PermissionWrite != 0 {
+		t.Fatalf("unexpected initial storage permissions: %#v", write)
+	}
+	var inventory Inventory
+	if err := json.Unmarshal([]byte(write.Value), &inventory); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"r1", "b1", "ax1", "ar1", "bl1", "bw1", "c1", "cb1", "e1", "h1", "sh1", "sp1", "st1", "sw1", "wn1"}
+	if len(inventory.Items) != len(want) || len(inventory.ProcessedRequests) != 0 {
+		t.Fatalf("unexpected initial inventory: %#v", inventory)
+	}
+	for _, itemID := range want {
+		item, ok := inventory.Items[itemID]
+		if !ok || item.Source != AccountRegistrationSource || item.AcquiredAt != 1_790_265_600 {
+			t.Errorf("unexpected default item %q: %#v", itemID, item)
+		}
+	}
+}
+
+func TestInitialStorageWriteRejectsPartWithoutNumericIDOne(t *testing.T) {
+	itemCatalog, err := skincatalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[1]},{"type":"hair","prefix":"r","ids":[2]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := testService(t, itemCatalog)
+	if _, err := service.InitialStorageWrite("new-user"); err == nil {
+		t.Fatal("expected catalog without numeric id 1 for every part to fail")
+	}
+	if _, err := service.InitialStorageWrite(""); err == nil {
+		t.Fatal("expected empty user id to fail")
+	}
+}
+
 func TestDrawTenReturnsUniqueItemsAndUsesDiscount(t *testing.T) {
 	service := testService(t, skincatalog.DefaultCatalog())
 	store := newFakeStore(1_000)

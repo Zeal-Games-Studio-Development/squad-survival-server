@@ -17,15 +17,16 @@ import (
 )
 
 const (
-	RPCName              = "skin_lucky_draw"
-	InventoryCollection  = "player_inventory"
-	InventoryKey         = "skins"
-	InventorySource      = "skin_lucky_draw"
-	GemCurrency          = "gem"
-	SingleDrawCost       = int64(100)
-	TenDrawCost          = int64(900)
-	MaxProcessedRequests = 50
-	maxConflictRetries   = 5
+	RPCName                   = "skin_lucky_draw"
+	InventoryCollection       = "player_inventory"
+	InventoryKey              = "skins"
+	InventorySource           = "skin_lucky_draw"
+	AccountRegistrationSource = "account_registration"
+	GemCurrency               = "gem"
+	SingleDrawCost            = int64(100)
+	TenDrawCost               = int64(900)
+	MaxProcessedRequests      = 50
+	maxConflictRetries        = 5
 )
 
 var (
@@ -94,6 +95,37 @@ type Service struct {
 	catalog *catalog.Catalog
 	random  Random
 	now     func() time.Time
+}
+
+// InitialStorageWrite builds the create-only skin inventory for a new account.
+func (s *Service) InitialStorageWrite(userID string) (*runtime.StorageWrite, error) {
+	if s == nil || s.catalog == nil {
+		return nil, errors.New("skin catalog is required")
+	}
+	if userID == "" {
+		return nil, errors.New("user id is required")
+	}
+
+	partCount := make(map[catalog.PartType]struct{})
+	initialItems := make(map[string]InventoryItem)
+	acquiredAt := s.now().UTC().Unix()
+	for _, item := range s.catalog.Items() {
+		partCount[item.PartType] = struct{}{}
+		if item.NumericID == 1 {
+			initialItems[item.ID] = InventoryItem{AcquiredAt: acquiredAt, Source: AccountRegistrationSource}
+		}
+	}
+	if len(initialItems) != len(partCount) {
+		return nil, fmt.Errorf("every skin part must define numeric id 1: parts=%d defaults=%d", len(partCount), len(initialItems))
+	}
+	value, err := json.Marshal(Inventory{Items: initialItems, ProcessedRequests: []ProcessedRequest{}})
+	if err != nil {
+		return nil, fmt.Errorf("encode initial player skin inventory: %w", err)
+	}
+	return &runtime.StorageWrite{
+		Collection: InventoryCollection, Key: InventoryKey, UserID: userID, Value: string(value),
+		Version: "*", PermissionRead: 1, PermissionWrite: 0,
+	}, nil
 }
 
 func NewService(itemCatalog *catalog.Catalog) (*Service, error) {

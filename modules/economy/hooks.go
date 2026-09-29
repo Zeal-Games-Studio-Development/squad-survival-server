@@ -10,20 +10,9 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
-func Register(initializer runtime.Initializer, service *Service) error {
+func Register(initializer runtime.Initializer, service *Service, storage InitialStorageWriter) error {
 	hook := func(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, session *api.Session) error {
-		if session == nil || !session.Created {
-			return nil
-		}
-		userID, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
-		if !ok || userID == "" {
-			return errors.New("new-user currency grant: user id missing from runtime context")
-		}
-		if err := service.GrantInitialCurrency(ctx, nk, userID); err != nil {
-			return fmt.Errorf("grant initial currency to user %s: %w", userID, err)
-		}
-		logger.Info("Granted initial currency to new user %s", userID)
-		return nil
+		return initializeAuthenticatedAccount(ctx, logger, nk, session, service, storage)
 	}
 
 	if err := initializer.RegisterAfterAuthenticateApple(func(ctx context.Context, l runtime.Logger, db *sql.DB, nk runtime.NakamaModule, out *api.Session, _ *api.AuthenticateAppleRequest) error {
@@ -69,4 +58,24 @@ func Register(initializer runtime.Initializer, service *Service) error {
 	return initializer.RegisterAfterAuthenticateSteam(func(ctx context.Context, l runtime.Logger, db *sql.DB, nk runtime.NakamaModule, out *api.Session, _ *api.AuthenticateSteamRequest) error {
 		return hook(ctx, l, db, nk, out)
 	})
+}
+
+func initializeAuthenticatedAccount(ctx context.Context, logger runtime.Logger, store NewAccountStore, session *api.Session, service *Service, storage InitialStorageWriter) error {
+	if session == nil || !session.Created {
+		return nil
+	}
+	userID, ok := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
+	if !ok || userID == "" {
+		return errors.New("new-account initialization: user id missing from runtime context")
+	}
+	if err := service.InitializeNewAccount(ctx, store, userID, storage); err != nil {
+		if logger != nil {
+			logger.Error("Could not initialize new user %s: %v", userID, err)
+		}
+		return fmt.Errorf("initialize new user %s: %w", userID, err)
+	}
+	if logger != nil {
+		logger.Info("Initialized currency and skin inventory for new user %s", userID)
+	}
+	return nil
 }
