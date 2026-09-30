@@ -18,6 +18,23 @@ func TestMatchQueryUsesNakamaBooleanToken(t *testing.T) {
 	}
 }
 
+func TestBattleRoyaleMatchQueryOnlyFindsWaitingLobbies(t *testing.T) {
+	query := matchQuery(Request{Mode: "battle-royale"})
+	want := "+label.mode:battle-royale +label.joinable:T +label.max_players:32 +label.status:waiting"
+	if query != want {
+		t.Fatalf("unexpected query: got %q want %q", query, want)
+	}
+}
+
+func TestMaxPlayersForMode(t *testing.T) {
+	if got := maxPlayersForMode("battle-royale"); got != 32 {
+		t.Fatalf("unexpected battle royale capacity: %d", got)
+	}
+	if got := maxPlayersForMode("survival"); got != 32 {
+		t.Fatalf("unexpected survival capacity: %d", got)
+	}
+}
+
 func TestParseRequestDefaults(t *testing.T) {
 	request, err := parseRequest("")
 	if err != nil {

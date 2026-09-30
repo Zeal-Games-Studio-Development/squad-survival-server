@@ -8,4 +8,5 @@ const (
 	OpPlayerRosterBatch          int64 = 104
 	OpProjectileMovementSnapshot int64 = 105
 	OpCharacterBoxState          int64 = 106
+	OpMatchLifecycleState        int64 = 107
 )

@@ -21,6 +21,58 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type MatchPhase int32
+
+const (
+	MatchPhase_MATCH_PHASE_UNSPECIFIED MatchPhase = 0
+	MatchPhase_MATCH_PHASE_WAITING     MatchPhase = 1
+	MatchPhase_MATCH_PHASE_PLAYING     MatchPhase = 2
+	MatchPhase_MATCH_PHASE_ENDED       MatchPhase = 3
+)
+
+// Enum value maps for MatchPhase.
+var (
+	MatchPhase_name = map[int32]string{
+		0: "MATCH_PHASE_UNSPECIFIED",
+		1: "MATCH_PHASE_WAITING",
+		2: "MATCH_PHASE_PLAYING",
+		3: "MATCH_PHASE_ENDED",
+	}
+	MatchPhase_value = map[string]int32{
+		"MATCH_PHASE_UNSPECIFIED": 0,
+		"MATCH_PHASE_WAITING":     1,
+		"MATCH_PHASE_PLAYING":     2,
+		"MATCH_PHASE_ENDED":       3,
+	}
+)
+
+func (x MatchPhase) Enum() *MatchPhase {
+	p := new(MatchPhase)
+	*p = x
+	return p
+}
+
+func (x MatchPhase) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MatchPhase) Descriptor() protoreflect.EnumDescriptor {
+	return file_modules_game_core_system_state_proto_enumTypes[0].Descriptor()
+}
+
+func (MatchPhase) Type() protoreflect.EnumType {
+	return &file_modules_game_core_system_state_proto_enumTypes[0]
+}
+
+func (x MatchPhase) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MatchPhase.Descriptor instead.
+func (MatchPhase) EnumDescriptor() ([]byte, []int) {
+	return file_modules_game_core_system_state_proto_rawDescGZIP(), []int{0}
+}
+
 type StateSnapshot struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Tick          int64                  `protobuf:"varint,1,opt,name=tick,proto3" json:"tick,omitempty"`
@@ -73,6 +125,74 @@ func (x *StateSnapshot) GetPlayerCount() int32 {
 	return 0
 }
 
+type MatchLifecycleState struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Phase           MatchPhase             `protobuf:"varint,1,opt,name=phase,proto3,enum=game.core.system.MatchPhase" json:"phase,omitempty"`
+	ServerTick      int64                  `protobuf:"varint,2,opt,name=server_tick,json=serverTick,proto3" json:"server_tick,omitempty"`
+	PhaseEndsAtTick int64                  `protobuf:"varint,3,opt,name=phase_ends_at_tick,json=phaseEndsAtTick,proto3" json:"phase_ends_at_tick,omitempty"`
+	TickRate        int32                  `protobuf:"varint,4,opt,name=tick_rate,json=tickRate,proto3" json:"tick_rate,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *MatchLifecycleState) Reset() {
+	*x = MatchLifecycleState{}
+	mi := &file_modules_game_core_system_state_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MatchLifecycleState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MatchLifecycleState) ProtoMessage() {}
+
+func (x *MatchLifecycleState) ProtoReflect() protoreflect.Message {
+	mi := &file_modules_game_core_system_state_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MatchLifecycleState.ProtoReflect.Descriptor instead.
+func (*MatchLifecycleState) Descriptor() ([]byte, []int) {
+	return file_modules_game_core_system_state_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *MatchLifecycleState) GetPhase() MatchPhase {
+	if x != nil {
+		return x.Phase
+	}
+	return MatchPhase_MATCH_PHASE_UNSPECIFIED
+}
+
+func (x *MatchLifecycleState) GetServerTick() int64 {
+	if x != nil {
+		return x.ServerTick
+	}
+	return 0
+}
+
+func (x *MatchLifecycleState) GetPhaseEndsAtTick() int64 {
+	if x != nil {
+		return x.PhaseEndsAtTick
+	}
+	return 0
+}
+
+func (x *MatchLifecycleState) GetTickRate() int32 {
+	if x != nil {
+		return x.TickRate
+	}
+	return 0
+}
+
 var File_modules_game_core_system_state_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_state_proto_rawDesc = "" +
@@ -80,7 +200,19 @@ const file_modules_game_core_system_state_proto_rawDesc = "" +
 	"$modules/game/core/system/state.proto\x12\x10game.core.system\"F\n" +
 	"\rStateSnapshot\x12\x12\n" +
 	"\x04tick\x18\x01 \x01(\x03R\x04tick\x12!\n" +
-	"\fplayer_count\x18\x02 \x01(\x05R\vplayerCountB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
+	"\fplayer_count\x18\x02 \x01(\x05R\vplayerCount\"\xb4\x01\n" +
+	"\x13MatchLifecycleState\x122\n" +
+	"\x05phase\x18\x01 \x01(\x0e2\x1c.game.core.system.MatchPhaseR\x05phase\x12\x1f\n" +
+	"\vserver_tick\x18\x02 \x01(\x03R\n" +
+	"serverTick\x12+\n" +
+	"\x12phase_ends_at_tick\x18\x03 \x01(\x03R\x0fphaseEndsAtTick\x12\x1b\n" +
+	"\ttick_rate\x18\x04 \x01(\x05R\btickRate*r\n" +
+	"\n" +
+	"MatchPhase\x12\x1b\n" +
+	"\x17MATCH_PHASE_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13MATCH_PHASE_WAITING\x10\x01\x12\x17\n" +
+	"\x13MATCH_PHASE_PLAYING\x10\x02\x12\x15\n" +
+	"\x11MATCH_PHASE_ENDED\x10\x03B3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
 
 var (
 	file_modules_game_core_system_state_proto_rawDescOnce sync.Once
@@ -94,16 +226,20 @@ func file_modules_game_core_system_state_proto_rawDescGZIP() []byte {
 	return file_modules_game_core_system_state_proto_rawDescData
 }
 
-var file_modules_game_core_system_state_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_modules_game_core_system_state_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_modules_game_core_system_state_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_modules_game_core_system_state_proto_goTypes = []any{
-	(*StateSnapshot)(nil), // 0: game.core.system.StateSnapshot
+	(MatchPhase)(0),             // 0: game.core.system.MatchPhase
+	(*StateSnapshot)(nil),       // 1: game.core.system.StateSnapshot
+	(*MatchLifecycleState)(nil), // 2: game.core.system.MatchLifecycleState
 }
 var file_modules_game_core_system_state_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0, // 0: game.core.system.MatchLifecycleState.phase:type_name -> game.core.system.MatchPhase
+	1, // [1:1] is the sub-list for method output_type
+	1, // [1:1] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_modules_game_core_system_state_proto_init() }
@@ -116,13 +252,14 @@ func file_modules_game_core_system_state_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_modules_game_core_system_state_proto_rawDesc), len(file_modules_game_core_system_state_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   1,
+			NumEnums:      1,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_modules_game_core_system_state_proto_goTypes,
 		DependencyIndexes: file_modules_game_core_system_state_proto_depIdxs,
+		EnumInfos:         file_modules_game_core_system_state_proto_enumTypes,
 		MessageInfos:      file_modules_game_core_system_state_proto_msgTypes,
 	}.Build()
 	File_modules_game_core_system_state_proto = out.File

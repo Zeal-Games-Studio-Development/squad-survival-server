@@ -27,6 +27,9 @@ const (
 	DefaultMode                 = "battle-royale"
 	MaxPlayers                  = 32
 	tickRate                    = entity.TickRate
+	waitingDurationTicks        = 60 * tickRate
+	playingDurationTicks        = 10 * 60 * tickRate
+	endedDurationTicks          = 10 * tickRate
 	reservationTTLSeconds       = 10
 	emptyMatchTTLSeconds        = 60
 	spatialCellSize             = 20.0
@@ -41,22 +44,33 @@ type Match struct {
 	registry *matchregistry.Registry
 }
 
+type Phase string
+
+const (
+	PhaseWaiting Phase = "waiting"
+	PhasePlaying Phase = "playing"
+	PhaseEnded   Phase = "ended"
+)
+
 type State struct {
-	MatchID             string
-	Mode                string
-	AllowJoinInProgress bool
-	Players             map[string]*entity.Player
-	Presences           map[string]runtime.Presence
-	Reservations        map[string]int64
-	SpatialGrid         *spatial.Grid
-	Combat              *combat.Simulation
-	RosterVersions      map[string]map[string]uint64
-	CharacterBoxes      map[string]*entity.CharacterBox
-	WeaponCatalog       []entity.Weapon
-	NextCharacterBoxID  uint64
-	NextBoxRefillTick   int64
-	EmptyTicks          int64
-	random              *rand.Rand
+	MatchID            string
+	Mode               string
+	Phase              Phase
+	WaitingEndsAtTick  int64
+	PlayingEndsAtTick  int64
+	EndedAtTick        int64
+	Players            map[string]*entity.Player
+	Presences          map[string]runtime.Presence
+	Reservations       map[string]int64
+	SpatialGrid        *spatial.Grid
+	Combat             *combat.Simulation
+	RosterVersions     map[string]map[string]uint64
+	CharacterBoxes     map[string]*entity.CharacterBox
+	WeaponCatalog      []entity.Weapon
+	NextCharacterBoxID uint64
+	NextBoxRefillTick  int64
+	EmptyTicks         int64
+	random             *rand.Rand
 }
 
 type Label struct {
@@ -75,19 +89,19 @@ func NewMatchHandler(registry *matchregistry.Registry) func(context.Context, run
 
 func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
 	state := &State{
-		MatchID:             matchIDFromContext(ctx),
-		Mode:                stringParam(params, "mode", DefaultMode),
-		AllowJoinInProgress: false,
-		Players:             make(map[string]*entity.Player),
-		Presences:           make(map[string]runtime.Presence),
-		Reservations:        make(map[string]int64),
-		SpatialGrid:         spatial.NewGrid(spatialCellSize),
-		Combat:              combat.NewSimulation(),
-		RosterVersions:      make(map[string]map[string]uint64),
-		CharacterBoxes:      make(map[string]*entity.CharacterBox),
-		WeaponCatalog:       entity.DefaultWeaponCatalog(),
-		NextBoxRefillTick:   characterBoxRefillTicks,
-		random:              rand.New(rand.NewSource(time.Now().UnixNano())),
+		MatchID:           matchIDFromContext(ctx),
+		Mode:              stringParam(params, "mode", DefaultMode),
+		Phase:             PhaseWaiting,
+		Players:           make(map[string]*entity.Player),
+		Presences:         make(map[string]runtime.Presence),
+		Reservations:      make(map[string]int64),
+		SpatialGrid:       spatial.NewGrid(spatialCellSize),
+		Combat:            combat.NewSimulation(),
+		RosterVersions:    make(map[string]map[string]uint64),
+		CharacterBoxes:    make(map[string]*entity.CharacterBox),
+		WeaponCatalog:     entity.DefaultWeaponCatalog(),
+		NextBoxRefillTick: characterBoxRefillTicks,
+		random:            rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 	initialBoxTarget := state.randomCharacterBoxTarget()
 	state.spawnCharacterBoxes(initialBoxTarget)
@@ -108,7 +122,7 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 	if state.MatchID != "" && !m.registry.CanJoin(presence.GetUserId(), state.MatchID) {
 		return state, false, "already in another match"
 	}
-	if !state.AllowJoinInProgress && len(state.Players) > 0 {
+	if state.Phase != PhaseWaiting {
 		return state, false, "match already started"
 	}
 	if state.occupiedSlots() >= MaxPlayers {
@@ -122,6 +136,7 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, rawState interface{}, presences []runtime.Presence) interface{} {
 	state := rawState.(*State)
 	playerCount := len(state.Players)
+	joined := make([]runtime.Presence, 0, len(presences))
 	displayNames, err := resolveDisplayNames(ctx, nk, presences)
 	if err != nil && logger != nil {
 		logger.Error("Could not load player display names: %v", err)
@@ -156,11 +171,18 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		}
 		state.Players[presence.GetSessionId()] = player
 		state.Presences[presence.GetSessionId()] = presence
+		if state.Phase == PhaseWaiting && state.WaitingEndsAtTick == 0 {
+			state.WaitingEndsAtTick = tick + waitingDurationTicks
+		}
 		state.sendInitialRoster(logger, dispatcher, tick, presence, player)
 		state.sendCurrentCharacterBoxes(logger, dispatcher, tick, presence)
+		joined = append(joined, presence)
 	}
 	state.EmptyTicks = 0
 	state.updateLabel(dispatcher)
+	if len(joined) > 0 {
+		state.broadcastLifecycle(logger, dispatcher, tick, joined)
+	}
 	if len(state.Players) != playerCount {
 		state.broadcastSnapshot(logger, dispatcher, tick)
 	}
@@ -219,6 +241,54 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	state.ensureCharacterBoxState(tick)
 	if state.expireReservations(tick) {
 		state.updateLabel(dispatcher)
+	}
+
+	switch state.Phase {
+	case PhaseWaiting:
+		if state.WaitingEndsAtTick > 0 && len(state.Players) == 0 && len(state.Reservations) == 0 {
+			if logger != nil {
+				logger.Info("Stopping empty battle royale lobby")
+			}
+			m.registry.RemoveMatch(state.MatchID)
+			return nil
+		}
+		if len(state.Players) >= MaxPlayers || state.WaitingEndsAtTick > 0 && tick >= state.WaitingEndsAtTick {
+			state.startPlaying(logger, dispatcher, tick)
+		} else {
+			if state.WaitingEndsAtTick == 0 && len(state.Reservations) == 0 {
+				state.EmptyTicks++
+				if state.EmptyTicks >= emptyMatchTTLSeconds*tickRate {
+					if logger != nil {
+						logger.Info("Stopping unused battle royale lobby")
+					}
+					m.registry.RemoveMatch(state.MatchID)
+					return nil
+				}
+			} else {
+				state.EmptyTicks = 0
+			}
+			return state
+		}
+	case PhasePlaying:
+		if tick >= state.PlayingEndsAtTick {
+			state.finishPlaying(logger, dispatcher, tick)
+			return state
+		}
+	case PhaseEnded:
+		if tick >= state.EndedAtTick {
+			if logger != nil {
+				logger.Info("Stopping ended battle royale match")
+			}
+			m.registry.RemoveMatch(state.MatchID)
+			return nil
+		}
+		return state
+	default:
+		if logger != nil {
+			logger.Error("Stopping battle royale match with invalid phase: phase=%s", state.Phase)
+		}
+		m.registry.RemoveMatch(state.MatchID)
+		return nil
 	}
 
 	for _, message := range messages {
@@ -331,6 +401,58 @@ func (s *State) expireReservations(tick int64) bool {
 
 func (s *State) updateLabel(dispatcher runtime.MatchDispatcher) {
 	_ = dispatcher.MatchLabelUpdate(s.label())
+}
+
+func (s *State) startPlaying(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64) {
+	s.Phase = PhasePlaying
+	s.PlayingEndsAtTick = tick + playingDurationTicks
+	s.NextBoxRefillTick = tick + characterBoxRefillTicks
+	s.EmptyTicks = 0
+	s.updateLabel(dispatcher)
+	s.broadcastLifecycle(logger, dispatcher, tick, nil)
+}
+
+func (s *State) finishPlaying(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64) {
+	s.Phase = PhaseEnded
+	s.EndedAtTick = tick + endedDurationTicks
+	s.updateLabel(dispatcher)
+	s.broadcastLifecycle(logger, dispatcher, tick, nil)
+}
+
+func (s *State) broadcastLifecycle(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, presences []runtime.Presence) {
+	payload, err := system.EncodeMatchLifecycleState(s.protocolPhase(), tick, s.phaseEndsAtTick(), tickRate)
+	if err == nil {
+		err = dispatcher.BroadcastMessage(system.OpMatchLifecycleState, payload, presences, nil, true)
+	}
+	if err != nil && logger != nil {
+		logger.Error("Could not send battle royale lifecycle state: %v", err)
+	}
+}
+
+func (s *State) phaseEndsAtTick() int64 {
+	switch s.Phase {
+	case PhaseWaiting:
+		return s.WaitingEndsAtTick
+	case PhasePlaying:
+		return s.PlayingEndsAtTick
+	case PhaseEnded:
+		return s.EndedAtTick
+	default:
+		return 0
+	}
+}
+
+func (s *State) protocolPhase() system.MatchPhase {
+	switch s.Phase {
+	case PhaseWaiting:
+		return system.MatchPhase_MATCH_PHASE_WAITING
+	case PhasePlaying:
+		return system.MatchPhase_MATCH_PHASE_PLAYING
+	case PhaseEnded:
+		return system.MatchPhase_MATCH_PHASE_ENDED
+	default:
+		return system.MatchPhase_MATCH_PHASE_UNSPECIFIED
+	}
 }
 
 func (s *State) broadcastSnapshot(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64) {
@@ -686,10 +808,10 @@ func (s *State) removeRosterTracking(sessionID string) {
 func (s *State) label() string {
 	label, _ := json.Marshal(Label{
 		Mode:        s.Mode,
-		Status:      "playing",
+		Status:      string(s.Phase),
 		PlayerCount: len(s.Players),
 		MaxPlayers:  MaxPlayers,
-		Joinable:    s.AllowJoinInProgress && s.occupiedSlots() < MaxPlayers,
+		Joinable:    s.Phase == PhaseWaiting && s.occupiedSlots() < MaxPlayers,
 	})
 	return string(label)
 }

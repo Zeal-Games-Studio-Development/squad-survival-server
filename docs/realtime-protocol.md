@@ -11,6 +11,7 @@
 | `104` | Server → Client | `PlayerRosterBatch` | Reliable | Join/enter detection/roster changed |
 | `105` | Server → Client | `ProjectileMovementSnapshot` | Unreliable | Mỗi tick |
 | `106` | Server → Client | `CharacterBoxStateBatch` | Reliable | Box spawn/despawn |
+| `107` | Server → Client | `MatchLifecycleState` | Reliable | Join và chuyển phase Battle Royale |
 
 Contract nằm trong các source schema:
 
@@ -36,7 +37,7 @@ sequenceDiagram
     Unity->>NakamaSDK: MovementInput.ToByteArray()
     NakamaSDK->>Match: opcode 1 + bytes
     Match->>Match: proto.Unmarshal + simulation
-    Match->>NakamaSDK: opcode 101/102/103/104/105/106 + proto.Marshal bytes
+    Match->>NakamaSDK: opcode 101/102/103/104/105/106/107 + proto.Marshal bytes
     NakamaSDK->>Unity: ReceivedMatchState
     Unity->>Unity: Message.Parser.ParseFrom(state.State)
 ```
@@ -78,6 +79,9 @@ socket.ReceivedMatchState += state => {
         case 106:
             Handle(CharacterBoxStateBatch.Parser.ParseFrom(state.State));
             break;
+        case 107:
+            Handle(MatchLifecycleState.Parser.ParseFrom(state.State));
+            break;
     }
 };
 ```
@@ -103,4 +107,4 @@ Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf ho�
 - Embedded `weapons.json` và `strategies.json`.
 - RPC `healthcheck` response.
 
-Realtime opcode `1`, `101`, `102`, `103`, `104`, `105`, `106` đều dùng Protobuf binary.
+Realtime opcode `1`, `101`, `102`, `103`, `104`, `105`, `106`, `107` đều dùng Protobuf binary.

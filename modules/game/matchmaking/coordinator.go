@@ -80,16 +80,13 @@ func findOrCreate(ctx context.Context, logger runtime.Logger, nk runtime.NakamaM
 	findOrCreateMutex.Lock()
 	defer findOrCreateMutex.Unlock()
 
-	allowJoin := request.Mode != royale.DefaultMode
-	if allowJoin {
-		matches, err := findJoinable(ctx, nk, request, requiredSlots)
-		if err != nil {
-			return "", false, err
-		}
-		if len(matches) > 0 {
-			logger.Info("Backfilling %s match: match_id=%s players=%d", request.Mode, matches[0].GetMatchId(), requiredSlots)
-			return matches[0].GetMatchId(), false, nil
-		}
+	matches, err := findJoinable(ctx, nk, request, requiredSlots)
+	if err != nil {
+		return "", false, err
+	}
+	if len(matches) > 0 {
+		logger.Info("Backfilling %s match: match_id=%s players=%d", request.Mode, matches[0].GetMatchId(), requiredSlots)
+		return matches[0].GetMatchId(), false, nil
 	}
 
 	moduleName := moduleNameForMode(request.Mode)
@@ -105,7 +102,7 @@ func findOrCreate(ctx context.Context, logger runtime.Logger, nk runtime.NakamaM
 }
 
 func findJoinable(ctx context.Context, nk runtime.NakamaModule, request Request, requiredSlots int) ([]*api.Match, error) {
-	maxCurrentSize := survival.MaxPlayers - requiredSlots
+	maxCurrentSize := maxPlayersForMode(request.Mode) - requiredSlots
 	if maxCurrentSize < 0 {
 		return nil, errors.New("matched party exceeds match capacity")
 	}
@@ -123,7 +120,18 @@ func findJoinable(ctx context.Context, nk runtime.NakamaModule, request Request,
 }
 
 func matchQuery(request Request) string {
-	return fmt.Sprintf("+label.mode:%s +label.joinable:T +label.max_players:%d", request.Mode, survival.MaxPlayers)
+	query := fmt.Sprintf("+label.mode:%s +label.joinable:T +label.max_players:%d", request.Mode, maxPlayersForMode(request.Mode))
+	if request.Mode == royale.DefaultMode {
+		query += " +label.status:waiting"
+	}
+	return query
+}
+
+func maxPlayersForMode(mode string) int {
+	if mode == royale.DefaultMode {
+		return royale.MaxPlayers
+	}
+	return survival.MaxPlayers
 }
 
 func moduleNameForMode(mode string) string {

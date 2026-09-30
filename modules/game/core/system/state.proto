@@ -8,3 +8,17 @@ message StateSnapshot {
   int64 tick = 1;
   int32 player_count = 2;
 }
+
+enum MatchPhase {
+  MATCH_PHASE_UNSPECIFIED = 0;
+  MATCH_PHASE_WAITING = 1;
+  MATCH_PHASE_PLAYING = 2;
+  MATCH_PHASE_ENDED = 3;
+}
+
+message MatchLifecycleState {
+  MatchPhase phase = 1;
+  int64 server_tick = 2;
+  int64 phase_ends_at_tick = 3;
+  int32 tick_rate = 4;
+}
