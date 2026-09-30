@@ -36,6 +36,7 @@ Tài liệu này mô tả trạng thái đã triển khai của Squad Survival S
 7. [Realtime protocol và Unity](realtime-protocol.md)
 8. [Kiểm thử và code generation](testing.md)
 9. [Battle Royale lifecycle](battle-royale.md)
+10. [Character skin runtime](character-skins.md)
 
 ## Planned
 

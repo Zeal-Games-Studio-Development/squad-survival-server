@@ -163,6 +163,7 @@ type CharacterRoster struct {
 	WeaponType    string                 `protobuf:"bytes,10,opt,name=weapon_type,json=weaponType,proto3" json:"weapon_type,omitempty"`
 	RangeClass    string                 `protobuf:"bytes,11,opt,name=range_class,json=rangeClass,proto3" json:"range_class,omitempty"`
 	WeaponName    string                 `protobuf:"bytes,12,opt,name=weapon_name,json=weaponName,proto3" json:"weapon_name,omitempty"`
+	Skin          *CharacterSkin         `protobuf:"bytes,13,opt,name=skin,proto3" json:"skin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -281,11 +282,18 @@ func (x *CharacterRoster) GetWeaponName() string {
 	return ""
 }
 
+func (x *CharacterRoster) GetSkin() *CharacterSkin {
+	if x != nil {
+		return x.Skin
+	}
+	return nil
+}
+
 var File_modules_game_core_system_roster_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\n" +
-	"%modules/game/core/system/roster.proto\x12\x10game.core.system\"a\n" +
+	"%modules/game/core/system/roster.proto\x12\x10game.core.system\x1a#modules/game/core/system/skin.proto\"a\n" +
 	"\x11PlayerRosterBatch\x12\x12\n" +
 	"\x04tick\x18\x01 \x01(\x03R\x04tick\x128\n" +
 	"\aplayers\x18\x02 \x03(\v2\x1e.game.core.system.PlayerRosterR\aplayers\"\xd3\x01\n" +
@@ -297,7 +305,7 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\x0eroster_version\x18\x04 \x01(\x04R\rrosterVersion\x12A\n" +
 	"\n" +
 	"characters\x18\x05 \x03(\v2!.game.core.system.CharacterRosterR\n" +
-	"characters\"\x8d\x03\n" +
+	"characters\"\xc2\x03\n" +
 	"\x0fCharacterRoster\x12!\n" +
 	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12\x16\n" +
 	"\x06health\x18\x02 \x01(\x01R\x06health\x12\x1d\n" +
@@ -317,7 +325,8 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\vrange_class\x18\v \x01(\tR\n" +
 	"rangeClass\x12\x1f\n" +
 	"\vweapon_name\x18\f \x01(\tR\n" +
-	"weaponNameB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
+	"weaponName\x123\n" +
+	"\x04skin\x18\r \x01(\v2\x1f.game.core.system.CharacterSkinR\x04skinB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
 
 var (
 	file_modules_game_core_system_roster_proto_rawDescOnce sync.Once
@@ -336,15 +345,17 @@ var file_modules_game_core_system_roster_proto_goTypes = []any{
 	(*PlayerRosterBatch)(nil), // 0: game.core.system.PlayerRosterBatch
 	(*PlayerRoster)(nil),      // 1: game.core.system.PlayerRoster
 	(*CharacterRoster)(nil),   // 2: game.core.system.CharacterRoster
+	(*CharacterSkin)(nil),     // 3: game.core.system.CharacterSkin
 }
 var file_modules_game_core_system_roster_proto_depIdxs = []int32{
 	1, // 0: game.core.system.PlayerRosterBatch.players:type_name -> game.core.system.PlayerRoster
 	2, // 1: game.core.system.PlayerRoster.characters:type_name -> game.core.system.CharacterRoster
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 2: game.core.system.CharacterRoster.skin:type_name -> game.core.system.CharacterSkin
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_modules_game_core_system_roster_proto_init() }
@@ -352,6 +363,7 @@ func file_modules_game_core_system_roster_proto_init() {
 	if File_modules_game_core_system_roster_proto != nil {
 		return
 	}
+	file_modules_game_core_system_skin_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

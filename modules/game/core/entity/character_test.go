@@ -19,6 +19,14 @@ func TestNewCharacterUsesDefaultStats(t *testing.T) {
 	}
 }
 
+func TestCharacterRetainsAssignedSkin(t *testing.T) {
+	character := NewCharacter()
+	character.Skin = Skin{HairID: 2, WeaponID: 3}
+	if character.Skin.HairID != 2 || character.Skin.WeaponID != 3 {
+		t.Fatalf("unexpected character skin: %+v", character.Skin)
+	}
+}
+
 func TestCharacterDamageRange(t *testing.T) {
 	character := Character{Damage: 10, DamageRatio: 1.1}
 	minimum, maximum := character.DamageRange()

@@ -11,6 +11,7 @@ import (
 
 func TestEncodePlayerRosterBatch(t *testing.T) {
 	player := entity.NewPlayer("user-1", "session-1", "Player One", entity.Vector2{}, rand.New(rand.NewSource(1)))
+	player.Characters[0].Skin = entity.Skin{HairID: 1, BeardID: 2, ChestID: 3, EyeID: 4, HelmetID: 5, WeaponID: 6, ProjectileID: 7}
 	player.Characters = append(player.Characters, nil)
 	data, err := EncodePlayerRosterBatch(12, []*entity.Player{player, nil})
 	if err != nil {
@@ -37,5 +38,9 @@ func TestEncodePlayerRosterBatch(t *testing.T) {
 		character.RegenRate != source.RegenRate || character.DamageRatio != source.DamageRatio ||
 		character.WeaponType != string(source.Weapon.Type) || character.RangeClass != string(source.RangeClass) || character.WeaponName != source.Weapon.Name {
 		t.Fatalf("unexpected character roster: %+v", character)
+	}
+	if character.Skin == nil || character.Skin.HairId != 1 || character.Skin.BeardId != 2 || character.Skin.ChestId != 3 ||
+		character.Skin.EyeId != 4 || character.Skin.HelmetId != 5 || character.Skin.WeaponId != 6 || character.Skin.ProjectileId != 7 {
+		t.Fatalf("unexpected character skin roster: %+v", character.Skin)
 	}
 }

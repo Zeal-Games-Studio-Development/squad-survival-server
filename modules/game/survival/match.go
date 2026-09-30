@@ -16,6 +16,8 @@ import (
 	"squad-survival-be/modules/game/core/system"
 	"squad-survival-be/modules/game/core/world"
 	"squad-survival-be/modules/game/matchregistry"
+	"squad-survival-be/modules/skin/catalog"
+	"squad-survival-be/modules/skin/loadout"
 
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -56,7 +58,10 @@ type State struct {
 	NextCharacterBoxID  uint64
 	NextBoxRefillTick   int64
 	EmptyTicks          int64
-	random              *rand.Rand
+	SkinCatalog         *catalog.Catalog
+	SkinInventories     map[string]loadout.Owned
+	random              *rand.Rand // Gameplay RNG: spawn, weapon, combat, and damage.
+	cosmeticRandom      *rand.Rand
 }
 
 type Label struct {
@@ -74,6 +79,7 @@ func NewMatchHandler(registry *matchregistry.Registry) func(context.Context, run
 }
 
 func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
+	randomSeed := time.Now().UnixNano()
 	state := &State{
 		MatchID:             matchIDFromContext(ctx),
 		Mode:                stringParam(params, "mode", DefaultMode),
@@ -87,7 +93,10 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		CharacterBoxes:      make(map[string]*entity.CharacterBox),
 		WeaponCatalog:       entity.DefaultWeaponCatalog(),
 		NextBoxRefillTick:   characterBoxRefillTicks,
-		random:              rand.New(rand.NewSource(time.Now().UnixNano())),
+		SkinCatalog:         catalog.DefaultCatalog(),
+		SkinInventories:     make(map[string]loadout.Owned),
+		random:              rand.New(rand.NewSource(randomSeed)),
+		cosmeticRandom:      rand.New(rand.NewSource(randomSeed + 1)),
 	}
 	initialBoxTarget := state.randomCharacterBoxTarget()
 	state.spawnCharacterBoxes(initialBoxTarget)
@@ -122,6 +131,17 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, rawState interface{}, presences []runtime.Presence) interface{} {
 	state := rawState.(*State)
 	playerCount := len(state.Players)
+	state.ensureSkinState()
+	userIDs := make([]string, 0, len(presences))
+	for _, presence := range presences {
+		userIDs = append(userIDs, presence.GetUserId())
+	}
+	ownedByUser, skinErrors := loadout.Load(ctx, nk, userIDs, state.SkinCatalog)
+	for _, skinErr := range skinErrors {
+		if logger != nil {
+			logger.Error("Could not load player skin inventory: %v", skinErr)
+		}
+	}
 	displayNames, err := resolveDisplayNames(ctx, nk, presences)
 	if err != nil && logger != nil {
 		logger.Error("Could not load player display names: %v", err)
@@ -147,6 +167,12 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 			state.randomPlayerSpawn(),
 			state.random,
 		)
+		owned := ownedByUser[presence.GetUserId()]
+		for _, character := range player.Characters {
+			if character != nil {
+				character.Skin = loadout.RandomSkin(state.cosmeticRandom, owned, character.Weapon.Type)
+			}
+		}
 		if err = state.SpatialGrid.Insert(player); err != nil {
 			m.registry.RemoveSession(presence.GetSessionId())
 			if logger != nil {
@@ -156,6 +182,7 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		}
 		state.Players[presence.GetSessionId()] = player
 		state.Presences[presence.GetSessionId()] = presence
+		state.SkinInventories[presence.GetSessionId()] = owned
 		state.sendInitialRoster(logger, dispatcher, tick, presence, player)
 		state.sendCurrentCharacterBoxes(logger, dispatcher, tick, presence)
 	}
@@ -204,6 +231,7 @@ func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, 
 		}
 		delete(state.Players, presence.GetSessionId())
 		delete(state.Presences, presence.GetSessionId())
+		delete(state.SkinInventories, presence.GetSessionId())
 		state.removeRosterTracking(presence.GetSessionId())
 		m.registry.RemoveSession(presence.GetSessionId())
 	}
@@ -286,6 +314,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 }
 
 func (s *State) ensureCharacterBoxState(tick int64) {
+	s.ensureSkinState()
 	if s.CharacterBoxes == nil {
 		s.CharacterBoxes = make(map[string]*entity.CharacterBox)
 	}
@@ -297,6 +326,18 @@ func (s *State) ensureCharacterBoxState(tick int64) {
 	}
 	if s.NextBoxRefillTick == 0 {
 		s.NextBoxRefillTick = tick + characterBoxRefillTicks
+	}
+}
+
+func (s *State) ensureSkinState() {
+	if s.SkinCatalog == nil {
+		s.SkinCatalog = catalog.DefaultCatalog()
+	}
+	if s.SkinInventories == nil {
+		s.SkinInventories = make(map[string]loadout.Owned)
+	}
+	if s.cosmeticRandom == nil {
+		s.cosmeticRandom = rand.New(rand.NewSource(time.Now().UnixNano()))
 	}
 }
 
@@ -452,6 +493,7 @@ func (s *State) collectCharacterBoxes(logger runtime.Logger) []system.CharacterB
 		for _, collision := range collisions {
 			character := entity.NewCharacter()
 			character.ApplyWeapon(weapon)
+			character.Skin = loadout.RandomSkin(s.cosmeticRandom, s.SkinInventories[collision.player.SessionID], weapon.Type)
 			if err := collision.player.AddCharacter(character); err != nil {
 				continue
 			}

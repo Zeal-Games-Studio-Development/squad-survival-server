@@ -22,6 +22,9 @@ func TestMatchInitStartsWaiting(t *testing.T) {
 	if rate != tickRate || state.Phase != PhaseWaiting || state.WaitingEndsAtTick != 0 {
 		t.Fatalf("unexpected initial lifecycle: rate=%d state=%+v", rate, state)
 	}
+	if state.random == nil || state.cosmeticRandom == nil || state.random == state.cosmeticRandom {
+		t.Fatal("gameplay and cosmetic random sources were not separated")
+	}
 	want := `{"mode":"battle-royale","status":"waiting","player_count":0,"max_players":32,"joinable":true}`
 	if label != want {
 		t.Fatalf("unexpected initial label: got %s want %s", label, want)
@@ -36,6 +39,10 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 
 	if state.WaitingEndsAtTick != 10+waitingDurationTicks {
 		t.Fatalf("unexpected waiting deadline: %d", state.WaitingEndsAtTick)
+	}
+	initialSkin := state.Players[presence.sessionID].Characters[0].Skin
+	if initialSkin.HairID != 1 || initialSkin.BeardID != 1 || initialSkin.ChestID != 1 || initialSkin.EyeID != 1 || initialSkin.HelmetID != 1 {
+		t.Fatalf("initial character did not receive fallback skin: %+v", initialSkin)
 	}
 	assertLifecycle(t, dispatcher, system.MatchPhase_MATCH_PHASE_WAITING, 10, state.WaitingEndsAtTick, true)
 
@@ -54,6 +61,13 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 	match.MatchLoop(nil, nil, nil, nil, dispatcher, state.WaitingEndsAtTick, state, nil)
 	if state.Phase != PhasePlaying || state.PlayingEndsAtTick != state.WaitingEndsAtTick+playingDurationTicks {
 		t.Fatalf("match did not start on deadline: %+v", state)
+	}
+	if len(player.Characters) != 2 {
+		t.Fatalf("playing transition did not award character box: %d", len(player.Characters))
+	}
+	awardedSkin := player.Characters[1].Skin
+	if awardedSkin.HairID != 1 || awardedSkin.WeaponID != 1 || awardedSkin.ProjectileID != 1 {
+		t.Fatalf("awarded character did not receive fallback bow skin: %+v", awardedSkin)
 	}
 	wantPlayingLabel := `{"mode":"battle-royale","status":"playing","player_count":1,"max_players":32,"joinable":false}`
 	if dispatcher.label != wantPlayingLabel {
