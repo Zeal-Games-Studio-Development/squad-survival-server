@@ -13,6 +13,18 @@ Nếu một trục đạt `0.2` trở lên, movement được ưu tiên và atta
 
 Target gần nhất được chọn; hòa khoảng cách thì theo target `UserID`, sau đó `Character.ID`. Target rời attack range hoặc chết trước impact làm đòn bị hủy.
 
+## Spatial Combat Query
+
+Target acquisition không quét toàn bộ character trong match. Mỗi tick, Survival và Battle Royale dùng `SpatialGrid.QueryPlayers` để lấy candidate players trong `DetectionRadius` của attacker; combat chỉ duyệt character thuộc các candidate này rồi kiểm tra chính xác `AttackRange` theo vị trí character.
+
+Combat query dùng safety buffer cấu hình trong `modules/game/core/combat/config.json`. Điều kiện bắt buộc là:
+
+```text
+AttackRange + QueryBuffer <= DetectionRadius
+```
+
+Buffer mặc định là `5 world units`; với detection radius mặc định `20`, attack range hợp lệ tối đa là `15`. Buffer dành cho formation offset và character follow lag, không làm tăng tầm đánh. Player ở cell cạnh hoặc cell chéo vẫn được tìm thấy vì spatial grid tự duyệt mọi cell giao với detection radius. Nếu target rời candidate region hoặc attack range trước impact, attack đang chạy bị reset.
+
 ## Attack Timing
 
 ```text
@@ -61,7 +73,7 @@ Khi khoảng cách còn lại nhỏ hơn quãng đường của một tick, proj
 
 Opcode `103` phát reliable events: `AttackStarted`, `ProjectileSpawned`, `ProjectileHit`, `ProjectileExpired`, `DamageApplied`, `CharacterDied`.
 
-Opcode `102` đồng thời chứa projectile đang active để Unity reconcile visual ngay cả khi không còn event spawn trong tick hiện tại.
+Opcode `105` chứa projectile đang active để Unity reconcile visual ngay cả khi không còn event spawn trong tick hiện tại. Projectile đã spawn tiếp tục được simulate bằng lookup toàn match và không phụ thuộc candidate set dùng để acquire attack mới.
 
 ## Giới Hạn Hiện Tại
 

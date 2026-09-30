@@ -99,6 +99,10 @@ func NewMatchHandler(registry *matchregistry.Registry) func(context.Context, run
 
 func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, params map[string]interface{}) (interface{}, int, string) {
 	randomSeed := time.Now().UnixNano()
+	weaponCatalog := entity.DefaultWeaponCatalog()
+	if err := combat.ValidateWeaponRanges(weaponCatalog, entity.DefaultDetectionRadius, combat.DefaultConfig()); err != nil {
+		panic("invalid battle royale combat configuration: " + err.Error())
+	}
 	state := &State{
 		MatchID:             matchIDFromContext(ctx),
 		Mode:                stringParam(params, "mode", DefaultMode),
@@ -110,7 +114,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		Combat:              combat.NewSimulation(),
 		RosterVersions:      make(map[string]map[string]uint64),
 		CharacterBoxes:      make(map[string]*entity.CharacterBox),
-		WeaponCatalog:       entity.DefaultWeaponCatalog(),
+		WeaponCatalog:       weaponCatalog,
 		NextBoxRefillTick:   characterBoxRefillTicks,
 		SkinCatalog:         catalog.DefaultCatalog(),
 		SkinInventories:     make(map[string]loadout.Owned),
@@ -370,7 +374,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	if state.Combat == nil {
 		state.Combat = combat.NewSimulation()
 	}
-	combatEvents := state.Combat.Step(state.Players, tick, state.random)
+	combatEvents := state.Combat.Step(state.Players, nearbyPlayers, tick, state.random)
 	for _, player := range state.Players {
 		if player.IsEliminated() {
 			player.Direction = entity.Vector2{}

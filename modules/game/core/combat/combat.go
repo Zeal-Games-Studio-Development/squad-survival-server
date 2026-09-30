@@ -45,7 +45,10 @@ type Projectile struct {
 	Speed, Damage                       float64
 }
 
-type Simulation struct{ projectiles map[string]*Projectile }
+type Simulation struct {
+	projectiles map[string]*Projectile
+	config      Config
+}
 type ownedCharacter struct {
 	owner     *entity.Player
 	character *entity.Character
@@ -55,7 +58,9 @@ type damageIntent struct {
 	target *entity.Character
 }
 
-func NewSimulation() *Simulation { return &Simulation{projectiles: make(map[string]*Projectile)} }
+func NewSimulation() *Simulation {
+	return &Simulation{projectiles: make(map[string]*Projectile), config: DefaultConfig()}
+}
 
 func (s *Simulation) Projectiles() []*Projectile {
 	if s == nil {
@@ -69,23 +74,27 @@ func (s *Simulation) Projectiles() []*Projectile {
 	return projectiles
 }
 
-func (s *Simulation) Step(players map[string]*entity.Player, tick int64, random *rand.Rand) []Event {
+func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[string][]*entity.Player, tick int64, random *rand.Rand) []Event {
 	if s == nil {
 		return nil
 	}
 	if s.projectiles == nil {
 		s.projectiles = make(map[string]*Projectile)
 	}
+	if err := s.config.Validate(); err != nil {
+		s.config = DefaultConfig()
+	}
 	if random == nil {
 		random = rand.New(rand.NewSource(tick))
 	}
 	characters := sortedCharacters(players)
 	lookup := characterLookup(characters)
+	candidates := candidateCharactersBySession(nearbyPlayers)
 	intents, events := s.stepProjectiles(lookup, tick)
 
 	for _, attacker := range characters {
 		character := attacker.character
-		if !canAttack(attacker) {
+		if !canAttack(attacker, s.config.QueryBuffer) {
 			character.ResetAttack()
 			continue
 		}
@@ -93,7 +102,7 @@ func (s *Simulation) Step(players map[string]*entity.Player, tick int64, random 
 			continue
 		}
 		target, ok := lookup[targetKey(character.TargetUserID, character.TargetCharacterID)]
-		if !ok || !validTarget(attacker, target) || !withinRange(character, target.character) {
+		if !ok || !isCandidatePlayer(attacker.owner, target.owner, nearbyPlayers) || !validTarget(attacker, target) || !withinRange(character, target.character) {
 			character.ResetAttack()
 			continue
 		}
@@ -126,10 +135,10 @@ func (s *Simulation) Step(players map[string]*entity.Player, tick int64, random 
 				character.ResetAttack()
 			}
 		}
-		if !canAttack(attacker) || character.TargetCharacterID != "" {
+		if !canAttack(attacker, s.config.QueryBuffer) || character.TargetCharacterID != "" {
 			continue
 		}
-		if target, ok := nearestTarget(attacker, characters); ok {
+		if target, ok := nearestTarget(attacker, candidates[attacker.owner.SessionID]); ok {
 			events = append(events, startAttack(attacker, target, tick))
 		}
 	}
@@ -272,9 +281,9 @@ func nearestTarget(attacker ownedCharacter, characters []ownedCharacter) (ownedC
 	return selected, found
 }
 
-func canAttack(attacker ownedCharacter) bool {
+func canAttack(attacker ownedCharacter, queryBuffer float64) bool {
 	character := attacker.character
-	if character == nil || character.ID == "" || character.Health <= 0 || character.AttackSpeed <= 0 || character.AttackRange < 0 || character.ImpactRatio <= 0 || character.ImpactRatio > 1 {
+	if character == nil || character.ID == "" || character.Health <= 0 || character.AttackSpeed <= 0 || character.AttackRange < 0 || character.AttackRange+queryBuffer > attacker.owner.DetectionRadius || character.ImpactRatio <= 0 || character.ImpactRatio > 1 {
 		return false
 	}
 	if math.Abs(attacker.owner.Direction.X) >= AttackMovementThreshold || math.Abs(attacker.owner.Direction.Y) >= AttackMovementThreshold {
@@ -284,6 +293,43 @@ func canAttack(attacker ownedCharacter) bool {
 		return character.Weapon.ProjectileSpeed > 0
 	}
 	return character.RangeClass == entity.RangeMelee
+}
+
+func candidateCharactersBySession(nearbyPlayers map[string][]*entity.Player) map[string][]ownedCharacter {
+	result := make(map[string][]ownedCharacter, len(nearbyPlayers))
+	for sessionID, players := range nearbyPlayers {
+		characterCount := 0
+		for _, player := range players {
+			if player != nil {
+				characterCount += len(player.Characters)
+			}
+		}
+		characters := make([]ownedCharacter, 0, characterCount)
+		for _, player := range players {
+			if player == nil || player.SessionID == sessionID {
+				continue
+			}
+			for _, character := range player.Characters {
+				if character != nil {
+					characters = append(characters, ownedCharacter{owner: player, character: character})
+				}
+			}
+		}
+		result[sessionID] = characters
+	}
+	return result
+}
+
+func isCandidatePlayer(attacker, target *entity.Player, nearbyPlayers map[string][]*entity.Player) bool {
+	if attacker == nil || target == nil {
+		return false
+	}
+	for _, candidate := range nearbyPlayers[attacker.SessionID] {
+		if candidate != nil && candidate.SessionID == target.SessionID {
+			return true
+		}
+	}
+	return false
 }
 
 func validTarget(attacker, target ownedCharacter) bool {

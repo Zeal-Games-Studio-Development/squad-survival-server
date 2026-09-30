@@ -24,7 +24,7 @@ matchmaking cùng các Survival và Battle Royale match handler trong cùng proc
 
 ## Authoritative State
 
-Mỗi authoritative match sở hữu state độc lập, gồm player, presence, reservation, spatial grid, combat simulation, random source và snapshot skin inventory theo session. Movement, health, formation và projectile đều do server quyết định. Battle Royale bổ sung phase và deadline tick cho phòng chờ, gameplay và thời gian giữ match sau khi kết thúc.
+Mỗi authoritative match sở hữu state độc lập, gồm player, presence, reservation, spatial grid, combat simulation, random source và snapshot skin inventory theo session. Movement, health, formation và projectile đều do server quyết định. Combat của cả hai mode dùng player trong spatial detection làm candidate set, sau đó kiểm tra attack range chính xác giữa các character. Battle Royale bổ sung phase và deadline tick cho phòng chờ, gameplay và thời gian giữ match sau khi kết thúc.
 
 State gameplay chỉ tồn tại trong memory. Nakama Storage/PostgreSQL hiện chưa lưu position, character health, formation hoặc projectile.
 

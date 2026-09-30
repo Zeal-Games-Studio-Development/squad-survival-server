@@ -97,6 +97,13 @@ func TestParseWeaponCatalogRejectsRangedWeaponWithoutProjectileSpeed(t *testing.
 	}
 }
 
+func TestParseWeaponCatalogRejectsInvalidAttackRange(t *testing.T) {
+	data := `{"weapons":[{"type":"sword","name":"sword","range_class":"melee","attack_speed":1,"attack_range":-1,"impact_ratio":0.5,"projectile_speed":0}]}`
+	if _, err := ParseWeaponCatalog([]byte(data)); err == nil {
+		t.Fatal("expected negative attack range to fail")
+	}
+}
+
 func TestCreateCharacterSelectsWeaponFromCatalog(t *testing.T) {
 	weapons := DefaultWeaponCatalog()
 	character := CreateCharacter(rand.New(rand.NewSource(1)), weapons)

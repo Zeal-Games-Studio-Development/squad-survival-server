@@ -66,6 +66,9 @@ func ParseWeaponCatalog(data []byte) ([]Weapon, error) {
 		if !weapon.RangeClass.Valid() {
 			return nil, errors.New("weapon range class must be melee or ranged")
 		}
+		if !isFinite(weapon.AttackRange) || weapon.AttackRange < 0 {
+			return nil, errors.New("weapon attack range must be finite and non-negative")
+		}
 		if !isFinite(weapon.AttackSpeed) || weapon.AttackSpeed <= 0 {
 			return nil, errors.New("weapon attack speed must be finite and greater than zero")
 		}
