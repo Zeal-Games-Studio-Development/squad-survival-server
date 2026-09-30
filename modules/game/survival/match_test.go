@@ -11,6 +11,7 @@ import (
 	"squad-survival-be/modules/game/core/combat"
 	"squad-survival-be/modules/game/core/entity"
 	"squad-survival-be/modules/game/core/spatial"
+	"squad-survival-be/modules/game/core/strategy"
 	"squad-survival-be/modules/game/core/system"
 	"squad-survival-be/modules/game/matchregistry"
 
@@ -639,7 +640,7 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 func TestCharacterBoxRemainsWhenPlayerIsAtCapacity(t *testing.T) {
 	state := characterBoxTestState(1)
 	player := entity.NewPlayer("user-1", "session-1", "Full", entity.Vector2{}, rand.New(rand.NewSource(2)))
-	for player.CharacterCount() < 5 {
+	for player.CharacterCount() < strategy.MaxCharacters {
 		if err := player.AddCharacter(entity.NewCharacter()); err != nil {
 			t.Fatal(err)
 		}

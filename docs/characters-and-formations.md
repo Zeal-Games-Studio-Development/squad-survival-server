@@ -6,7 +6,7 @@ Player mới được tạo cùng một character có weapon chọn ngẫu nhiê
 
 Character có position, target position, health/max health, damage, movement/attack stats, weapon và combat state. Khi `Health <= 0`, character bị remove trong combat tick; formation được gán lại trước snapshot tiếp theo.
 
-Mỗi player tối đa `25` character non-nil. `nil` không chiếm slot và không xuất hiện trong snapshot.
+Mỗi player tối đa `13` character non-nil. `nil` không chiếm slot và không xuất hiện trong snapshot.
 
 ## Weapon Catalog
 
@@ -30,7 +30,7 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 
 ## Strategy 5x5
 
-Strategy là mask cố định `5x5`: `1` mở slot, `0` khóa slot. Tâm là cell `[2][2]`, khoảng cách slot là `1.5 world units`. Catalog hiện chỉ có strategy `compact` với 25 slot mở.
+Strategy là mask cố định `5x5`: `1` mở slot, `0` khóa slot. Tâm là cell `[2][2]`, khoảng cách slot là `1.5 world units`. Catalog có `x-type` và `plus-type`, mỗi strategy mở 13 slot đối xứng quanh tâm. `x-type` có offset xa nhất khoảng `4.24 units`; `plus-type` có offset xa nhất `3 units`.
 
 Slot được sắp từ gần tâm ra xa, hòa thì theo row/column. Character được stable-sort theo class:
 
@@ -53,13 +53,13 @@ Character không overshoot và không teleport khi formation/facing đổi. Char
 
 ## Character Box
 
-Match duy trì Character Box tĩnh và mỗi phút refill đến target của mode. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính collision, server khóa một box cho một player và bắt đầu countdown; mỗi player chỉ được claim một box. Player phải ở trong vùng, còn sống và còn capacity cho tới deadline. Delay theo số character lúc bắt đầu claim là 1/2/3/4 giây tương ứng với 1/2/3/4 character; đủ 5 character thì không thể claim. Bảng thời gian nằm trong `modules/game/core/characterbox/pickup_delays.json`.
+Match duy trì Character Box tĩnh và mỗi phút refill đến target của mode. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính collision, server khóa một box cho một player và bắt đầu countdown; mỗi player chỉ được claim một box. Player phải ở trong vùng, còn sống và còn capacity cho tới deadline. Delay dựa trên số character lúc bắt đầu claim: count 1–4 chờ tương ứng 1–4 giây, 5–7 chờ 5 giây, 8–10 chờ 6 giây và 11–12 chờ 7 giây. Đủ 13 character thì không thể claim. Bảng thời gian nằm trong `modules/game/core/characterbox/pickup_delays.json`.
 
 Opcode reliable `106` broadcast `PICKUP_STARTED` và `PICKUP_CANCELLED`; client tự tính countdown từ deadline tick. Khi hoàn tất, server mới random skin, grant character và gửi `DESPAWNED`. Box đang được claim vẫn tồn tại trong world và được tính khi refill.
 
 ## Giới Hạn Hiện Tại
 
-- Client chưa có opcode chọn strategy; mọi player dùng `compact`.
+- Client chưa có opcode chọn strategy; mọi player dùng mặc định `x-type`.
 - Character chưa persist qua match restart.
 - Chưa có collision giữa character, obstacle hoặc blocked strategy cell.
 - `impact_ratio` hiện là dữ liệu tạm, chưa hiệu chỉnh theo animation Unity cuối cùng.

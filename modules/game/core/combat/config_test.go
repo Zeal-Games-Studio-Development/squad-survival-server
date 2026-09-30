@@ -7,8 +7,8 @@ import (
 	"squad-survival-be/modules/game/core/entity"
 )
 
-func TestDefaultConfigUsesFiveUnitQueryBuffer(t *testing.T) {
-	if got := DefaultConfig().QueryBuffer; got != 5 {
+func TestDefaultConfigUsesTenUnitQueryBuffer(t *testing.T) {
+	if got := DefaultConfig().QueryBuffer; got != 10 {
 		t.Fatalf("unexpected query buffer: %f", got)
 	}
 }
@@ -27,11 +27,11 @@ func TestCombatConfigRejectsInvalidQueryBuffer(t *testing.T) {
 }
 
 func TestValidateWeaponRangesIncludesBuffer(t *testing.T) {
-	config := Config{QueryBuffer: 5}
-	if err := ValidateWeaponRanges([]entity.Weapon{{Type: entity.WeaponBow, AttackRange: 15}}, 20, config); err != nil {
+	config := Config{QueryBuffer: 10}
+	if err := ValidateWeaponRanges([]entity.Weapon{{Type: entity.WeaponBow, AttackRange: 10}}, 20, config); err != nil {
 		t.Fatalf("expected boundary range to be valid: %v", err)
 	}
-	if err := ValidateWeaponRanges([]entity.Weapon{{Type: entity.WeaponBow, AttackRange: 15.01}}, 20, config); err == nil {
+	if err := ValidateWeaponRanges([]entity.Weapon{{Type: entity.WeaponBow, AttackRange: 10.01}}, 20, config); err == nil {
 		t.Fatal("expected attack range plus buffer above detection radius to fail")
 	}
 }

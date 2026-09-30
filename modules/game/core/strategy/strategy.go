@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	GridSize      = 3
+	GridSize      = 5
 	GridCenter    = GridSize / 2
-	MaxCharacters = 5
+	MaxCharacters = 13
 	SlotSpacing   = 1.5
 
 	DefaultStrategyName = "x-type"

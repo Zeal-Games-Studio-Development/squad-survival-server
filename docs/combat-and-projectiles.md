@@ -23,7 +23,7 @@ Combat query dùng safety buffer cấu hình trong `modules/game/core/combat/con
 AttackRange + QueryBuffer <= DetectionRadius
 ```
 
-Buffer mặc định là `5 world units`; với detection radius mặc định `20`, attack range hợp lệ tối đa là `15`. Buffer dành cho formation offset và character follow lag, không làm tăng tầm đánh. Player ở cell cạnh hoặc cell chéo vẫn được tìm thấy vì spatial grid tự duyệt mọi cell giao với detection radius. Nếu target rời candidate region hoặc attack range trước impact, attack đang chạy bị reset.
+Buffer mặc định là `10 world units`; với detection radius mặc định `20`, attack range hợp lệ tối đa là `10`. Formation 5×5 có tổng offset hai phía lớn nhất khoảng `8.49 units`; phần buffer còn lại dành cho character follow lag. Buffer không làm tăng tầm đánh. Player ở cell cạnh hoặc cell chéo vẫn được tìm thấy vì spatial grid tự duyệt mọi cell giao với detection radius. Nếu target rời candidate region hoặc attack range trước impact, attack đang chạy bị reset.
 
 ## Attack Timing
 

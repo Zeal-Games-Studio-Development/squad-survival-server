@@ -210,6 +210,22 @@ func TestTargetAcquisitionUsesOnlySpatialCandidatesAcrossCells(t *testing.T) {
 	}
 }
 
+func TestCombatQueryCoversOpposingFiveByFiveFormationCorners(t *testing.T) {
+	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{X: 3, Y: 3}, 10, 0.5)
+	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 10, Y: 10}, 1, 0.5)
+	attacker.Position = entity.Vector2{}
+	target.Position = entity.Vector2{X: 13, Y: 13}
+	players := playerMap(attacker, target)
+	nearby := spatialCandidates(t, players)
+	if len(nearby[attacker.SessionID]) != 1 {
+		t.Fatalf("target player center was not detected: %+v", nearby[attacker.SessionID])
+	}
+	events := NewSimulation().Step(players, nearby, 1, rand.New(rand.NewSource(1)))
+	if findEvent(events, EventAttackStarted, "a:1") == nil {
+		t.Fatal("characters at opposing 5x5 formation corners were not considered for attack")
+	}
+}
+
 func TestTargetOutsideCandidateSetIsNotAcquiredAndActiveAttackResets(t *testing.T) {
 	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
@@ -226,7 +242,7 @@ func TestTargetOutsideCandidateSetIsNotAcquiredAndActiveAttackResets(t *testing.
 }
 
 func TestAttackRangePlusBufferCannotExceedDetectionRadius(t *testing.T) {
-	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 15.01, 0.5)
+	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 10.01, 0.5)
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
 	players := playerMap(attacker, target)
 	events := NewSimulation().Step(players, allNearby(players), 1, rand.New(rand.NewSource(1)))

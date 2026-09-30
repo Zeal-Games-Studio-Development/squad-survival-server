@@ -1,10 +1,13 @@
 package strategy
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestDefaultStrategies(t *testing.T) {
-	if MaxCharacters != 5 {
-		t.Fatalf("expected maximum of 5 characters, got %d", MaxCharacters)
+	if GridSize != 5 || GridCenter != 2 || MaxCharacters != 13 {
+		t.Fatalf("unexpected formation constants: size=%d center=%d max=%d", GridSize, GridCenter, MaxCharacters)
 	}
 	for _, strategyName := range []string{"x-type", "plus-type"} {
 		definition, ok := DefaultDefinition(strategyName)
@@ -18,17 +21,25 @@ func TestDefaultStrategies(t *testing.T) {
 		if slots[0].Row != GridCenter || slots[0].Column != GridCenter || slots[0].Offset.X != 0 || slots[0].Offset.Y != 0 {
 			t.Fatalf("expected %q center slot first, got %+v", strategyName, slots[0])
 		}
+		maximumDistance := math.Sqrt(slots[len(slots)-1].DistanceSquared)
+		wantMaximumDistance := 3.0
+		if strategyName == "x-type" {
+			wantMaximumDistance = math.Sqrt(18)
+		}
+		if math.Abs(maximumDistance-wantMaximumDistance) > 1e-9 {
+			t.Fatalf("expected %q maximum offset %f, got %f", strategyName, wantMaximumDistance, maximumDistance)
+		}
 	}
 }
 
 func TestParseCatalogRejectsInvalidDefinitions(t *testing.T) {
 	tests := []string{
 		`{"strategies":[]}`,
-		`{"strategies":[{"type":"","grid":[[1,1,1],[1,1,1],[1,1,1]]}]}`,
+		`{"strategies":[{"type":"","grid":[[1,1,1,1,1],[1,1,1,1,1],[1,1,1,1,1],[1,1,1,1,1],[1,1,1,1,1]]}]}`,
 		`{"strategies":[{"type":"x","grid":[[1]]}]}`,
-		`{"strategies":[{"type":"x","grid":[[2,0,0],[0,0,0],[0,0,0]]}]}`,
-		`{"strategies":[{"type":"x","grid":[[0,0,0],[0,0,0],[0,0,0]]}]}`,
-		`{"strategies":[{"type":"x","grid":[[1,0,0],[0,0,0],[0,0,0]]},{"type":"x","grid":[[1,0,0],[0,0,0],[0,0,0]]}]}`,
+		`{"strategies":[{"type":"x","grid":[[2,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]}]}`,
+		`{"strategies":[{"type":"x","grid":[[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]}]}`,
+		`{"strategies":[{"type":"x","grid":[[1,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]},{"type":"x","grid":[[1,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]}]}`,
 	}
 	for _, data := range tests {
 		if _, err := ParseCatalog([]byte(data)); err == nil {

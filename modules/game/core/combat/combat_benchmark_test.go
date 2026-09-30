@@ -8,7 +8,7 @@ import (
 	"squad-survival-be/modules/game/core/entity"
 )
 
-func BenchmarkCombatCandidateAcquisition32Players160Characters(b *testing.B) {
+func BenchmarkCombatCandidateAcquisition32Players416Characters(b *testing.B) {
 	for _, scenario := range []struct {
 		name   string
 		nearby bool
@@ -17,7 +17,7 @@ func BenchmarkCombatCandidateAcquisition32Players160Characters(b *testing.B) {
 		{name: "dispersed", nearby: false},
 	} {
 		b.Run(scenario.name, func(b *testing.B) {
-			players := benchmarkPlayers(32, 5)
+			players := benchmarkPlayers(32, 13)
 			candidates := make(map[string][]*entity.Player, len(players))
 			if scenario.nearby {
 				candidates = allNearby(players)
