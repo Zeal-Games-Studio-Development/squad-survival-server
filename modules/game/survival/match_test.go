@@ -64,7 +64,8 @@ func TestJoinAndLeaveUpdateCapacityLabel(t *testing.T) {
 		t.Fatalf("expected username fallback, got %q", state.Players[presence.sessionID].DisplayName)
 	}
 	initialSkin := state.Players[presence.sessionID].Characters[0].Skin
-	if initialSkin.HairID != 1 || initialSkin.BeardID != 1 || initialSkin.ChestID != 1 || initialSkin.EyeID != 1 || initialSkin.HelmetID != 1 {
+	if initialSkin.HairID < 0 || initialSkin.HairID > 1 || initialSkin.BeardID < 0 || initialSkin.BeardID > 1 ||
+		initialSkin.ChestID < 0 || initialSkin.ChestID > 1 || initialSkin.EyeID < 0 || initialSkin.EyeID > 1 || initialSkin.HelmetID < 0 || initialSkin.HelmetID > 1 {
 		t.Fatalf("initial character did not receive fallback skin: %+v", initialSkin)
 	}
 	if _, ok := state.SkinInventories[presence.sessionID]; !ok {
@@ -612,7 +613,7 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 	if awarded.Weapon.Type != entity.WeaponBow || awarded.MaxHealth != weapon.Health || awarded.Damage != weapon.Damage {
 		t.Fatalf("character did not receive weapon stats: %#v", awarded)
 	}
-	if awarded.Skin.HairID != 1 || awarded.Skin.WeaponID != 1 || awarded.Skin.ProjectileID != 1 {
+	if awarded.Skin.HairID < 0 || awarded.Skin.HairID > 1 || awarded.Skin.WeaponID != 1 || awarded.Skin.ProjectileID != 1 {
 		t.Fatalf("character did not receive fallback bow skin: %+v", awarded.Skin)
 	}
 	if _, exists := state.CharacterBoxes[box.ID]; exists || len(state.SpatialGrid.QueryCharacterBoxes(entity.Vector2{}, 1)) != 0 {

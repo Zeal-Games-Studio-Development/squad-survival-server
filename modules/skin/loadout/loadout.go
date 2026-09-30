@@ -131,11 +131,11 @@ func errorsForUsers(users map[string]Owned, err error) []error {
 // RandomSkin selects appearance IDs and the IDs relevant to the character's weapon.
 func RandomSkin(random *rand.Rand, owned Owned, weaponType entity.WeaponType) entity.Skin {
 	skin := entity.Skin{
-		HairID:   choose(random, owned[catalog.PartHair]),
-		BeardID:  choose(random, owned[catalog.PartBeard]),
-		ChestID:  choose(random, owned[catalog.PartChest]),
-		EyeID:    choose(random, owned[catalog.PartEye]),
-		HelmetID: choose(random, owned[catalog.PartHelmet]),
+		HairID:   chooseAppearance(random, owned[catalog.PartHair]),
+		BeardID:  chooseAppearance(random, owned[catalog.PartBeard]),
+		ChestID:  chooseAppearance(random, owned[catalog.PartChest]),
+		EyeID:    chooseAppearance(random, owned[catalog.PartEye]),
+		HelmetID: chooseAppearance(random, owned[catalog.PartHelmet]),
 	}
 	if partType, ok := weaponPart(weaponType); ok {
 		skin.WeaponID = choose(random, owned[partType])
@@ -144,6 +144,20 @@ func RandomSkin(random *rand.Rand, owned Owned, weaponType entity.WeaponType) en
 		skin.ProjectileID = choose(random, owned[catalog.PartArrow])
 	}
 	return skin
+}
+
+func chooseAppearance(random *rand.Rand, ids []int) int {
+	if len(ids) == 0 {
+		ids = []int{1}
+	}
+	if random == nil {
+		return 0
+	}
+	offset := random.Intn(len(ids) + 1)
+	if offset == 0 {
+		return 0
+	}
+	return ids[offset-1]
 }
 
 func choose(random *rand.Rand, ids []int) int {

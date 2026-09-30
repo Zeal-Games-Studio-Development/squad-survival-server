@@ -17,16 +17,16 @@ Storage lưu item trực tiếp bằng `key` và numeric `id`, không ghép cano
 
 RPC `skin_lucky_draw` cũng trả `items: [{"key":"hair","id":3}]` thay cho `item_ids` dạng chuỗi.
 
-Nếu storage lỗi, object không tồn tại, JSON invalid hoặc chứa item không có trong catalog, player vẫn được join và toàn bộ skin cần thiết fallback về numeric ID `1`.
+Nếu storage lỗi, object không tồn tại, JSON invalid hoặc chứa item không có trong catalog, player vẫn được join. Các part ngoại hình random giữa runtime-only ID `0` và fallback ID `1`; weapon/projectile fallback về ID `1`.
 
 ## Random loadout
 
 Mỗi character random độc lập từ các ID player sở hữu:
 
-- Ngoại hình luôn gồm `hair`, `beard`, `chest`, `eye` và `helmet`.
+- Ngoại hình luôn gồm `hair`, `beard`, `chest`, `eye` và `helmet`. Mỗi part random thêm lựa chọn runtime-only ID `0`, nghĩa là không render skin cho part đó; ID `0` không nằm trong catalog hoặc storage.
 - `weapon_id` lấy từ part trùng với `weapon_type` của character.
 - Bow dùng `projectile_id` từ part `arrow`.
-- Part bị thiếu trong inventory dùng ID `1`. Exclusive item vẫn được chọn nếu có trong inventory.
+- Part ngoại hình bị thiếu trong inventory random giữa `0` và fallback `1`. Weapon/projectile bị thiếu vẫn dùng ID `1`. Exclusive item vẫn được chọn nếu có trong inventory.
 
 Skin được gán sau weapon và trước khi character được thêm vào roster. Skin chỉ phục vụ render, không thay đổi health, damage, movement hoặc combat.
 

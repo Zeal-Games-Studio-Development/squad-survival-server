@@ -41,7 +41,8 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 		t.Fatalf("unexpected waiting deadline: %d", state.WaitingEndsAtTick)
 	}
 	initialSkin := state.Players[presence.sessionID].Characters[0].Skin
-	if initialSkin.HairID != 1 || initialSkin.BeardID != 1 || initialSkin.ChestID != 1 || initialSkin.EyeID != 1 || initialSkin.HelmetID != 1 {
+	if initialSkin.HairID < 0 || initialSkin.HairID > 1 || initialSkin.BeardID < 0 || initialSkin.BeardID > 1 ||
+		initialSkin.ChestID < 0 || initialSkin.ChestID > 1 || initialSkin.EyeID < 0 || initialSkin.EyeID > 1 || initialSkin.HelmetID < 0 || initialSkin.HelmetID > 1 {
 		t.Fatalf("initial character did not receive fallback skin: %+v", initialSkin)
 	}
 	assertLifecycle(t, dispatcher, system.MatchPhase_MATCH_PHASE_WAITING, 10, state.WaitingEndsAtTick, true)
@@ -66,7 +67,7 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 		t.Fatalf("playing transition did not award character box: %d", len(player.Characters))
 	}
 	awardedSkin := player.Characters[1].Skin
-	if awardedSkin.HairID != 1 || awardedSkin.WeaponID != 1 || awardedSkin.ProjectileID != 1 {
+	if awardedSkin.HairID < 0 || awardedSkin.HairID > 1 || awardedSkin.WeaponID != 1 || awardedSkin.ProjectileID != 1 {
 		t.Fatalf("awarded character did not receive fallback bow skin: %+v", awardedSkin)
 	}
 	wantPlayingLabel := `{"mode":"battle-royale","status":"playing","player_count":1,"max_players":32,"joinable":false}`

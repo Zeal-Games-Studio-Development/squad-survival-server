@@ -53,19 +53,44 @@ func TestRandomSkinUsesOwnedAppearanceAndWeaponParts(t *testing.T) {
 		catalog.PartEye: {5}, catalog.PartHelmet: {6}, catalog.PartBow: {7}, catalog.PartArrow: {8},
 	}
 	skin := RandomSkin(rand.New(rand.NewSource(1)), owned, entity.WeaponBow)
-	if skin != (entity.Skin{HairID: 2, BeardID: 3, ChestID: 4, EyeID: 5, HelmetID: 6, WeaponID: 7, ProjectileID: 8}) {
+	if !oneOf(skin.HairID, 0, 2) || !oneOf(skin.BeardID, 0, 3) || !oneOf(skin.ChestID, 0, 4) ||
+		!oneOf(skin.EyeID, 0, 5) || !oneOf(skin.HelmetID, 0, 6) || skin.WeaponID != 7 || skin.ProjectileID != 8 {
 		t.Fatalf("unexpected bow skin: %+v", skin)
 	}
 }
 
 func TestRandomSkinDefaultsMissingPartsAndLeavesUnknownWeaponUnset(t *testing.T) {
 	skin := RandomSkin(rand.New(rand.NewSource(1)), nil, entity.WeaponType("unknown"))
-	if skin.HairID != 1 || skin.BeardID != 1 || skin.ChestID != 1 || skin.EyeID != 1 || skin.HelmetID != 1 {
-		t.Fatalf("appearance did not use ID 1 fallback: %+v", skin)
+	if !oneOf(skin.HairID, 0, 1) || !oneOf(skin.BeardID, 0, 1) || !oneOf(skin.ChestID, 0, 1) ||
+		!oneOf(skin.EyeID, 0, 1) || !oneOf(skin.HelmetID, 0, 1) {
+		t.Fatalf("appearance did not use ID 0/1 fallback: %+v", skin)
 	}
 	if skin.WeaponID != 0 || skin.ProjectileID != 0 {
 		t.Fatalf("unknown weapon unexpectedly received a catalog skin: %+v", skin)
 	}
+}
+
+func TestRandomSkinCanSelectNoAppearance(t *testing.T) {
+	random := rand.New(rand.NewSource(7))
+	owned := Owned{catalog.PartHair: {2}}
+	seenNone, seenOwned := false, false
+	for range 100 {
+		hairID := RandomSkin(random, owned, entity.WeaponSword).HairID
+		seenNone = seenNone || hairID == 0
+		seenOwned = seenOwned || hairID == 2
+	}
+	if !seenNone || !seenOwned {
+		t.Fatalf("appearance random did not include both no-skin and owned skin: none=%v owned=%v", seenNone, seenOwned)
+	}
+}
+
+func oneOf(value int, allowed ...int) bool {
+	for _, candidate := range allowed {
+		if value == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 type fakeReader struct {
