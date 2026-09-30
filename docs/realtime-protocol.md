@@ -89,7 +89,7 @@ socket.ReceivedMatchState += state => {
 
 `CombatEvent` dùng protobuf `oneof`; Unity kiểm tra `EventCase` trước khi đọc `AttackStarted`, projectile event, damage hoặc death.
 
-`CharacterRoster.skin` chứa các numeric ID để render ngoại hình và weapon của character. Client kết hợp `weapon_type` hiện có với `weapon_id`; `projectile_id` hiện chỉ dùng cho arrow của bow. Dagger chưa có skin catalog nên nhận `weapon_id=0`.
+`CharacterRoster.skin` chứa các numeric ID để render ngoại hình và weapon của character. Client kết hợp `weapon_type` hiện có với `weapon_id`; `projectile_id` hiện chỉ dùng cho arrow của bow.
 
 ## Generate C#
 

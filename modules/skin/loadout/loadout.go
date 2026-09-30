@@ -96,17 +96,28 @@ func parseInventory(value string, itemCatalog *catalog.Catalog) (Owned, error) {
 		return nil, fmt.Errorf("decode skin inventory: %w", err)
 	}
 	owned := make(Owned)
-	for itemID := range inventory.Items {
-		item, ok := itemCatalog.Lookup(itemID)
+	seen := make(map[partID]struct{}, len(inventory.Items))
+	for _, stored := range inventory.Items {
+		item, ok := itemCatalog.LookupPart(stored.Key, stored.ID)
 		if !ok {
-			return nil, fmt.Errorf("unknown skin item %q", itemID)
+			return nil, fmt.Errorf("unknown skin item key=%q id=%d", stored.Key, stored.ID)
 		}
+		key := partID{partType: stored.Key, numericID: stored.ID}
+		if _, duplicate := seen[key]; duplicate {
+			return nil, fmt.Errorf("duplicate skin item key=%q id=%d", stored.Key, stored.ID)
+		}
+		seen[key] = struct{}{}
 		owned[item.PartType] = append(owned[item.PartType], item.NumericID)
 	}
 	for partType := range owned {
 		sort.Ints(owned[partType])
 	}
 	return owned, nil
+}
+
+type partID struct {
+	partType  catalog.PartType
+	numericID int
 }
 
 func errorsForUsers(users map[string]Owned, err error) []error {

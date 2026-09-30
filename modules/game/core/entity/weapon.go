@@ -12,14 +12,13 @@ type WeaponType string
 type RangeClass string
 
 const (
-	WeaponDagger WeaponType = "dagger"
-	WeaponBow    WeaponType = "bow"
-	WeaponStaff  WeaponType = "staff"
-	WeaponSpear  WeaponType = "spear"
-	WeaponSword  WeaponType = "sword"
-	WeaponWand   WeaponType = "wand"
-	WeaponAxe    WeaponType = "axe"
-	WeaponBlunt  WeaponType = "blunt"
+	WeaponBow   WeaponType = "bow"
+	WeaponStaff WeaponType = "staff"
+	WeaponSpear WeaponType = "spear"
+	WeaponSword WeaponType = "sword"
+	WeaponWand  WeaponType = "wand"
+	WeaponAxe   WeaponType = "axe"
+	WeaponBlunt WeaponType = "blunt"
 )
 
 const (

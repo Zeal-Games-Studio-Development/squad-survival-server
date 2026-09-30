@@ -1,20 +1,6 @@
 {
   "weapons": [
     {
-      "type": "dagger",
-      "name": "dagger",
-      "range_class": "melee",
-      "health": 90,
-      "damage": 8,
-      "move_speed": 6.2,
-      "attack_speed": 1.8,
-      "attack_range": 1.2,
-      "impact_ratio": 0.35,
-      "projectile_speed": 0,
-      "regen_rate": 0,
-      "damage_ratio": 1.15
-    },
-    {
       "type": "bow",
       "name": "bow",
       "range_class": "ranged",

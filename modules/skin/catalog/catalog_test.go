@@ -35,49 +35,34 @@ func TestDefaultCatalogCounts(t *testing.T) {
 func TestCatalogBoundaryLookups(t *testing.T) {
 	catalog := DefaultCatalog()
 	tests := []struct {
-		itemID    string
 		partType  PartType
 		numericID int
 	}{
-		{"r1", PartHair, 1}, {"r26", PartHair, 26}, {"h40", PartHelmet, 40},
-		{"sw19", PartSword, 19}, {"wn9", PartWand, 9}, {"ar8", PartArrow, 8},
+		{PartHair, 1}, {PartHair, 26}, {PartHelmet, 40},
+		{PartSword, 19}, {PartWand, 9}, {PartArrow, 8},
 	}
 
 	for _, test := range tests {
-		byID, ok := catalog.Lookup(test.itemID)
-		if !ok {
-			t.Errorf("Lookup(%q) failed", test.itemID)
-			continue
-		}
 		byPart, ok := catalog.LookupPart(test.partType, test.numericID)
 		if !ok {
 			t.Errorf("LookupPart(%q, %d) failed", test.partType, test.numericID)
 			continue
 		}
-		canonicalID, ok := catalog.CanonicalID(test.partType, test.numericID)
-		if !ok || canonicalID != test.itemID {
-			t.Errorf("CanonicalID(%q, %d) = %q, %v", test.partType, test.numericID, canonicalID, ok)
-		}
-		if byID != byPart || byID.ID != test.itemID {
-			t.Errorf("lookup mismatch: by ID %#v, by part %#v", byID, byPart)
+		if byPart.PartType != test.partType || byPart.NumericID != test.numericID {
+			t.Errorf("lookup mismatch: %#v", byPart)
 		}
 	}
 }
 
 func TestCatalogLookupRejectsUnknownItems(t *testing.T) {
 	catalog := DefaultCatalog()
-	for _, itemID := range []string{"", "r0", "r27", "h41", "xx1", "wn01"} {
-		if _, ok := catalog.Lookup(itemID); ok {
-			t.Errorf("Lookup(%q) unexpectedly succeeded", itemID)
-		}
-	}
 	for _, numericID := range []int{-1, 0, 10} {
 		if _, ok := catalog.LookupPart(PartWand, numericID); ok {
 			t.Errorf("LookupPart(wand, %d) unexpectedly succeeded", numericID)
 		}
-		if _, ok := catalog.CanonicalID(PartWand, numericID); ok {
-			t.Errorf("CanonicalID(wand, %d) unexpectedly succeeded", numericID)
-		}
+	}
+	if _, ok := catalog.LookupPart(PartType("unknown"), 1); ok {
+		t.Fatal("unknown part unexpectedly succeeded")
 	}
 }
 
@@ -88,18 +73,15 @@ func TestParseCatalogRejectsInvalidConfiguration(t *testing.T) {
 		message string
 	}{
 		{"empty catalog", `{"parts":[]}`, "no parts"},
-		{"empty type", `{"parts":[{"type":"","prefix":"x","ids":[1]}]}`, "part type"},
-		{"empty prefix", `{"parts":[{"type":"hat","prefix":"","ids":[1]}]}`, "part prefix"},
-		{"duplicate type", `{"parts":[{"type":"hat","prefix":"h","ids":[1]},{"type":"hat","prefix":"x","ids":[1]}]}`, "duplicate part type"},
-		{"duplicate prefix", `{"parts":[{"type":"hat","prefix":"h","ids":[1]},{"type":"hair","prefix":"h","ids":[2]}]}`, "duplicate part prefix"},
-		{"empty IDs", `{"parts":[{"type":"hat","prefix":"h","ids":[]}]}`, "no item ids"},
-		{"zero ID", `{"parts":[{"type":"hat","prefix":"h","ids":[0]}]}`, "greater than zero"},
-		{"negative ID", `{"parts":[{"type":"hat","prefix":"h","ids":[-1]}]}`, "greater than zero"},
-		{"duplicate numeric ID", `{"parts":[{"type":"hat","prefix":"h","ids":[1,1]}]}`, "duplicate item id"},
-		{"zero exclusive ID", `{"parts":[{"type":"hat","prefix":"h","ids":[1],"exclusive_ids":[0]}]}`, "exclusive item id must be greater than zero"},
-		{"duplicate exclusive ID", `{"parts":[{"type":"hat","prefix":"h","ids":[1],"exclusive_ids":[1,1]}]}`, "duplicate exclusive item id"},
-		{"unknown exclusive ID", `{"parts":[{"type":"hat","prefix":"h","ids":[1],"exclusive_ids":[2]}]}`, "is not present in ids"},
-		{"canonical collision", `{"parts":[{"type":"first","prefix":"a","ids":[11]},{"type":"second","prefix":"a1","ids":[1]}]}`, "collides"},
+		{"empty type", `{"parts":[{"type":"","ids":[1]}]}`, "part type"},
+		{"duplicate type", `{"parts":[{"type":"hat","ids":[1]},{"type":"hat","ids":[2]}]}`, "duplicate part type"},
+		{"empty IDs", `{"parts":[{"type":"hat","ids":[]}]}`, "no item ids"},
+		{"zero ID", `{"parts":[{"type":"hat","ids":[0]}]}`, "greater than zero"},
+		{"negative ID", `{"parts":[{"type":"hat","ids":[-1]}]}`, "greater than zero"},
+		{"duplicate numeric ID", `{"parts":[{"type":"hat","ids":[1,1]}]}`, "duplicate item id"},
+		{"zero exclusive ID", `{"parts":[{"type":"hat","ids":[1],"exclusive_ids":[0]}]}`, "exclusive item id must be greater than zero"},
+		{"duplicate exclusive ID", `{"parts":[{"type":"hat","ids":[1],"exclusive_ids":[1,1]}]}`, "duplicate exclusive item id"},
+		{"unknown exclusive ID", `{"parts":[{"type":"hat","ids":[1],"exclusive_ids":[2]}]}`, "is not present in ids"},
 	}
 
 	for _, test := range tests {
@@ -113,31 +95,31 @@ func TestParseCatalogRejectsInvalidConfiguration(t *testing.T) {
 }
 
 func TestCatalogDrawableItemsExcludeExclusive(t *testing.T) {
-	catalog, err := ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[1,2,3],"exclusive_ids":[2]}]}`))
+	catalog, err := ParseCatalog([]byte(`{"parts":[{"type":"hat","ids":[1,2,3],"exclusive_ids":[2]}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	items := catalog.DrawableItems()
-	if len(items) != 2 || items[0].ID != "h1" || items[1].ID != "h3" {
+	if len(items) != 2 || items[0].NumericID != 1 || items[1].NumericID != 3 {
 		t.Fatalf("unexpected drawable items: %#v", items)
 	}
-	exclusive, ok := catalog.Lookup("h2")
+	exclusive, ok := catalog.LookupPart(PartType("hat"), 2)
 	if !ok || !exclusive.Exclusive {
 		t.Fatalf("exclusive catalog item was not retained: %#v", exclusive)
 	}
 }
 
 func TestCatalogItemsPreserveOrderAndReturnDefensiveCopy(t *testing.T) {
-	catalog, err := ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[2,1],"exclusive_ids":[2]},{"type":"hair","prefix":"r","ids":[1]}]}`))
+	catalog, err := ParseCatalog([]byte(`{"parts":[{"type":"hat","ids":[2,1],"exclusive_ids":[2]},{"type":"hair","ids":[1]}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	items := catalog.Items()
-	if len(items) != 3 || items[0].ID != "h2" || items[1].ID != "h1" || items[2].ID != "r1" || !items[0].Exclusive {
+	if len(items) != 3 || items[0].NumericID != 2 || items[1].NumericID != 1 || items[2].PartType != PartHair || !items[0].Exclusive {
 		t.Fatalf("unexpected catalog items: %#v", items)
 	}
-	items[0].ID = "changed"
-	if unchanged := catalog.Items(); unchanged[0].ID != "h2" {
+	items[0].NumericID = 999
+	if unchanged := catalog.Items(); unchanged[0].NumericID != 2 {
 		t.Fatalf("catalog items were mutated through returned slice: %#v", unchanged)
 	}
 }

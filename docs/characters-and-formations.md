@@ -26,7 +26,7 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 | `projectile_speed` | World units mỗi giây; ranged phải lớn hơn 0 |
 | `regen_rate` | Stat đã có, chưa có regen system |
 
-`dagger`, `spear`, `sword`, `axe`, `blunt` là melee. `bow`, `staff`, `wand` là ranged.
+`spear`, `sword`, `axe`, `blunt` là melee. `bow`, `staff`, `wand` là ranged.
 
 ## Strategy 5x5
 

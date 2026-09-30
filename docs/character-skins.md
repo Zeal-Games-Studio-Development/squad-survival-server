@@ -4,6 +4,19 @@
 
 Khi player join Survival hoặc Battle Royale, server batch-read object `player_inventory/skins` và cache một snapshot theo session trong state của match. Skin player quay thêm trong lúc trận đang chạy chỉ có hiệu lực ở trận sau. Cache được xóa khi session leave hoặc khi match state bị terminate.
 
+Storage lưu item trực tiếp bằng `key` và numeric `id`, không ghép canonical string:
+
+```json
+{
+  "items": [
+    { "key": "hair", "id": 3, "acquired_at": 1790265600, "source": "skin_lucky_draw" },
+    { "key": "eye", "id": 1, "acquired_at": 1790265600, "source": "account_registration" }
+  ]
+}
+```
+
+RPC `skin_lucky_draw` cũng trả `items: [{"key":"hair","id":3}]` thay cho `item_ids` dạng chuỗi.
+
 Nếu storage lỗi, object không tồn tại, JSON invalid hoặc chứa item không có trong catalog, player vẫn được join và toàn bộ skin cần thiết fallback về numeric ID `1`.
 
 ## Random loadout
@@ -13,7 +26,6 @@ Mỗi character random độc lập từ các ID player sở hữu:
 - Ngoại hình luôn gồm `hair`, `beard`, `chest`, `eye` và `helmet`.
 - `weapon_id` lấy từ part trùng với `weapon_type` của character.
 - Bow dùng `projectile_id` từ part `arrow`.
-- Dagger chưa có part trong catalog nên dùng `weapon_id=0`; client render default dagger asset.
 - Part bị thiếu trong inventory dùng ID `1`. Exclusive item vẫn được chọn nếu có trong inventory.
 
 Skin được gán sau weapon và trước khi character được thêm vào roster. Skin chỉ phục vụ render, không thay đổi health, damage, movement hoặc combat.

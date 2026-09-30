@@ -44,31 +44,38 @@ type Request struct {
 }
 
 type Response struct {
-	RequestID       string   `json:"request_id"`
-	DrawCount       int      `json:"draw_count"`
-	ItemIDs         []string `json:"item_ids"`
-	GemSpent        int64    `json:"gem_spent"`
-	GemBalanceAfter int64    `json:"gem_balance_after"`
-	Replayed        bool     `json:"replayed"`
+	RequestID       string    `json:"request_id"`
+	DrawCount       int       `json:"draw_count"`
+	Items           []ItemRef `json:"items"`
+	GemSpent        int64     `json:"gem_spent"`
+	GemBalanceAfter int64     `json:"gem_balance_after"`
+	Replayed        bool      `json:"replayed"`
+}
+
+type ItemRef struct {
+	Key catalog.PartType `json:"key"`
+	ID  int              `json:"id"`
 }
 
 type InventoryItem struct {
-	AcquiredAt int64  `json:"acquired_at"`
-	Source     string `json:"source"`
+	Key        catalog.PartType `json:"key"`
+	ID         int              `json:"id"`
+	AcquiredAt int64            `json:"acquired_at"`
+	Source     string           `json:"source"`
 }
 
 type ProcessedRequest struct {
-	RequestID       string   `json:"request_id"`
-	DrawCount       int      `json:"draw_count"`
-	ItemIDs         []string `json:"item_ids"`
-	GemSpent        int64    `json:"gem_spent"`
-	GemBalanceAfter int64    `json:"gem_balance_after,omitempty"`
-	CreatedAt       int64    `json:"created_at"`
+	RequestID       string    `json:"request_id"`
+	DrawCount       int       `json:"draw_count"`
+	Items           []ItemRef `json:"items"`
+	GemSpent        int64     `json:"gem_spent"`
+	GemBalanceAfter int64     `json:"gem_balance_after,omitempty"`
+	CreatedAt       int64     `json:"created_at"`
 }
 
 type Inventory struct {
-	Items             map[string]InventoryItem `json:"items"`
-	ProcessedRequests []ProcessedRequest       `json:"processed_requests"`
+	Items             []InventoryItem    `json:"items"`
+	ProcessedRequests []ProcessedRequest `json:"processed_requests"`
 }
 
 type NakamaStore interface {
@@ -107,12 +114,12 @@ func (s *Service) InitialStorageWrite(userID string) (*runtime.StorageWrite, err
 	}
 
 	partCount := make(map[catalog.PartType]struct{})
-	initialItems := make(map[string]InventoryItem)
+	initialItems := make([]InventoryItem, 0)
 	acquiredAt := s.now().UTC().Unix()
 	for _, item := range s.catalog.Items() {
 		partCount[item.PartType] = struct{}{}
 		if item.NumericID == 1 {
-			initialItems[item.ID] = InventoryItem{AcquiredAt: acquiredAt, Source: AccountRegistrationSource}
+			initialItems = append(initialItems, InventoryItem{Key: item.PartType, ID: item.NumericID, AcquiredAt: acquiredAt, Source: AccountRegistrationSource})
 		}
 	}
 	if len(initialItems) != len(partCount) {
@@ -179,13 +186,13 @@ func (s *Service) Draw(ctx context.Context, store NakamaStore, userID string, re
 		}
 
 		createdAt := s.now().UTC().Unix()
-		itemIDs := make([]string, len(selected))
+		items := make([]ItemRef, len(selected))
 		for i, item := range selected {
-			itemIDs[i] = item.ID
-			inventory.Items[item.ID] = InventoryItem{AcquiredAt: createdAt, Source: InventorySource}
+			items[i] = ItemRef{Key: item.PartType, ID: item.NumericID}
+			inventory.Items = append(inventory.Items, InventoryItem{Key: item.PartType, ID: item.NumericID, AcquiredAt: createdAt, Source: InventorySource})
 		}
 		receipt := ProcessedRequest{
-			RequestID: request.RequestID, DrawCount: request.DrawCount, ItemIDs: itemIDs,
+			RequestID: request.RequestID, DrawCount: request.DrawCount, Items: items,
 			GemSpent: cost, GemBalanceAfter: gemBalance - cost, CreatedAt: createdAt,
 		}
 		inventory.ProcessedRequests = append(inventory.ProcessedRequests, receipt)
@@ -199,7 +206,7 @@ func (s *Service) Draw(ctx context.Context, store NakamaStore, userID string, re
 		}
 		metadata := map[string]interface{}{
 			"event": InventorySource, "request_id": request.RequestID,
-			"draw_count": request.DrawCount, "item_ids": itemIDs,
+			"draw_count": request.DrawCount, "items": items,
 		}
 		_, walletResults, err := store.MultiUpdate(ctx, nil, []*runtime.StorageWrite{{
 			Collection: InventoryCollection, Key: InventoryKey, UserID: userID, Value: string(value),
@@ -250,7 +257,7 @@ func (s *Service) readInventory(ctx context.Context, store NakamaStore, userID s
 		return Inventory{}, "", fmt.Errorf("read player skin inventory: %w", err)
 	}
 	if len(objects) == 0 {
-		return Inventory{Items: make(map[string]InventoryItem)}, "*", nil
+		return Inventory{Items: []InventoryItem{}}, "*", nil
 	}
 	if len(objects) != 1 {
 		return Inventory{}, "", fmt.Errorf("%w: expected one object, got %d", ErrInvalidInventory, len(objects))
@@ -259,13 +266,16 @@ func (s *Service) readInventory(ctx context.Context, store NakamaStore, userID s
 	if err := json.Unmarshal([]byte(objects[0].Value), &inventory); err != nil {
 		return Inventory{}, "", fmt.Errorf("%w: %v", ErrInvalidInventory, err)
 	}
-	if inventory.Items == nil {
-		inventory.Items = make(map[string]InventoryItem)
-	}
-	for itemID := range inventory.Items {
-		if _, ok := s.catalog.Lookup(itemID); !ok {
-			return Inventory{}, "", fmt.Errorf("%w: unknown item %q", ErrInvalidInventory, itemID)
+	seen := make(map[itemKey]struct{}, len(inventory.Items))
+	for _, stored := range inventory.Items {
+		if _, ok := s.catalog.LookupPart(stored.Key, stored.ID); !ok {
+			return Inventory{}, "", fmt.Errorf("%w: unknown item key=%q id=%d", ErrInvalidInventory, stored.Key, stored.ID)
 		}
+		key := itemKey{partType: stored.Key, numericID: stored.ID}
+		if _, duplicate := seen[key]; duplicate {
+			return Inventory{}, "", fmt.Errorf("%w: duplicate item key=%q id=%d", ErrInvalidInventory, stored.Key, stored.ID)
+		}
+		seen[key] = struct{}{}
 	}
 	return inventory, objects[0].Version, nil
 }
@@ -286,14 +296,23 @@ func currentGemBalance(ctx context.Context, store NakamaStore, userID string) (i
 }
 
 func (s *Service) eligibleItems(inventory Inventory) []catalog.Item {
+	owned := make(map[itemKey]struct{}, len(inventory.Items))
+	for _, item := range inventory.Items {
+		owned[itemKey{partType: item.Key, numericID: item.ID}] = struct{}{}
+	}
 	items := s.catalog.DrawableItems()
 	eligible := make([]catalog.Item, 0, len(items))
 	for _, item := range items {
-		if _, owned := inventory.Items[item.ID]; !owned {
+		if _, exists := owned[itemKey{partType: item.PartType, numericID: item.NumericID}]; !exists {
 			eligible = append(eligible, item)
 		}
 	}
 	return eligible
+}
+
+type itemKey struct {
+	partType  catalog.PartType
+	numericID int
 }
 
 func (s *Service) selectItems(items []catalog.Item, count int) ([]catalog.Item, error) {
@@ -321,7 +340,7 @@ func findProcessedRequest(requests []ProcessedRequest, requestID string) (Proces
 func responseFromReceipt(receipt ProcessedRequest, replayed bool) Response {
 	return Response{
 		RequestID: receipt.RequestID, DrawCount: receipt.DrawCount,
-		ItemIDs: append([]string(nil), receipt.ItemIDs...), GemSpent: receipt.GemSpent,
+		Items: append([]ItemRef(nil), receipt.Items...), GemSpent: receipt.GemSpent,
 		GemBalanceAfter: receipt.GemBalanceAfter, Replayed: replayed,
 	}
 }

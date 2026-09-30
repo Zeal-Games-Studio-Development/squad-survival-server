@@ -7,8 +7,8 @@ import (
 
 func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	weapons := DefaultWeaponCatalog()
-	if len(weapons) != 8 {
-		t.Fatalf("expected 8 weapons, got %d", len(weapons))
+	if len(weapons) != 7 {
+		t.Fatalf("expected 7 weapons, got %d", len(weapons))
 	}
 
 	found := make(map[WeaponType]bool, len(weapons))
@@ -25,7 +25,7 @@ func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 		}
 	}
 	for _, weaponType := range []WeaponType{
-		WeaponDagger, WeaponBow, WeaponStaff, WeaponSpear,
+		WeaponBow, WeaponStaff, WeaponSpear,
 		WeaponSword, WeaponWand, WeaponAxe, WeaponBlunt,
 	} {
 		if !found[weaponType] {

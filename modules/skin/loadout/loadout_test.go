@@ -16,7 +16,7 @@ import (
 func TestLoadBatchesUsersAndFallsBackForMissingInventory(t *testing.T) {
 	reader := &fakeReader{objects: []*api.StorageObject{{
 		Collection: "player_inventory", Key: "skins", UserId: "user-1",
-		Value: `{"items":{"r3":{},"r2":{},"bw4":{},"ar5":{},"c7":{},"b6":{},"e8":{},"h9":{}}}`,
+		Value: `{"items":[{"key":"hair","id":3},{"key":"hair","id":2},{"key":"bow","id":4},{"key":"arrow","id":5},{"key":"chest","id":7},{"key":"beard","id":6},{"key":"eye","id":8},{"key":"helmet","id":9}]}`,
 	}}}
 	owned, loadErrors := Load(context.Background(), reader, []string{"user-1", "user-2", "user-1"}, catalog.DefaultCatalog())
 	if reader.calls != 1 || len(reader.reads) != 2 {
@@ -34,7 +34,7 @@ func TestLoadBatchesUsersAndFallsBackForMissingInventory(t *testing.T) {
 }
 
 func TestLoadFallsBackForInvalidInventoryAndReadFailure(t *testing.T) {
-	reader := &fakeReader{objects: []*api.StorageObject{{UserId: "user-1", Value: `{"items":{"unknown":{}}}`}}}
+	reader := &fakeReader{objects: []*api.StorageObject{{UserId: "user-1", Value: `{"items":[{"key":"unknown","id":1}]}`}}}
 	owned, loadErrors := Load(context.Background(), reader, []string{"user-1"}, catalog.DefaultCatalog())
 	if len(loadErrors) != 1 || len(owned["user-1"]) != 0 {
 		t.Fatalf("invalid inventory did not fall back: owned=%v errors=%v", owned, loadErrors)
@@ -58,13 +58,13 @@ func TestRandomSkinUsesOwnedAppearanceAndWeaponParts(t *testing.T) {
 	}
 }
 
-func TestRandomSkinDefaultsMissingPartsAndLeavesDaggerWeaponUnset(t *testing.T) {
-	skin := RandomSkin(rand.New(rand.NewSource(1)), nil, entity.WeaponDagger)
+func TestRandomSkinDefaultsMissingPartsAndLeavesUnknownWeaponUnset(t *testing.T) {
+	skin := RandomSkin(rand.New(rand.NewSource(1)), nil, entity.WeaponType("unknown"))
 	if skin.HairID != 1 || skin.BeardID != 1 || skin.ChestID != 1 || skin.EyeID != 1 || skin.HelmetID != 1 {
 		t.Fatalf("appearance did not use ID 1 fallback: %+v", skin)
 	}
 	if skin.WeaponID != 0 || skin.ProjectileID != 0 {
-		t.Fatalf("dagger unexpectedly received a catalog skin: %+v", skin)
+		t.Fatalf("unknown weapon unexpectedly received a catalog skin: %+v", skin)
 	}
 }
 

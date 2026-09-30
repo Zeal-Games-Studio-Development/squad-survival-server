@@ -120,7 +120,7 @@ func TestDrawSingleAtomicallyChargesAndStoresItem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(response.ItemIDs, []string{"r1"}) || response.GemSpent != 100 || response.GemBalanceAfter != 900 || response.Replayed {
+	if !reflect.DeepEqual(response.Items, []ItemRef{{Key: skincatalog.PartHair, ID: 1}}) || response.GemSpent != 100 || response.GemBalanceAfter != 900 || response.Replayed {
 		t.Fatalf("unexpected response: %#v", response)
 	}
 	if store.multiCalls != 1 || store.lastWrite.Collection != InventoryCollection || store.lastWrite.Key != InventoryKey {
@@ -137,7 +137,7 @@ func TestDrawSingleAtomicallyChargesAndStoresItem(t *testing.T) {
 	if err := json.Unmarshal([]byte(store.object.Value), &inventory); err != nil {
 		t.Fatal(err)
 	}
-	if inventory.Items["r1"].Source != InventorySource || inventory.Items["r1"].AcquiredAt != 1_790_265_600 {
+	if len(inventory.Items) != 1 || inventory.Items[0].Key != skincatalog.PartHair || inventory.Items[0].ID != 1 || inventory.Items[0].Source != InventorySource || inventory.Items[0].AcquiredAt != 1_790_265_600 {
 		t.Fatalf("unexpected inventory: %#v", inventory)
 	}
 	if len(inventory.ProcessedRequests) != 1 || inventory.ProcessedRequests[0].GemBalanceAfter != 900 {
@@ -161,20 +161,20 @@ func TestInitialStorageWriteIncludesNumericIDOneForEveryPart(t *testing.T) {
 	if err := json.Unmarshal([]byte(write.Value), &inventory); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"r1", "b1", "ax1", "ar1", "bl1", "bw1", "c1", "cb1", "e1", "h1", "sh1", "sp1", "st1", "sw1", "wn1"}
+	want := []skincatalog.PartType{skincatalog.PartHair, skincatalog.PartBeard, skincatalog.PartAxe, skincatalog.PartArrow, skincatalog.PartBlunt, skincatalog.PartBow, skincatalog.PartChest, skincatalog.PartCrossbow, skincatalog.PartEye, skincatalog.PartHelmet, skincatalog.PartShield, skincatalog.PartSpear, skincatalog.PartStaff, skincatalog.PartSword, skincatalog.PartWand}
 	if len(inventory.Items) != len(want) || len(inventory.ProcessedRequests) != 0 {
 		t.Fatalf("unexpected initial inventory: %#v", inventory)
 	}
-	for _, itemID := range want {
-		item, ok := inventory.Items[itemID]
-		if !ok || item.Source != AccountRegistrationSource || item.AcquiredAt != 1_790_265_600 {
-			t.Errorf("unexpected default item %q: %#v", itemID, item)
+	for index, key := range want {
+		item := inventory.Items[index]
+		if item.Key != key || item.ID != 1 || item.Source != AccountRegistrationSource || item.AcquiredAt != 1_790_265_600 {
+			t.Errorf("unexpected default item %q: %#v", key, item)
 		}
 	}
 }
 
 func TestInitialStorageWriteRejectsPartWithoutNumericIDOne(t *testing.T) {
-	itemCatalog, err := skincatalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[1]},{"type":"hair","prefix":"r","ids":[2]}]}`))
+	itemCatalog, err := skincatalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","ids":[1]},{"type":"hair","ids":[2]}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,33 +194,33 @@ func TestDrawTenReturnsUniqueItemsAndUsesDiscount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(response.ItemIDs) != 10 || response.GemSpent != 900 || response.GemBalanceAfter != 100 {
+	if len(response.Items) != 10 || response.GemSpent != 900 || response.GemBalanceAfter != 100 {
 		t.Fatalf("unexpected response: %#v", response)
 	}
-	seen := make(map[string]struct{}, len(response.ItemIDs))
-	for _, itemID := range response.ItemIDs {
-		if _, duplicate := seen[itemID]; duplicate {
-			t.Fatalf("duplicate result %q in %#v", itemID, response.ItemIDs)
+	seen := make(map[ItemRef]struct{}, len(response.Items))
+	for _, item := range response.Items {
+		if _, duplicate := seen[item]; duplicate {
+			t.Fatalf("duplicate result %#v in %#v", item, response.Items)
 		}
-		seen[itemID] = struct{}{}
+		seen[item] = struct{}{}
 	}
 }
 
 func TestDrawExcludesOwnedAndExclusiveItems(t *testing.T) {
-	itemCatalog, err := skincatalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[1,2,3],"exclusive_ids":[2]}]}`))
+	itemCatalog, err := skincatalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","ids":[1,2,3],"exclusive_ids":[2]}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	service := testService(t, itemCatalog)
 	store := newFakeStore(1_000)
-	setInventory(t, store, Inventory{Items: map[string]InventoryItem{"h1": {AcquiredAt: 1, Source: "other"}}})
+	setInventory(t, store, Inventory{Items: []InventoryItem{{Key: skincatalog.PartType("hat"), ID: 1, AcquiredAt: 1, Source: "other"}}})
 
 	response, err := service.Draw(context.Background(), store, "user-1", Request{RequestID: testRequestID, DrawCount: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(response.ItemIDs, []string{"h3"}) {
-		t.Fatalf("unexpected result: %#v", response.ItemIDs)
+	if !reflect.DeepEqual(response.Items, []ItemRef{{Key: skincatalog.PartType("hat"), ID: 3}}) {
+		t.Fatalf("unexpected result: %#v", response.Items)
 	}
 }
 
@@ -232,7 +232,7 @@ func TestDrawRejectsInsufficientGemsAndPoolWithoutMutation(t *testing.T) {
 		t.Fatalf("insufficient gems result: err=%v object=%#v wallet=%#v", err, store.object, store.wallet)
 	}
 
-	smallCatalog, _ := skincatalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","prefix":"h","ids":[1,2,3]}]}`))
+	smallCatalog, _ := skincatalog.ParseCatalog([]byte(`{"parts":[{"type":"hat","ids":[1,2,3]}]}`))
 	service = testService(t, smallCatalog)
 	store = newFakeStore(1_000)
 	_, err = service.Draw(context.Background(), store, "user-1", Request{RequestID: testRequestID, DrawCount: 10})
@@ -252,7 +252,7 @@ func TestDrawIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if store.multiCalls != 1 || store.wallet[GemCurrency] != 900 || !second.Replayed || !reflect.DeepEqual(first.ItemIDs, second.ItemIDs) {
+	if store.multiCalls != 1 || store.wallet[GemCurrency] != 900 || !second.Replayed || !reflect.DeepEqual(first.Items, second.Items) {
 		t.Fatalf("idempotency failed: first=%#v second=%#v store=%#v", first, second, store)
 	}
 }
@@ -272,7 +272,7 @@ func TestDrawRetriesVersionConflict(t *testing.T) {
 func TestDrawTrimsProcessedRequestHistory(t *testing.T) {
 	service := testService(t, skincatalog.DefaultCatalog())
 	store := newFakeStore(1_000)
-	inventory := Inventory{Items: make(map[string]InventoryItem)}
+	inventory := Inventory{Items: []InventoryItem{}}
 	for i := 0; i < MaxProcessedRequests; i++ {
 		inventory.ProcessedRequests = append(inventory.ProcessedRequests, ProcessedRequest{RequestID: fmt.Sprintf("old-%d", i)})
 	}
@@ -298,7 +298,7 @@ func TestDrawRejectsInvalidRequestAndInventory(t *testing.T) {
 			t.Errorf("request %#v returned %v", request, err)
 		}
 	}
-	store.object = &api.StorageObject{Collection: InventoryCollection, Key: InventoryKey, UserId: "user-1", Value: `{"items":{"unknown1":{"acquired_at":1,"source":"other"}}}`, Version: "v1"}
+	store.object = &api.StorageObject{Collection: InventoryCollection, Key: InventoryKey, UserId: "user-1", Value: `{"items":[{"key":"unknown","id":1,"acquired_at":1,"source":"other"}]}`, Version: "v1"}
 	if _, err := service.Draw(context.Background(), store, "user-1", Request{RequestID: testRequestID, DrawCount: 1}); !errors.Is(err, ErrInvalidInventory) {
 		t.Fatalf("expected invalid inventory error, got %v", err)
 	}
