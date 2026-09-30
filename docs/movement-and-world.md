@@ -60,3 +60,5 @@ Opcode `102` gửi riêng mỗi player ở `10 Hz`, `reliable=false`:
 - Projectile correction được gửi riêng bằng opcode `105`, chỉ gồm projectile ID và position.
 
 Snapshot rỗng vẫn được gửi để Unity loại entity đã rời vùng detection.
+
+Client xem danh sách `players` của snapshot mới nhất là tập player đang được render trong detection. Player leave match hoặc đi ra khỏi detection sẽ biến mất khỏi danh sách này; server không gửi thêm `PlayerRosterBatch` removal. Roster chỉ cung cấp static metadata, character loadout và skin khi entity xuất hiện hoặc roster thay đổi.

@@ -91,6 +91,12 @@ socket.ReceivedMatchState += state => {
 
 `CharacterRoster.skin` chứa các numeric ID để render ngoại hình và weapon của character. Client kết hợp `weapon_type` hiện có với `weapon_id`; `projectile_id` hiện chỉ dùng cho arrow của bow.
 
+### Roster và trạng thái render
+
+`PlayerRosterBatch` chỉ đồng bộ metadata/static state khi player join, đi vào detection hoặc roster version thay đổi. Server không gửi roster removal riêng khi player leave match hoặc rời detection.
+
+`PlayerMovementSnapshot` opcode `102` là nguồn authoritative cho tập entity client cần render ở mỗi tick: `self` là player hiện tại và `players` là toàn bộ player khác đang trong detection. Nếu một `session_id` không còn xuất hiện trong snapshot mới, client loại player cùng các character của session đó khỏi scene. Vì movement snapshot đã đảm nhiệm visibility/despawn, roster không cần phát lại chỉ để báo leave.
+
 ## Generate C#
 
 Project dùng Buf remote plugins:
