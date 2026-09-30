@@ -9,9 +9,20 @@ import (
 )
 
 type CharacterBoxEvent struct {
-	Type CharacterBoxEventType
-	Box  *entity.CharacterBox
-	ID   string
+	Type              CharacterBoxEventType
+	Box               *entity.CharacterBox
+	ID                string
+	ClaimantSessionID string
+	StartedAtTick     int64
+	CompletesAtTick   int64
+}
+
+func CharacterBoxPickupStarted(id, sessionID string, startedAtTick, completesAtTick int64) CharacterBoxEvent {
+	return CharacterBoxEvent{Type: CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED, ID: id, ClaimantSessionID: sessionID, StartedAtTick: startedAtTick, CompletesAtTick: completesAtTick}
+}
+
+func CharacterBoxPickupCancelled(id, sessionID string) CharacterBoxEvent {
+	return CharacterBoxEvent{Type: CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED, ID: id, ClaimantSessionID: sessionID}
 }
 
 func SpawnedCharacterBox(box *entity.CharacterBox) CharacterBoxEvent {
@@ -51,6 +62,16 @@ func characterBoxStateEventSnapshot(event CharacterBoxEvent) (*CharacterBoxState
 			return nil, errors.New("despawned character box id is required")
 		}
 		return &CharacterBoxStateEvent{EventType: event.Type, BoxId: event.ID}, nil
+	case CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED:
+		if event.ID == "" || event.ClaimantSessionID == "" || event.StartedAtTick < 0 || event.CompletesAtTick <= event.StartedAtTick {
+			return nil, errors.New("character box pickup started event is invalid")
+		}
+		return &CharacterBoxStateEvent{EventType: event.Type, BoxId: event.ID, ClaimantSessionId: event.ClaimantSessionID, StartedAtTick: event.StartedAtTick, CompletesAtTick: event.CompletesAtTick}, nil
+	case CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED:
+		if event.ID == "" || event.ClaimantSessionID == "" {
+			return nil, errors.New("character box pickup cancelled event is invalid")
+		}
+		return &CharacterBoxStateEvent{EventType: event.Type, BoxId: event.ID, ClaimantSessionId: event.ClaimantSessionID}, nil
 	default:
 		return nil, errors.New("unknown character box event type")
 	}

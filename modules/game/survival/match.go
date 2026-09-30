@@ -10,9 +10,11 @@ import (
 	"strconv"
 	"time"
 
+	"squad-survival-be/modules/game/core/characterbox"
 	"squad-survival-be/modules/game/core/combat"
 	"squad-survival-be/modules/game/core/entity"
 	"squad-survival-be/modules/game/core/spatial"
+	"squad-survival-be/modules/game/core/strategy"
 	"squad-survival-be/modules/game/core/system"
 	"squad-survival-be/modules/game/core/world"
 	"squad-survival-be/modules/game/matchregistry"
@@ -60,6 +62,9 @@ type State struct {
 	EmptyTicks          int64
 	SkinCatalog         *catalog.Catalog
 	SkinInventories     map[string]loadout.Owned
+	BoxClaims           map[string]characterbox.Claim
+	ClaimedBoxBySession map[string]string
+	BoxPickupDelays     map[int]int64
 	random              *rand.Rand // Gameplay RNG: spawn, weapon, combat, and damage.
 	cosmeticRandom      *rand.Rand
 }
@@ -95,6 +100,9 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		NextBoxRefillTick:   characterBoxRefillTicks,
 		SkinCatalog:         catalog.DefaultCatalog(),
 		SkinInventories:     make(map[string]loadout.Owned),
+		BoxClaims:           make(map[string]characterbox.Claim),
+		ClaimedBoxBySession: make(map[string]string),
+		BoxPickupDelays:     characterbox.DefaultDelays(),
 		random:              rand.New(rand.NewSource(randomSeed)),
 		cosmeticRandom:      rand.New(rand.NewSource(randomSeed + 1)),
 	}
@@ -224,7 +232,9 @@ func resolveDisplayNames(ctx context.Context, lookup userLookup, presences []run
 func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, rawState interface{}, presences []runtime.Presence) interface{} {
 	state := rawState.(*State)
 	playerCount := len(state.Players)
+	boxEvents := make([]system.CharacterBoxEvent, 0, len(presences))
 	for _, presence := range presences {
+		boxEvents = append(boxEvents, state.cancelBoxClaimForSession(presence.GetSessionId())...)
 		delete(state.Reservations, presence.GetSessionId())
 		if _, exists := state.Players[presence.GetSessionId()]; exists && !state.SpatialGrid.Remove(presence.GetSessionId()) && logger != nil {
 			logger.Error("Could not remove player from spatial grid: session_id=%s", presence.GetSessionId())
@@ -235,6 +245,7 @@ func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, 
 		state.removeRosterTracking(presence.GetSessionId())
 		m.registry.RemoveSession(presence.GetSessionId())
 	}
+	state.broadcastCharacterBoxEvents(logger, dispatcher, tick, boxEvents, nil)
 	state.updateLabel(dispatcher)
 	if len(state.Players) != playerCount {
 		state.broadcastSnapshot(logger, dispatcher, tick)
@@ -274,7 +285,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 			logger.Error("Could not move player in spatial grid: session_id=%s error=%v", player.SessionID, err)
 		}
 	}
-	boxEvents := state.collectCharacterBoxes(logger)
+	boxEvents := state.collectCharacterBoxes(tick, logger)
 	if tick >= state.NextBoxRefillTick {
 		target := state.randomCharacterBoxTarget()
 		boxEvents = append(boxEvents, state.spawnCharacterBoxes(target)...)
@@ -317,6 +328,15 @@ func (s *State) ensureCharacterBoxState(tick int64) {
 	s.ensureSkinState()
 	if s.CharacterBoxes == nil {
 		s.CharacterBoxes = make(map[string]*entity.CharacterBox)
+	}
+	if s.BoxClaims == nil {
+		s.BoxClaims = make(map[string]characterbox.Claim)
+	}
+	if s.ClaimedBoxBySession == nil {
+		s.ClaimedBoxBySession = make(map[string]string)
+	}
+	if s.BoxPickupDelays == nil {
+		s.BoxPickupDelays = characterbox.DefaultDelays()
 	}
 	if len(s.WeaponCatalog) == 0 {
 		s.WeaponCatalog = entity.DefaultWeaponCatalog()
@@ -453,7 +473,8 @@ type boxCollisionCandidate struct {
 	distanceSquared float64
 }
 
-func (s *State) collectCharacterBoxes(logger runtime.Logger) []system.CharacterBoxEvent {
+func (s *State) collectCharacterBoxes(tick int64, logger runtime.Logger) []system.CharacterBoxEvent {
+	s.ensureCharacterBoxState(tick)
 	candidates := make(map[string][]boxCollisionCandidate)
 	for _, player := range s.Players {
 		if player == nil || player.IsEliminated() {
@@ -465,12 +486,55 @@ func (s *State) collectCharacterBoxes(logger runtime.Logger) []system.CharacterB
 			})
 		}
 	}
+	events := make([]system.CharacterBoxEvent, 0, len(candidates))
+	claimedBoxIDs := make([]string, 0, len(s.BoxClaims))
+	for boxID := range s.BoxClaims {
+		claimedBoxIDs = append(claimedBoxIDs, boxID)
+	}
+	sort.Strings(claimedBoxIDs)
+	completedSessions := make(map[string]struct{})
+	for _, boxID := range claimedBoxIDs {
+		claim := s.BoxClaims[boxID]
+		box := s.CharacterBoxes[boxID]
+		player := s.Players[claim.SessionID]
+		valid := box != nil && player != nil && !player.IsEliminated() && player.CharacterCount() < strategy.MaxCharacters && distanceSquared(player.Position, box.Position) <= entity.CharacterBoxCollisionRadius*entity.CharacterBoxCollisionRadius
+		if !valid {
+			events = append(events, s.cancelBoxClaim(boxID)...)
+			continue
+		}
+		if tick < claim.CompletesAtTick {
+			continue
+		}
+		weapon, ok := s.weaponByType(box.WeaponType())
+		if !ok {
+			if logger != nil {
+				logger.Error("Character box has unknown weapon: box_id=%s weapon_type=%s", box.ID, box.WeaponType())
+			}
+			events = append(events, s.cancelBoxClaim(boxID)...)
+			continue
+		}
+		character := entity.NewCharacter()
+		character.ApplyWeapon(weapon)
+		character.Skin = loadout.RandomSkin(s.cosmeticRandom, s.SkinInventories[player.SessionID], weapon.Type)
+		if err := player.AddCharacter(character); err != nil {
+			events = append(events, s.cancelBoxClaim(boxID)...)
+			continue
+		}
+		delete(s.BoxClaims, boxID)
+		delete(s.ClaimedBoxBySession, player.SessionID)
+		delete(s.CharacterBoxes, boxID)
+		s.SpatialGrid.RemoveCharacterBox(boxID)
+		completedSessions[player.SessionID] = struct{}{}
+		events = append(events, system.DespawnedCharacterBox(boxID))
+	}
+
 	boxIDs := make([]string, 0, len(candidates))
 	for boxID := range candidates {
-		boxIDs = append(boxIDs, boxID)
+		if _, claimed := s.BoxClaims[boxID]; !claimed {
+			boxIDs = append(boxIDs, boxID)
+		}
 	}
 	sort.Strings(boxIDs)
-	events := make([]system.CharacterBoxEvent, 0, len(boxIDs))
 	for _, boxID := range boxIDs {
 		box := s.CharacterBoxes[boxID]
 		if box == nil {
@@ -483,27 +547,43 @@ func (s *State) collectCharacterBoxes(logger runtime.Logger) []system.CharacterB
 			}
 			return collisions[i].distanceSquared < collisions[j].distanceSquared
 		})
-		weapon, ok := s.weaponByType(box.WeaponType())
-		if !ok {
-			if logger != nil {
-				logger.Error("Character box has unknown weapon: box_id=%s weapon_type=%s", box.ID, box.WeaponType())
-			}
-			continue
-		}
 		for _, collision := range collisions {
-			character := entity.NewCharacter()
-			character.ApplyWeapon(weapon)
-			character.Skin = loadout.RandomSkin(s.cosmeticRandom, s.SkinInventories[collision.player.SessionID], weapon.Type)
-			if err := collision.player.AddCharacter(character); err != nil {
+			if _, claimed := s.ClaimedBoxBySession[collision.player.SessionID]; claimed {
 				continue
 			}
-			delete(s.CharacterBoxes, box.ID)
-			s.SpatialGrid.RemoveCharacterBox(box.ID)
-			events = append(events, system.DespawnedCharacterBox(box.ID))
+			if _, completed := completedSessions[collision.player.SessionID]; completed {
+				continue
+			}
+			delay, ok := characterbox.DelayTicks(s.BoxPickupDelays, collision.player.CharacterCount(), tickRate)
+			if !ok {
+				continue
+			}
+			claim := characterbox.Claim{BoxID: box.ID, SessionID: collision.player.SessionID, StartedAtTick: tick, CompletesAtTick: tick + delay}
+			s.BoxClaims[box.ID] = claim
+			s.ClaimedBoxBySession[collision.player.SessionID] = box.ID
+			events = append(events, system.CharacterBoxPickupStarted(box.ID, claim.SessionID, claim.StartedAtTick, claim.CompletesAtTick))
 			break
 		}
 	}
 	return events
+}
+
+func (s *State) cancelBoxClaim(boxID string) []system.CharacterBoxEvent {
+	claim, ok := s.BoxClaims[boxID]
+	if !ok {
+		return nil
+	}
+	delete(s.BoxClaims, boxID)
+	delete(s.ClaimedBoxBySession, claim.SessionID)
+	return []system.CharacterBoxEvent{system.CharacterBoxPickupCancelled(boxID, claim.SessionID)}
+}
+
+func (s *State) cancelBoxClaimForSession(sessionID string) []system.CharacterBoxEvent {
+	boxID, ok := s.ClaimedBoxBySession[sessionID]
+	if !ok {
+		return nil
+	}
+	return s.cancelBoxClaim(boxID)
 }
 
 func (s *State) weaponByType(weaponType entity.WeaponType) (entity.Weapon, bool) {
@@ -521,9 +601,14 @@ func (s *State) sendCurrentCharacterBoxes(logger runtime.Logger, dispatcher runt
 		boxIDs = append(boxIDs, boxID)
 	}
 	sort.Strings(boxIDs)
-	events := make([]system.CharacterBoxEvent, 0, len(boxIDs))
+	events := make([]system.CharacterBoxEvent, 0, len(boxIDs)+len(s.BoxClaims))
 	for _, boxID := range boxIDs {
 		events = append(events, system.SpawnedCharacterBox(s.CharacterBoxes[boxID]))
+	}
+	for _, boxID := range boxIDs {
+		if claim, ok := s.BoxClaims[boxID]; ok {
+			events = append(events, system.CharacterBoxPickupStarted(boxID, claim.SessionID, claim.StartedAtTick, claim.CompletesAtTick))
+		}
 	}
 	s.broadcastCharacterBoxEvents(logger, dispatcher, tick, events, []runtime.Presence{presence})
 }

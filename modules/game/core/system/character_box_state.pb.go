@@ -25,9 +25,11 @@ const (
 type CharacterBoxEventType int32
 
 const (
-	CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_UNSPECIFIED CharacterBoxEventType = 0
-	CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_SPAWNED     CharacterBoxEventType = 1
-	CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_DESPAWNED   CharacterBoxEventType = 2
+	CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_UNSPECIFIED      CharacterBoxEventType = 0
+	CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_SPAWNED          CharacterBoxEventType = 1
+	CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_DESPAWNED        CharacterBoxEventType = 2
+	CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED   CharacterBoxEventType = 3
+	CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED CharacterBoxEventType = 4
 )
 
 // Enum value maps for CharacterBoxEventType.
@@ -36,11 +38,15 @@ var (
 		0: "CHARACTER_BOX_EVENT_TYPE_UNSPECIFIED",
 		1: "CHARACTER_BOX_EVENT_TYPE_SPAWNED",
 		2: "CHARACTER_BOX_EVENT_TYPE_DESPAWNED",
+		3: "CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED",
+		4: "CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED",
 	}
 	CharacterBoxEventType_value = map[string]int32{
-		"CHARACTER_BOX_EVENT_TYPE_UNSPECIFIED": 0,
-		"CHARACTER_BOX_EVENT_TYPE_SPAWNED":     1,
-		"CHARACTER_BOX_EVENT_TYPE_DESPAWNED":   2,
+		"CHARACTER_BOX_EVENT_TYPE_UNSPECIFIED":      0,
+		"CHARACTER_BOX_EVENT_TYPE_SPAWNED":          1,
+		"CHARACTER_BOX_EVENT_TYPE_DESPAWNED":        2,
+		"CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED":   3,
+		"CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED": 4,
 	}
 )
 
@@ -124,13 +130,16 @@ func (x *CharacterBoxStateBatch) GetEvents() []*CharacterBoxStateEvent {
 }
 
 type CharacterBoxStateEvent struct {
-	state         protoimpl.MessageState    `protogen:"open.v1"`
-	EventType     CharacterBoxEventType     `protobuf:"varint,1,opt,name=event_type,json=eventType,proto3,enum=game.core.system.CharacterBoxEventType" json:"event_type,omitempty"`
-	BoxId         string                    `protobuf:"bytes,2,opt,name=box_id,json=boxId,proto3" json:"box_id,omitempty"`
-	Position      *Vector2                  `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"`
-	Value         *entity.CharacterBoxValue `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState    `protogen:"open.v1"`
+	EventType         CharacterBoxEventType     `protobuf:"varint,1,opt,name=event_type,json=eventType,proto3,enum=game.core.system.CharacterBoxEventType" json:"event_type,omitempty"`
+	BoxId             string                    `protobuf:"bytes,2,opt,name=box_id,json=boxId,proto3" json:"box_id,omitempty"`
+	Position          *Vector2                  `protobuf:"bytes,3,opt,name=position,proto3" json:"position,omitempty"`
+	Value             *entity.CharacterBoxValue `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
+	ClaimantSessionId string                    `protobuf:"bytes,5,opt,name=claimant_session_id,json=claimantSessionId,proto3" json:"claimant_session_id,omitempty"`
+	StartedAtTick     int64                     `protobuf:"varint,6,opt,name=started_at_tick,json=startedAtTick,proto3" json:"started_at_tick,omitempty"`
+	CompletesAtTick   int64                     `protobuf:"varint,7,opt,name=completes_at_tick,json=completesAtTick,proto3" json:"completes_at_tick,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CharacterBoxStateEvent) Reset() {
@@ -191,6 +200,27 @@ func (x *CharacterBoxStateEvent) GetValue() *entity.CharacterBoxValue {
 	return nil
 }
 
+func (x *CharacterBoxStateEvent) GetClaimantSessionId() string {
+	if x != nil {
+		return x.ClaimantSessionId
+	}
+	return ""
+}
+
+func (x *CharacterBoxStateEvent) GetStartedAtTick() int64 {
+	if x != nil {
+		return x.StartedAtTick
+	}
+	return 0
+}
+
+func (x *CharacterBoxStateEvent) GetCompletesAtTick() int64 {
+	if x != nil {
+		return x.CompletesAtTick
+	}
+	return 0
+}
+
 var File_modules_game_core_system_character_box_state_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_character_box_state_proto_rawDesc = "" +
@@ -198,17 +228,22 @@ const file_modules_game_core_system_character_box_state_proto_rawDesc = "" +
 	"2modules/game/core/system/character_box_state.proto\x12\x10game.core.system\x1a,modules/game/core/entity/character_box.proto\x1a%modules/game/core/system/vector.proto\"n\n" +
 	"\x16CharacterBoxStateBatch\x12\x12\n" +
 	"\x04tick\x18\x01 \x01(\x03R\x04tick\x12@\n" +
-	"\x06events\x18\x02 \x03(\v2(.game.core.system.CharacterBoxStateEventR\x06events\"\xe9\x01\n" +
+	"\x06events\x18\x02 \x03(\v2(.game.core.system.CharacterBoxStateEventR\x06events\"\xed\x02\n" +
 	"\x16CharacterBoxStateEvent\x12F\n" +
 	"\n" +
 	"event_type\x18\x01 \x01(\x0e2'.game.core.system.CharacterBoxEventTypeR\teventType\x12\x15\n" +
 	"\x06box_id\x18\x02 \x01(\tR\x05boxId\x125\n" +
 	"\bposition\x18\x03 \x01(\v2\x19.game.core.system.Vector2R\bposition\x129\n" +
-	"\x05value\x18\x04 \x01(\v2#.game.core.entity.CharacterBoxValueR\x05value*\x8f\x01\n" +
+	"\x05value\x18\x04 \x01(\v2#.game.core.entity.CharacterBoxValueR\x05value\x12.\n" +
+	"\x13claimant_session_id\x18\x05 \x01(\tR\x11claimantSessionId\x12&\n" +
+	"\x0fstarted_at_tick\x18\x06 \x01(\x03R\rstartedAtTick\x12*\n" +
+	"\x11completes_at_tick\x18\a \x01(\x03R\x0fcompletesAtTick*\xeb\x01\n" +
 	"\x15CharacterBoxEventType\x12(\n" +
 	"$CHARACTER_BOX_EVENT_TYPE_UNSPECIFIED\x10\x00\x12$\n" +
 	" CHARACTER_BOX_EVENT_TYPE_SPAWNED\x10\x01\x12&\n" +
-	"\"CHARACTER_BOX_EVENT_TYPE_DESPAWNED\x10\x02B3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
+	"\"CHARACTER_BOX_EVENT_TYPE_DESPAWNED\x10\x02\x12+\n" +
+	"'CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED\x10\x03\x12-\n" +
+	")CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED\x10\x04B3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
 
 var (
 	file_modules_game_core_system_character_box_state_proto_rawDescOnce sync.Once

@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"squad-survival-be/modules/game/core/characterbox"
 	"squad-survival-be/modules/game/core/entity"
 	"squad-survival-be/modules/game/core/system"
 	"squad-survival-be/modules/game/matchregistry"
@@ -63,8 +64,12 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 	if state.Phase != PhasePlaying || state.PlayingEndsAtTick != state.WaitingEndsAtTick+playingDurationTicks {
 		t.Fatalf("match did not start on deadline: %+v", state)
 	}
+	if len(player.Characters) != 1 || state.BoxClaims[box.ID].SessionID != player.SessionID {
+		t.Fatalf("playing transition did not start character box pickup: characters=%d claim=%+v", len(player.Characters), state.BoxClaims[box.ID])
+	}
+	match.MatchLoop(nil, nil, nil, nil, dispatcher, state.WaitingEndsAtTick+tickRate, state, nil)
 	if len(player.Characters) != 2 {
-		t.Fatalf("playing transition did not award character box: %d", len(player.Characters))
+		t.Fatalf("character box was not awarded at deadline: %d", len(player.Characters))
 	}
 	awardedSkin := player.Characters[1].Skin
 	if awardedSkin.HairID < 0 || awardedSkin.HairID > 1 || awardedSkin.WeaponID != 1 || awardedSkin.ProjectileID != 1 {
@@ -122,6 +127,8 @@ func TestPlayingEndsAfterTenMinutesAndTerminatesAfterGracePeriod(t *testing.T) {
 	dispatcher := &testDispatcher{}
 	state.Phase = PhasePlaying
 	state.PlayingEndsAtTick = playingDurationTicks
+	state.BoxClaims["box:1"] = characterbox.Claim{BoxID: "box:1", SessionID: "session-1", StartedAtTick: 1, CompletesAtTick: playingDurationTicks + 1}
+	state.ClaimedBoxBySession["session-1"] = "box:1"
 
 	result := match.MatchLoop(nil, nil, nil, nil, dispatcher, playingDurationTicks, state, nil)
 	if result == nil || state.Phase != PhaseEnded || state.EndedAtTick != playingDurationTicks+endedDurationTicks {
@@ -131,6 +138,9 @@ func TestPlayingEndsAfterTenMinutesAndTerminatesAfterGracePeriod(t *testing.T) {
 	if dispatcher.label != wantEndedLabel {
 		t.Fatalf("unexpected ended label: got %s want %s", dispatcher.label, wantEndedLabel)
 	}
+	if len(state.BoxClaims) != 0 || len(state.ClaimedBoxBySession) != 0 || !hasCharacterBoxEvent(t, dispatcher, system.CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED) {
+		t.Fatal("playing-to-ended transition did not cancel active box claims")
+	}
 	assertLifecycle(t, dispatcher, system.MatchPhase_MATCH_PHASE_ENDED, playingDurationTicks, state.EndedAtTick, false)
 	if result = match.MatchLoop(nil, nil, nil, nil, dispatcher, state.EndedAtTick-1, state, nil); result == nil {
 		t.Fatal("ended match terminated before grace period")
@@ -138,6 +148,25 @@ func TestPlayingEndsAfterTenMinutesAndTerminatesAfterGracePeriod(t *testing.T) {
 	if result = match.MatchLoop(nil, nil, nil, nil, dispatcher, state.EndedAtTick, state, nil); result != nil {
 		t.Fatal("ended match did not terminate after grace period")
 	}
+}
+
+func hasCharacterBoxEvent(t *testing.T, dispatcher *testDispatcher, eventType system.CharacterBoxEventType) bool {
+	t.Helper()
+	for _, broadcast := range dispatcher.broadcasts {
+		if broadcast.opCode != system.OpCharacterBoxState {
+			continue
+		}
+		var batch system.CharacterBoxStateBatch
+		if err := proto.Unmarshal(broadcast.data, &batch); err != nil {
+			t.Fatal(err)
+		}
+		for _, event := range batch.Events {
+			if event.EventType == eventType {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func newTestMatchState(t *testing.T) (*Match, *State) {

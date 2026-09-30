@@ -10,7 +10,7 @@
 | `103` | Server → Client | `CombatEventBatch` | Reliable | Khi có event |
 | `104` | Server → Client | `PlayerRosterBatch` | Reliable | Join/enter detection/roster changed |
 | `105` | Server → Client | `ProjectileMovementSnapshot` | Unreliable | Mỗi tick |
-| `106` | Server → Client | `CharacterBoxStateBatch` | Reliable | Box spawn/despawn |
+| `106` | Server → Client | `CharacterBoxStateBatch` | Reliable | Box spawn/despawn và pickup countdown |
 | `107` | Server → Client | `MatchLifecycleState` | Reliable | Join và chuyển phase Battle Royale |
 
 Contract nằm trong các source schema:
@@ -89,6 +89,8 @@ socket.ReceivedMatchState += state => {
 
 `CombatEvent` dùng protobuf `oneof`; Unity kiểm tra `EventCase` trước khi đọc `AttackStarted`, projectile event, damage hoặc death.
 
+`CharacterBoxStateBatch` dùng `PICKUP_STARTED` để gửi `box_id`, `claimant_session_id`, `started_at_tick` và `completes_at_tick`. Client suy ra countdown từ tick server, không chờ packet mỗi tick. `PICKUP_CANCELLED` mở khóa UI khi claimant rời vùng, chết hoặc leave; `DESPAWNED` xác nhận box đã được consume và character được grant. Các event này được broadcast reliable toàn match. Snapshot gửi lúc join gồm cả box và claim đang hoạt động.
+
 `CharacterRoster.skin` chứa các numeric ID để render ngoại hình và weapon của character. Client kết hợp `weapon_type` hiện có với `weapon_id`; `projectile_id` hiện chỉ dùng cho arrow của bow.
 
 ### Roster và trạng thái render
@@ -113,7 +115,7 @@ Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf ho�
 
 - RPC `find_or_create_match` request/response.
 - Match label cho `MatchList` query.
-- Embedded `weapons.json` và `strategies.json`.
+- Embedded `weapons.json`, `strategies.json` và `pickup_delays.json`.
 - RPC `healthcheck` response.
 
 Realtime opcode `1`, `101`, `102`, `103`, `104`, `105`, `106`, `107` đều dùng Protobuf binary.

@@ -11,6 +11,8 @@ enum CharacterBoxEventType {
   CHARACTER_BOX_EVENT_TYPE_UNSPECIFIED = 0;
   CHARACTER_BOX_EVENT_TYPE_SPAWNED = 1;
   CHARACTER_BOX_EVENT_TYPE_DESPAWNED = 2;
+  CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED = 3;
+  CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED = 4;
 }
 
 message CharacterBoxStateBatch {
@@ -23,4 +25,7 @@ message CharacterBoxStateEvent {
   string box_id = 2;
   Vector2 position = 3;
   game.core.entity.CharacterBoxValue value = 4;
+  string claimant_session_id = 5;
+  int64 started_at_tick = 6;
+  int64 completes_at_tick = 7;
 }

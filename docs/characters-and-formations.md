@@ -53,7 +53,9 @@ Character không overshoot và không teleport khi formation/facing đổi. Char
 
 ## Character Box
 
-Match duy trì 18–24 Character Box tĩnh và mỗi phút bù lại đến một target ngẫu nhiên trong khoảng này. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính 1, server tự động tạo character với đầy đủ weapon stats và consume box; player đã đầy formation không consume box. Spawn/despawn được gửi reliable toàn match qua opcode `106`.
+Match duy trì Character Box tĩnh và mỗi phút refill đến target của mode. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính collision, server khóa một box cho một player và bắt đầu countdown; mỗi player chỉ được claim một box. Player phải ở trong vùng, còn sống và còn capacity cho tới deadline. Delay theo số character lúc bắt đầu claim là 1/2/3/4 giây tương ứng với 1/2/3/4 character; đủ 5 character thì không thể claim. Bảng thời gian nằm trong `modules/game/core/characterbox/pickup_delays.json`.
+
+Opcode reliable `106` broadcast `PICKUP_STARTED` và `PICKUP_CANCELLED`; client tự tính countdown từ deadline tick. Khi hoàn tất, server mới random skin, grant character và gửi `DESPAWNED`. Box đang được claim vẫn tồn tại trong world và được tính khi refill.
 
 ## Giới Hạn Hiện Tại
 

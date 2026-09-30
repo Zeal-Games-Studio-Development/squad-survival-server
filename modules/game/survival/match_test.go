@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
 	"testing"
 
+	"squad-survival-be/modules/game/core/characterbox"
 	"squad-survival-be/modules/game/core/combat"
 	"squad-survival-be/modules/game/core/entity"
 	"squad-survival-be/modules/game/core/spatial"
@@ -601,9 +603,16 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 		t.Fatal(err)
 	}
 	initialVersion := near.RosterVersion
-	events := state.collectCharacterBoxes(nil)
-	if len(events) != 1 || events[0].ID != box.ID || events[0].Type != system.CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_DESPAWNED {
+	events := state.collectCharacterBoxes(10, nil)
+	if len(events) != 1 || events[0].ID != box.ID || events[0].Type != system.CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED || events[0].ClaimantSessionID != near.SessionID || events[0].CompletesAtTick != 20 {
 		t.Fatalf("unexpected collision events: %#v", events)
+	}
+	if len(near.Characters) != 1 || state.CharacterBoxes[box.ID] == nil {
+		t.Fatal("box was granted before the pickup deadline")
+	}
+	events = state.collectCharacterBoxes(20, nil)
+	if len(events) != 1 || events[0].Type != system.CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_DESPAWNED {
+		t.Fatalf("unexpected completion events: %#v", events)
 	}
 	if len(far.Characters) != 1 || len(near.Characters) != 2 || near.RosterVersion != initialVersion+1 {
 		t.Fatalf("wrong player received box: far=%d near=%d version=%d", len(far.Characters), len(near.Characters), near.RosterVersion)
@@ -641,11 +650,53 @@ func TestCharacterBoxRemainsWhenPlayerIsAtCapacity(t *testing.T) {
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
 	}
-	if events := state.collectCharacterBoxes(nil); len(events) != 0 {
+	if events := state.collectCharacterBoxes(1, nil); len(events) != 0 {
 		t.Fatalf("full player consumed box: %#v", events)
 	}
 	if state.CharacterBoxes[box.ID] == nil {
 		t.Fatal("box was removed for full player")
+	}
+}
+
+func TestCharacterBoxPickupCancelsOutsideRadiusAndAllowsRetry(t *testing.T) {
+	state := characterBoxTestState(1)
+	player := entity.NewPlayer("user-1", "session-1", "Player", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	state.Players[player.SessionID] = player
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe)
+	state.CharacterBoxes[box.ID] = box
+	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
+		t.Fatal(err)
+	}
+	started := state.collectCharacterBoxes(10, nil)
+	if len(started) != 1 || started[0].Type != system.CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED {
+		t.Fatalf("pickup did not start: %#v", started)
+	}
+	player.Position = entity.Vector2{X: entity.CharacterBoxCollisionRadius + 1}
+	cancelled := state.collectCharacterBoxes(11, nil)
+	if len(cancelled) != 1 || cancelled[0].Type != system.CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED || len(state.BoxClaims) != 0 || len(state.ClaimedBoxBySession) != 0 {
+		t.Fatalf("pickup was not cancelled: events=%#v claims=%#v", cancelled, state.BoxClaims)
+	}
+	player.Position = entity.Vector2{}
+	restarted := state.collectCharacterBoxes(12, nil)
+	if len(restarted) != 1 || restarted[0].StartedAtTick != 12 || restarted[0].CompletesAtTick != 22 {
+		t.Fatalf("pickup did not restart with a fresh deadline: %#v", restarted)
+	}
+}
+
+func TestCharacterBoxPickupAllowsOnlyOneClaimPerPlayer(t *testing.T) {
+	state := characterBoxTestState(1)
+	player := entity.NewPlayer("user-1", "session-1", "Player", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	state.Players[player.SessionID] = player
+	for _, id := range []string{"box:1", "box:2"} {
+		box := entity.NewCharacterBox(id, entity.Vector2{}, entity.WeaponAxe)
+		state.CharacterBoxes[id] = box
+		if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
+			t.Fatal(err)
+		}
+	}
+	events := state.collectCharacterBoxes(10, nil)
+	if len(events) != 1 || len(state.BoxClaims) != 1 || len(state.ClaimedBoxBySession) != 1 {
+		t.Fatalf("player claimed more than one box: events=%#v claims=%#v", events, state.BoxClaims)
 	}
 }
 
@@ -674,7 +725,7 @@ func TestEliminatedPlayerCannotCollectCharacterBoxButRemainsInWorld(t *testing.T
 	if err := state.SpatialGrid.Move(detector); err != nil {
 		t.Fatal(err)
 	}
-	if events := state.collectCharacterBoxes(nil); len(events) != 0 {
+	if events := state.collectCharacterBoxes(1, nil); len(events) != 0 {
 		t.Fatalf("eliminated player collected a box: %#v", events)
 	}
 	if state.CharacterBoxes[box.ID] == nil {
@@ -697,7 +748,11 @@ func TestCharacterBoxCollisionTieBreaksBySessionID(t *testing.T) {
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
 	}
-	state.collectCharacterBoxes(nil)
+	events := state.collectCharacterBoxes(1, nil)
+	if len(events) != 1 || events[0].ClaimantSessionID != playerA.SessionID {
+		t.Fatalf("session ID tie-break failed: %#v", events)
+	}
+	state.collectCharacterBoxes(11, nil)
 	if len(playerA.Characters) != 2 || len(playerB.Characters) != 1 {
 		t.Fatalf("session ID tie-break failed: player-a=%d player-b=%d", len(playerA.Characters), len(playerB.Characters))
 	}
@@ -706,6 +761,15 @@ func TestCharacterBoxCollisionTieBreaksBySessionID(t *testing.T) {
 func TestCharacterBoxRefillAndJoinSnapshot(t *testing.T) {
 	state := characterBoxTestState(4)
 	state.spawnCharacterBoxes(60)
+	state.ensureCharacterBoxState(10)
+	boxIDs := make([]string, 0, len(state.CharacterBoxes))
+	for boxID := range state.CharacterBoxes {
+		boxIDs = append(boxIDs, boxID)
+	}
+	sort.Strings(boxIDs)
+	claim := characterbox.Claim{BoxID: boxIDs[0], SessionID: "claimant", StartedAtTick: 5, CompletesAtTick: 15}
+	state.BoxClaims[claim.BoxID] = claim
+	state.ClaimedBoxBySession[claim.SessionID] = claim.BoxID
 	dispatcher := &testDispatcher{}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
 	state.sendCurrentCharacterBoxes(nil, dispatcher, 10, presence)
@@ -716,8 +780,8 @@ func TestCharacterBoxRefillAndJoinSnapshot(t *testing.T) {
 	if err := proto.Unmarshal(dispatcher.broadcasts[0].data, &batch); err != nil {
 		t.Fatal(err)
 	}
-	if len(batch.Events) != 60 {
-		t.Fatalf("join snapshot has %d boxes, want 60", len(batch.Events))
+	if len(batch.Events) != 61 || batch.Events[60].EventType != system.CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_STARTED || batch.Events[60].BoxId != claim.BoxID {
+		t.Fatalf("join snapshot does not include active claim: %#v", batch.Events)
 	}
 
 	state.NextBoxRefillTick = 600

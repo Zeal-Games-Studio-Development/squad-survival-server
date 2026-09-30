@@ -6,13 +6,13 @@ Mode `battle-royale` dùng cùng tick rate, giới hạn 32 player và gameplay 
 
 | Phase | Thời lượng | Join | Gameplay |
 | --- | --- | --- | --- |
-| `waiting` | Tối đa 60 giây từ player đầu tiên | Có, đến khi đủ 32 player | Tạm dừng |
+| `waiting` | Tối đa 15 giây từ player đầu tiên | Có, đến khi đủ 32 player | Tạm dừng |
 | `playing` | 10 phút | Không | Hoạt động |
 | `ended` | 10 giây | Không | Tạm dừng |
 
 Match bắt đầu `waiting`. Countdown chỉ bắt đầu khi player đầu tiên join thành công. Match chuyển sang `playing` khi countdown hết hoặc phòng đủ 32 player. Lobby đã từng có player sẽ terminate khi không còn player hoặc reservation; lobby chưa từng có player tiếp tục dùng empty TTL 60 giây.
 
-Khi vào `playing`, server khóa join, đặt lại lịch refill character box theo thời điểm bắt đầu gameplay và chạy simulation giống Survival. Sau 10 phút, match chuyển sang `ended`, dừng input và simulation, rồi terminate sau 10 giây để client nhận trạng thái cuối.
+Khi vào `playing`, server khóa join, đặt lại lịch refill character box theo thời điểm bắt đầu gameplay và chạy simulation giống Survival. Character Box dùng claim/countdown giống Survival; mọi claim còn hoạt động bị cancel khi chuyển sang `ended`. Sau 10 phút, match chuyển sang `ended`, dừng input và simulation, rồi terminate sau 10 giây để client nhận trạng thái cuối.
 
 ## Matchmaking và label
 

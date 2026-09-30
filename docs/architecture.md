@@ -12,6 +12,7 @@
 | `modules/game/core/strategy` | Strategy mask và slot formation |
 | `modules/game/core/spatial` | Spatial grid cho player detection |
 | `modules/game/core/combat` | Attack cycle, damage và projectile simulation |
+| `modules/game/core/characterbox` | Claim model và embedded delay config cho Character Box |
 | `modules/game/core/system` | Opcode, protobuf encoding và snapshots |
 | `modules/game/core/world` | Tọa độ, spawn và world boundary |
 | `modules/skin/loadout` | Đọc snapshot inventory và random character skin dùng chung cho các mode |
@@ -37,11 +38,12 @@ flowchart TD
     B --> C[Step player movement]
     C --> D[Assign formation targets and move characters]
     D --> E[Update player spatial grid]
-    E --> F[Cache nearby players]
-    F --> G[Step attacks and projectiles]
-    G --> H[Apply damage and remove dead characters]
-    H --> I[Broadcast reliable combat events]
-    I --> J[Broadcast unreliable player and projectile movement snapshots]
+    E --> F[Update Character Box claims]
+    F --> G[Cache nearby players]
+    G --> H[Step attacks and projectiles]
+    H --> I[Apply damage and remove dead characters]
+    I --> J[Broadcast reliable combat events]
+    J --> K[Broadcast unreliable player and projectile movement snapshots]
 ```
 
 Invalid opcode hoặc malformed movement payload bị bỏ qua và không dừng match.
@@ -65,7 +67,7 @@ Survival và Battle Royale lobby chưa từng có player tự dừng sau `60 gi�
 ```mermaid
 stateDiagram-v2
     [*] --> waiting
-    waiting --> playing: 60 giây từ player đầu tiên hoặc đủ 32 player
+    waiting --> playing: 15 giây từ player đầu tiên hoặc đủ 32 player
     waiting --> [*]: lobby đã khởi động nhưng trở thành trống
     playing --> ended: đủ 10 phút gameplay
     ended --> [*]: giữ 10 giây
@@ -84,5 +86,5 @@ Coordinator chọn module và capacity theo `mode`: `survival.MaxPlayers` cho Su
 - Realtime opcode dùng binary Protobuf; opcode `107` hiện chỉ được Battle Royale phát ra.
 - `CharacterRoster` mang skin numeric ID đã được server random từ snapshot inventory lúc player join.
 - Matchmaking RPC request/response và match label dùng JSON.
-- Weapon/strategy catalog mặc định dùng embedded JSON.
+- Weapon/strategy catalog và Character Box pickup delay mặc định dùng embedded JSON.
 - Generated Go code được compile vào `backend.so`; `.proto`, Buf và generated C# không cần có trong runtime image.
