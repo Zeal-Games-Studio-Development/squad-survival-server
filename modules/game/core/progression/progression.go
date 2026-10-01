@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	MinLevel            = 1
-	MaxLevel            = 10
+	MinLevel = 1
+	MaxLevel = 10
 )
 
 type Level struct {
@@ -89,4 +89,10 @@ func MaxCharactersForLevel(level int) int {
 		return strategy.MaxCharacters
 	}
 	return maximum
+}
+
+// MaxExperienceForLevel is the experience needed to advance from the current level.
+// The maximum level has no next level, so its value is zero.
+func MaxExperienceForLevel(level int) uint64 {
+	return embeddedCatalog.Levels[ClampLevel(level)-MinLevel].ExperienceToNextLevel
 }

@@ -25,7 +25,19 @@ func TestEncodePlayerProgressionBatch(t *testing.T) {
 		t.Fatalf("unexpected progression batch: %+v", &batch)
 	}
 	state := batch.Players[0]
-	if state.UserId != player.UserID || state.SessionId != player.SessionID || state.Level != 3 || state.Experience != 175 {
+	if state.UserId != player.UserID || state.SessionId != player.SessionID || state.Level != 3 || state.Experience != 175 || state.MaxExperience != 300 {
 		t.Fatalf("unexpected player progression: %+v", state)
+	}
+	player.Level = 10
+	player.Experience = 0
+	data, err = EncodePlayerProgressionBatch(13, []*entity.Player{player})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = proto.Unmarshal(data, &batch); err != nil {
+		t.Fatal(err)
+	}
+	if batch.Players[0].MaxExperience != 0 {
+		t.Fatalf("expected no next-level experience at max level, got %d", batch.Players[0].MaxExperience)
 	}
 }

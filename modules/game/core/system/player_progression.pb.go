@@ -79,6 +79,7 @@ type PlayerProgression struct {
 	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	Level         int32                  `protobuf:"varint,3,opt,name=level,proto3" json:"level,omitempty"`
 	Experience    uint64                 `protobuf:"varint,4,opt,name=experience,proto3" json:"experience,omitempty"`
+	MaxExperience uint64                 `protobuf:"varint,5,opt,name=max_experience,json=maxExperience,proto3" json:"max_experience,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -141,6 +142,13 @@ func (x *PlayerProgression) GetExperience() uint64 {
 	return 0
 }
 
+func (x *PlayerProgression) GetMaxExperience() uint64 {
+	if x != nil {
+		return x.MaxExperience
+	}
+	return 0
+}
+
 var File_modules_game_core_system_player_progression_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_player_progression_proto_rawDesc = "" +
@@ -148,7 +156,7 @@ const file_modules_game_core_system_player_progression_proto_rawDesc = "" +
 	"1modules/game/core/system/player_progression.proto\x12\x10game.core.system\"k\n" +
 	"\x16PlayerProgressionBatch\x12\x12\n" +
 	"\x04tick\x18\x01 \x01(\x03R\x04tick\x12=\n" +
-	"\aplayers\x18\x02 \x03(\v2#.game.core.system.PlayerProgressionR\aplayers\"\x81\x01\n" +
+	"\aplayers\x18\x02 \x03(\v2#.game.core.system.PlayerProgressionR\aplayers\"\xa8\x01\n" +
 	"\x11PlayerProgression\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
@@ -156,7 +164,8 @@ const file_modules_game_core_system_player_progression_proto_rawDesc = "" +
 	"\x05level\x18\x03 \x01(\x05R\x05level\x12\x1e\n" +
 	"\n" +
 	"experience\x18\x04 \x01(\x04R\n" +
-	"experienceB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
+	"experience\x12%\n" +
+	"\x0emax_experience\x18\x05 \x01(\x04R\rmaxExperienceB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
 
 var (
 	file_modules_game_core_system_player_progression_proto_rawDescOnce sync.Once

@@ -102,7 +102,7 @@ socket.ReceivedMatchState += state => {
 
 `PlayerRosterBatch` chỉ đồng bộ metadata/static state khi player join, đi vào detection hoặc roster version thay đổi. Server không gửi roster removal riêng khi player leave match hoặc rời detection.
 
-`PlayerProgressionBatch` tách khỏi roster và chứa `user_id`, `session_id`, `level`, `experience`. Server gửi state của chính player khi join, gửi remote player khi đi vào detection và phát lại khi progression version thay đổi. Client suy ra giới hạn formation bằng `min(level, 9)`.
+`PlayerProgressionBatch` tách khỏi roster và chứa `user_id`, `session_id`, `level`, `experience`, `max_experience`. `max_experience` là experience cần để lên level kế tiếp, lấy từ bảng progression; ở level 10 giá trị là `0` vì không có level kế tiếp. UI có thể hiển thị `experience / max_experience` khi `max_experience > 0` và trạng thái đạt level tối đa khi bằng `0`. Server gửi state của chính player khi join, gửi remote player khi đi vào detection và phát lại khi progression version thay đổi. Client suy ra giới hạn formation bằng `min(level, 9)`.
 
 `PlayerMovementSnapshot` opcode `102` là nguồn authoritative cho tập entity client cần render ở mỗi tick: `self` là player hiện tại và `players` là toàn bộ player khác đang trong detection. Nếu một `session_id` không còn xuất hiện trong snapshot mới, client loại player cùng các character của session đó khỏi scene. Vì movement snapshot đã đảm nhiệm visibility/despawn, roster không cần phát lại chỉ để báo leave.
 
