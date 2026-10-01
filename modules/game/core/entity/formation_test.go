@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"squad-survival-be/modules/game/core/progression"
 	"squad-survival-be/modules/game/core/strategy"
 )
 
@@ -100,13 +101,26 @@ func TestAddCharacterEnforcesMaximum(t *testing.T) {
 	if player.CharacterCount() != 1 {
 		t.Fatalf("nil character consumed capacity: %d", player.CharacterCount())
 	}
-	for player.CharacterCount() < strategy.MaxCharacters {
+	for player.CharacterCount() < player.MaxCharacters() {
 		if err := player.AddCharacter(NewCharacter()); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if err := player.AddCharacter(NewCharacter()); !errors.Is(err, ErrCharacterLimit) {
 		t.Fatalf("expected character limit error, got %v", err)
+	}
+	if player.CharacterCount() != 4 {
+		t.Fatalf("expected level 1 character limit 4, got %d", player.CharacterCount())
+	}
+
+	player.Level = progression.MaxLevel
+	for player.CharacterCount() < strategy.MaxCharacters {
+		if err := player.AddCharacter(NewCharacter()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := player.AddCharacter(NewCharacter()); !errors.Is(err, ErrCharacterLimit) {
+		t.Fatalf("expected absolute character limit error, got %v", err)
 	}
 }
 

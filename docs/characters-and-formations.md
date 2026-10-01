@@ -1,5 +1,11 @@
 # Character Và Formation
 
+## Level, Experience Và Giới Hạn Character
+
+Mỗi player trong match có progression runtime, khởi đầu ở level `1` với experience `0`. Progression chưa được lưu vào storage và chưa có nguồn nhận experience.
+
+Giới hạn character hiện tại được tính bằng `min(level + 3, 13)`: level 1 có 4 slot, level 2 có 5 slot và level 10 có 13 slot. Hằng `strategy.MaxCharacters = 13` vẫn là boundary tuyệt đối của formation. Bảng experience nằm trong `modules/game/core/progression/level_progression.json`; mỗi giá trị là experience cần thêm để sang level kế tiếp.
+
 ## Character Lifecycle
 
 Player mới được tạo cùng một character có weapon chọn ngẫu nhiên từ embedded catalog. Character ID có dạng `<user_id>:<sequence>` và ổn định khi array được compact.
@@ -53,7 +59,7 @@ Character không overshoot và không teleport khi formation/facing đổi. Char
 
 ## Character Box
 
-Match duy trì Character Box tĩnh và mỗi phút refill đến target của mode. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính collision, server khóa một box cho một player và bắt đầu countdown; mỗi player chỉ được claim một box. Player phải ở trong vùng, còn sống và còn capacity cho tới deadline. Delay dựa trên số character lúc bắt đầu claim: count 1–4 chờ tương ứng 1–4 giây, 5–7 chờ 5 giây, 8–10 chờ 6 giây và 11–12 chờ 7 giây. Đủ 13 character thì không thể claim. Bảng thời gian nằm trong `modules/game/core/characterbox/pickup_delays.json`.
+Match duy trì Character Box tĩnh và mỗi phút refill đến target của mode. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính collision, server khóa một box cho một player và bắt đầu countdown; mỗi player chỉ được claim một box. Player phải ở trong vùng, còn sống và còn capacity theo level cho tới deadline. Delay dựa trên số character lúc bắt đầu claim: count 1–4 chờ tương ứng 1–4 giây, 5–7 chờ 5 giây, 8–10 chờ 6 giây và 11–12 chờ 7 giây. Player đã đạt giới hạn runtime không thể claim; boundary tuyệt đối vẫn là 13 character. Bảng thời gian nằm trong `modules/game/core/characterbox/pickup_delays.json`.
 
 Opcode reliable `106` broadcast `PICKUP_STARTED` và `PICKUP_CANCELLED`; client tự tính countdown từ deadline tick. Khi hoàn tất, server mới random skin, grant character và gửi `DESPAWNED`. Box đang được claim vẫn tồn tại trong world và được tính khi refill.
 

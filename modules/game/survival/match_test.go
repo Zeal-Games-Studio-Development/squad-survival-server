@@ -10,6 +10,7 @@ import (
 	"squad-survival-be/modules/game/core/characterbox"
 	"squad-survival-be/modules/game/core/combat"
 	"squad-survival-be/modules/game/core/entity"
+	"squad-survival-be/modules/game/core/progression"
 	"squad-survival-be/modules/game/core/spatial"
 	"squad-survival-be/modules/game/core/strategy"
 	"squad-survival-be/modules/game/core/system"
@@ -492,6 +493,58 @@ func TestRemoveRosterTrackingCleansObserverAndTarget(t *testing.T) {
 	}
 }
 
+func TestProgressionBroadcastsOnEncounterAndVersionChange(t *testing.T) {
+	random := rand.New(rand.NewSource(8))
+	playerA := entity.NewPlayer("user-a", "session-a", "A", entity.Vector2{}, random)
+	playerB := entity.NewPlayer("user-b", "session-b", "B", entity.Vector2{}, random)
+	state := &State{
+		Players: map[string]*entity.Player{playerA.SessionID: playerA, playerB.SessionID: playerB},
+		Presences: map[string]runtime.Presence{
+			playerA.SessionID: testPresence{userID: playerA.UserID, sessionID: playerA.SessionID},
+			playerB.SessionID: testPresence{userID: playerB.UserID, sessionID: playerB.SessionID},
+		},
+		ProgressionVersions: map[string]map[string]uint64{
+			playerA.SessionID: {playerA.SessionID: playerA.ProgressionVersion},
+			playerB.SessionID: {playerB.SessionID: playerB.ProgressionVersion},
+		},
+	}
+	nearby := map[string][]*entity.Player{playerA.SessionID: {playerB}, playerB.SessionID: {playerA}}
+	dispatcher := &testDispatcher{}
+	state.broadcastProgressionUpdates(nil, dispatcher, 1, nearby)
+	assertProgressionBroadcasts(t, dispatcher.broadcasts, 2)
+
+	dispatcher.broadcasts = nil
+	state.broadcastProgressionUpdates(nil, dispatcher, 2, nearby)
+	if len(dispatcher.broadcasts) != 0 {
+		t.Fatalf("expected no unchanged progression broadcasts, got %d", len(dispatcher.broadcasts))
+	}
+
+	playerB.Level = 2
+	playerB.Experience = 25
+	playerB.MarkProgressionChanged()
+	state.broadcastProgressionUpdates(nil, dispatcher, 3, nearby)
+	assertProgressionBroadcasts(t, dispatcher.broadcasts, 2)
+}
+
+func assertProgressionBroadcasts(t *testing.T, broadcasts []testBroadcast, expected int) {
+	t.Helper()
+	if len(broadcasts) != expected {
+		t.Fatalf("expected %d progression broadcasts, got %d", expected, len(broadcasts))
+	}
+	for _, broadcast := range broadcasts {
+		if broadcast.opCode != system.OpPlayerProgressionBatch || !broadcast.reliable || len(broadcast.presences) != 1 {
+			t.Fatalf("unexpected progression broadcast: %+v", broadcast)
+		}
+		var batch system.PlayerProgressionBatch
+		if err := proto.Unmarshal(broadcast.data, &batch); err != nil {
+			t.Fatal(err)
+		}
+		if len(batch.Players) != 1 {
+			t.Fatalf("unexpected progression payload: %+v", &batch)
+		}
+	}
+}
+
 func TestMatchLoopSendsReliableCombatEventsToRelevantViewers(t *testing.T) {
 	match := &Match{}
 	dispatcher := &testDispatcher{}
@@ -640,6 +693,7 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 func TestCharacterBoxRemainsWhenPlayerIsAtCapacity(t *testing.T) {
 	state := characterBoxTestState(1)
 	player := entity.NewPlayer("user-1", "session-1", "Full", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	player.Level = progression.MaxLevel
 	for player.CharacterCount() < strategy.MaxCharacters {
 		if err := player.AddCharacter(entity.NewCharacter()); err != nil {
 			t.Fatal(err)
@@ -681,6 +735,32 @@ func TestCharacterBoxPickupCancelsOutsideRadiusAndAllowsRetry(t *testing.T) {
 	restarted := state.collectCharacterBoxes(12, nil)
 	if len(restarted) != 1 || restarted[0].StartedAtTick != 12 || restarted[0].CompletesAtTick != 22 {
 		t.Fatalf("pickup did not restart with a fresh deadline: %#v", restarted)
+	}
+}
+
+func TestCharacterBoxPickupCancelsWhenRuntimeCapacityIsReached(t *testing.T) {
+	state := characterBoxTestState(1)
+	player := entity.NewPlayer("user-1", "session-1", "Player", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	state.Players[player.SessionID] = player
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe)
+	state.CharacterBoxes[box.ID] = box
+	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
+		t.Fatal(err)
+	}
+	if started := state.collectCharacterBoxes(10, nil); len(started) != 1 || len(state.BoxClaims) != 1 {
+		t.Fatalf("pickup did not start: %#v", started)
+	}
+	for player.CharacterCount() < player.MaxCharacters() {
+		if err := player.AddCharacter(entity.NewCharacter()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cancelled := state.collectCharacterBoxes(11, nil)
+	if len(cancelled) != 1 || cancelled[0].Type != system.CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_PICKUP_CANCELLED || len(state.BoxClaims) != 0 {
+		t.Fatalf("capacity did not cancel pickup: events=%#v claims=%#v", cancelled, state.BoxClaims)
+	}
+	if state.CharacterBoxes[box.ID] == nil {
+		t.Fatal("cancelled pickup consumed the box")
 	}
 }
 

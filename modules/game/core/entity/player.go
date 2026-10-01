@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"strconv"
 
+	"squad-survival-be/modules/game/core/progression"
 	"squad-survival-be/modules/game/core/strategy"
 	"squad-survival-be/modules/game/core/world"
 )
@@ -31,6 +32,9 @@ type Player struct {
 	DetectionRadius       float64
 	Strategy              strategy.Definition
 	RosterVersion         uint64
+	Level                 int
+	Experience            uint64
+	ProgressionVersion    uint64
 	nextCharacterSequence uint64
 }
 
@@ -41,15 +45,18 @@ func NewPlayer(userID, sessionID, displayName string, position Vector2, random *
 	}
 	character := CreateCharacter(random, DefaultWeaponCatalog())
 	player := &Player{
-		UserID:          userID,
-		SessionID:       sessionID,
-		DisplayName:     displayName,
-		Position:        world.ClampToPlayArea(position),
-		Facing:          Vector2{X: 1},
-		Characters:      []*Character{character},
-		DetectionRadius: DefaultDetectionRadius,
-		Strategy:        definition,
-		RosterVersion:   1,
+		UserID:             userID,
+		SessionID:          sessionID,
+		DisplayName:        displayName,
+		Position:           world.ClampToPlayArea(position),
+		Facing:             Vector2{X: 1},
+		Characters:         []*Character{character},
+		DetectionRadius:    DefaultDetectionRadius,
+		Strategy:           definition,
+		RosterVersion:      1,
+		Level:              progression.MinLevel,
+		Experience:         0,
+		ProgressionVersion: 1,
 	}
 	player.assignCharacterID(character)
 
@@ -62,6 +69,17 @@ func NewPlayer(userID, sessionID, displayName string, position Vector2, random *
 		}
 	}
 	return player
+}
+
+func (p *Player) MaxCharacters() int {
+	if p == nil {
+		return 0
+	}
+	return progression.MaxCharactersForLevel(p.Level)
+}
+
+func (p *Player) MarkProgressionChanged() {
+	p.ProgressionVersion++
 }
 
 func ApplyMovementInput(player *Player, input *MovementInput, tick int64) bool {

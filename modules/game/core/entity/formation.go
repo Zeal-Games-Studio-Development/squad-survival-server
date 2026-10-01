@@ -39,7 +39,7 @@ func (p *Player) AddCharacter(character *Character) error {
 	if character == nil {
 		return ErrNilCharacter
 	}
-	if p.CharacterCount() >= strategy.MaxCharacters {
+	if p.CharacterCount() >= p.MaxCharacters() || p.CharacterCount() >= strategy.MaxCharacters {
 		return ErrCharacterLimit
 	}
 	if p.CharacterCount()+1 > p.Strategy.Capacity() {

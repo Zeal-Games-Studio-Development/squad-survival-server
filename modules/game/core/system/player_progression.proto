@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package game.core.system;
+
+option go_package = "squad-survival-be/modules/game/core/system;system";
+
+message PlayerProgressionBatch {
+  int64 tick = 1;
+  repeated PlayerProgression players = 2;
+}
+
+message PlayerProgression {
+  string user_id = 1;
+  string session_id = 2;
+  int32 level = 3;
+  uint64 experience = 4;
+}

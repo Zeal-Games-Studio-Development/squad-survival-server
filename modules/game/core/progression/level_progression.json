@@ -1,0 +1,14 @@
+{
+  "levels": [
+    { "level": 1, "experience_to_next_level": 100 },
+    { "level": 2, "experience_to_next_level": 200 },
+    { "level": 3, "experience_to_next_level": 300 },
+    { "level": 4, "experience_to_next_level": 400 },
+    { "level": 5, "experience_to_next_level": 500 },
+    { "level": 6, "experience_to_next_level": 600 },
+    { "level": 7, "experience_to_next_level": 700 },
+    { "level": 8, "experience_to_next_level": 800 },
+    { "level": 9, "experience_to_next_level": 900 },
+    { "level": 10, "experience_to_next_level": 0 }
+  ]
+}

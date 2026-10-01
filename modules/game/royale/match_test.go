@@ -98,6 +98,38 @@ func TestWaitingStartsImmediatelyWhenFull(t *testing.T) {
 	}
 }
 
+func TestProgressionBroadcastsOnEncounterWithoutRepeating(t *testing.T) {
+	playerA := entity.NewPlayer("user-a", "session-a", "A", entity.Vector2{}, rand.New(rand.NewSource(1)))
+	playerB := entity.NewPlayer("user-b", "session-b", "B", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	state := &State{
+		Players: map[string]*entity.Player{playerA.SessionID: playerA, playerB.SessionID: playerB},
+		Presences: map[string]runtime.Presence{
+			playerA.SessionID: testPresence{userID: playerA.UserID, sessionID: playerA.SessionID},
+			playerB.SessionID: testPresence{userID: playerB.UserID, sessionID: playerB.SessionID},
+		},
+		ProgressionVersions: map[string]map[string]uint64{
+			playerA.SessionID: {playerA.SessionID: playerA.ProgressionVersion},
+			playerB.SessionID: {playerB.SessionID: playerB.ProgressionVersion},
+		},
+	}
+	nearby := map[string][]*entity.Player{playerA.SessionID: {playerB}, playerB.SessionID: {playerA}}
+	dispatcher := &testDispatcher{}
+	state.broadcastProgressionUpdates(nil, dispatcher, 1, nearby)
+	if len(dispatcher.broadcasts) != 2 {
+		t.Fatalf("expected progression for both observers, got %d", len(dispatcher.broadcasts))
+	}
+	for _, broadcast := range dispatcher.broadcasts {
+		if broadcast.opCode != system.OpPlayerProgressionBatch || !broadcast.reliable {
+			t.Fatalf("unexpected progression broadcast: %+v", broadcast)
+		}
+	}
+	dispatcher.broadcasts = nil
+	state.broadcastProgressionUpdates(nil, dispatcher, 2, nearby)
+	if len(dispatcher.broadcasts) != 0 {
+		t.Fatalf("expected no unchanged progression broadcasts, got %d", len(dispatcher.broadcasts))
+	}
+}
+
 func TestJoinIsAllowedOnlyWhileWaiting(t *testing.T) {
 	match, state := newTestMatchState(t)
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}

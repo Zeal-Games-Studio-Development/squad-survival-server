@@ -14,7 +14,6 @@ import (
 	"squad-survival-be/modules/game/core/combat"
 	"squad-survival-be/modules/game/core/entity"
 	"squad-survival-be/modules/game/core/spatial"
-	"squad-survival-be/modules/game/core/strategy"
 	"squad-survival-be/modules/game/core/system"
 	"squad-survival-be/modules/game/core/world"
 	"squad-survival-be/modules/game/matchregistry"
@@ -69,6 +68,7 @@ type State struct {
 	SpatialGrid         *spatial.Grid
 	Combat              *combat.Simulation
 	RosterVersions      map[string]map[string]uint64
+	ProgressionVersions map[string]map[string]uint64
 	CharacterBoxes      map[string]*entity.CharacterBox
 	WeaponCatalog       []entity.Weapon
 	NextCharacterBoxID  uint64
@@ -113,6 +113,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		SpatialGrid:         spatial.NewGrid(spatialCellSize),
 		Combat:              combat.NewSimulation(),
 		RosterVersions:      make(map[string]map[string]uint64),
+		ProgressionVersions: make(map[string]map[string]uint64),
 		CharacterBoxes:      make(map[string]*entity.CharacterBox),
 		WeaponCatalog:       weaponCatalog,
 		NextBoxRefillTick:   characterBoxRefillTicks,
@@ -214,6 +215,7 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 			state.WaitingEndsAtTick = tick + waitingDurationTicks
 		}
 		state.sendInitialRoster(logger, dispatcher, tick, presence, player)
+		state.sendInitialProgression(logger, dispatcher, tick, presence, player)
 		state.sendCurrentCharacterBoxes(logger, dispatcher, tick, presence)
 		joined = append(joined, presence)
 	}
@@ -269,6 +271,7 @@ func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, 
 		delete(state.Presences, presence.GetSessionId())
 		delete(state.SkinInventories, presence.GetSessionId())
 		state.removeRosterTracking(presence.GetSessionId())
+		state.removeProgressionTracking(presence.GetSessionId())
 		m.registry.RemoveSession(presence.GetSessionId())
 	}
 	state.broadcastCharacterBoxEvents(logger, dispatcher, tick, boxEvents, nil)
@@ -371,6 +374,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	state.broadcastCharacterBoxEvents(logger, dispatcher, tick, boxEvents, nil)
 	nearbyPlayers := state.queryNearbyPlayers()
 	state.broadcastRosterUpdates(logger, dispatcher, tick, nearbyPlayers)
+	state.broadcastProgressionUpdates(logger, dispatcher, tick, nearbyPlayers)
 	if state.Combat == nil {
 		state.Combat = combat.NewSimulation()
 	}
@@ -624,7 +628,7 @@ func (s *State) collectCharacterBoxes(tick int64, logger runtime.Logger) []syste
 		claim := s.BoxClaims[boxID]
 		box := s.CharacterBoxes[boxID]
 		player := s.Players[claim.SessionID]
-		valid := box != nil && player != nil && !player.IsEliminated() && player.CharacterCount() < strategy.MaxCharacters && distanceSquared(player.Position, box.Position) <= entity.CharacterBoxCollisionRadius*entity.CharacterBoxCollisionRadius
+		valid := box != nil && player != nil && !player.IsEliminated() && player.CharacterCount() < player.MaxCharacters() && distanceSquared(player.Position, box.Position) <= entity.CharacterBoxCollisionRadius*entity.CharacterBoxCollisionRadius
 		if !valid {
 			events = append(events, s.cancelBoxClaim(boxID)...)
 			continue
@@ -675,6 +679,9 @@ func (s *State) collectCharacterBoxes(tick int64, logger runtime.Logger) []syste
 			return collisions[i].distanceSquared < collisions[j].distanceSquared
 		})
 		for _, collision := range collisions {
+			if collision.player.CharacterCount() >= collision.player.MaxCharacters() {
+				continue
+			}
 			if _, claimed := s.ClaimedBoxBySession[collision.player.SessionID]; claimed {
 				continue
 			}
@@ -946,6 +953,82 @@ func (s *State) broadcastRosterUpdates(logger runtime.Logger, dispatcher runtime
 func (s *State) removeRosterTracking(sessionID string) {
 	delete(s.RosterVersions, sessionID)
 	for _, sent := range s.RosterVersions {
+		delete(sent, sessionID)
+	}
+}
+
+func (s *State) sendInitialProgression(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, presence runtime.Presence, player *entity.Player) {
+	payload, err := system.EncodePlayerProgressionBatch(tick, []*entity.Player{player})
+	if err == nil {
+		err = dispatcher.BroadcastMessage(system.OpPlayerProgressionBatch, payload, []runtime.Presence{presence}, nil, true)
+	}
+	if err != nil {
+		if logger != nil {
+			logger.Error("Could not send initial player progression: session_id=%s error=%v", player.SessionID, err)
+		}
+		return
+	}
+	if s.ProgressionVersions == nil {
+		s.ProgressionVersions = make(map[string]map[string]uint64)
+	}
+	s.ProgressionVersions[player.SessionID] = map[string]uint64{player.SessionID: player.ProgressionVersion}
+}
+
+func (s *State) broadcastProgressionUpdates(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, nearbyPlayers map[string][]*entity.Player) {
+	if s.ProgressionVersions == nil {
+		s.ProgressionVersions = make(map[string]map[string]uint64)
+	}
+	for observerSessionID, observer := range s.Players {
+		presence, ok := s.Presences[observerSessionID]
+		if !ok {
+			continue
+		}
+		sent := s.ProgressionVersions[observerSessionID]
+		if sent == nil {
+			sent = make(map[string]uint64)
+			s.ProgressionVersions[observerSessionID] = sent
+		}
+		visible := make(map[string]*entity.Player, len(nearbyPlayers[observerSessionID])+1)
+		visible[observerSessionID] = observer
+		for _, player := range nearbyPlayers[observerSessionID] {
+			if player != nil {
+				visible[player.SessionID] = player
+			}
+		}
+		for targetSessionID := range sent {
+			if _, ok := visible[targetSessionID]; !ok {
+				delete(sent, targetSessionID)
+			}
+		}
+		pending := make([]*entity.Player, 0, len(visible))
+		for targetSessionID, player := range visible {
+			if version, ok := sent[targetSessionID]; !ok || version != player.ProgressionVersion {
+				pending = append(pending, player)
+			}
+		}
+		if len(pending) == 0 {
+			continue
+		}
+		sort.Slice(pending, func(i, j int) bool { return pending[i].SessionID < pending[j].SessionID })
+		payload, err := system.EncodePlayerProgressionBatch(tick, pending)
+		if err == nil {
+			err = dispatcher.BroadcastMessage(system.OpPlayerProgressionBatch, payload, []runtime.Presence{presence}, nil, true)
+		}
+		if err != nil {
+			if logger != nil {
+				logger.Error("Could not send player progression: session_id=%s error=%v", observerSessionID, err)
+			}
+			continue
+		}
+		for _, player := range pending {
+			sent[player.SessionID] = player.ProgressionVersion
+		}
+	}
+}
+
+func (s *State) removeProgressionTracking(sessionID string) {
+	delete(s.ProgressionVersions, sessionID)
+	for _, sent := range s.ProgressionVersions {
 		delete(sent, sessionID)
 	}
 }

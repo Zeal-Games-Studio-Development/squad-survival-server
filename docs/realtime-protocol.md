@@ -12,6 +12,7 @@
 | `105` | Server → Client | `ProjectileMovementSnapshot` | Unreliable | Mỗi tick |
 | `106` | Server → Client | `CharacterBoxStateBatch` | Reliable | Box spawn/despawn và pickup countdown |
 | `107` | Server → Client | `MatchLifecycleState` | Reliable | Join và chuyển phase Battle Royale |
+| `108` | Server → Client | `PlayerProgressionBatch` | Reliable | Join/enter detection/progression changed |
 
 Contract nằm trong các source schema:
 
@@ -25,6 +26,7 @@ Contract nằm trong các source schema:
 - [`combat.proto`](../modules/game/core/system/combat.proto)
 - [`character_box.proto`](../modules/game/core/entity/character_box.proto)
 - [`character_box_state.proto`](../modules/game/core/system/character_box_state.proto)
+- [`player_progression.proto`](../modules/game/core/system/player_progression.proto)
 
 Không đổi hoặc tái sử dụng field number đã phát hành. Field bị xóa trong tương lai cần được đánh dấu `reserved`.
 
@@ -38,7 +40,7 @@ sequenceDiagram
     Unity->>NakamaSDK: MovementInput.ToByteArray()
     NakamaSDK->>Match: opcode 1 + bytes
     Match->>Match: proto.Unmarshal + simulation
-    Match->>NakamaSDK: opcode 101/102/103/104/105/106/107 + proto.Marshal bytes
+    Match->>NakamaSDK: opcode 101/102/103/104/105/106/107/108 + proto.Marshal bytes
     NakamaSDK->>Unity: ReceivedMatchState
     Unity->>Unity: Message.Parser.ParseFrom(state.State)
 ```
@@ -83,6 +85,9 @@ socket.ReceivedMatchState += state => {
         case 107:
             Handle(MatchLifecycleState.Parser.ParseFrom(state.State));
             break;
+        case 108:
+            Handle(PlayerProgressionBatch.Parser.ParseFrom(state.State));
+            break;
     }
 };
 ```
@@ -97,6 +102,8 @@ socket.ReceivedMatchState += state => {
 
 `PlayerRosterBatch` chỉ đồng bộ metadata/static state khi player join, đi vào detection hoặc roster version thay đổi. Server không gửi roster removal riêng khi player leave match hoặc rời detection.
 
+`PlayerProgressionBatch` tách khỏi roster và chứa `user_id`, `session_id`, `level`, `experience`. Server gửi state của chính player khi join, gửi remote player khi đi vào detection và phát lại khi progression version thay đổi. Client suy ra giới hạn formation bằng `min(level + 3, 13)`.
+
 `PlayerMovementSnapshot` opcode `102` là nguồn authoritative cho tập entity client cần render ở mỗi tick: `self` là player hiện tại và `players` là toàn bộ player khác đang trong detection. Nếu một `session_id` không còn xuất hiện trong snapshot mới, client loại player cùng các character của session đó khỏi scene. Vì movement snapshot đã đảm nhiệm visibility/despawn, roster không cần phát lại chỉ để báo leave.
 
 ## Generate C#
@@ -107,7 +114,7 @@ Project dùng Buf remote plugins:
 buf generate
 ```
 
-Go `.pb.go` được giữ trong backend repo. C# được tạo local tại `clients/unity/Generated/Protobuf` và bị Git ignore vì Unity nằm ở repo riêng; copy `Input.cs`, `State.cs`, `Skin.cs`, `PlayerMovement.cs`, `Roster.cs`, `ProjectileMovement.cs`, `Vector.cs`, `Combat.cs` sang Unity sau khi schema thay đổi.
+Go `.pb.go` được giữ trong backend repo. C# được tạo local tại `clients/unity/Generated/Protobuf` và bị Git ignore vì Unity nằm ở repo riêng; copy `Input.cs`, `State.cs`, `Skin.cs`, `PlayerMovement.cs`, `PlayerProgression.cs`, `Roster.cs`, `ProjectileMovement.cs`, `Vector.cs`, `Combat.cs` sang Unity sau khi schema thay đổi.
 
 Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf hoặc `protoc` nếu chỉ sử dụng generated `.cs`.
 
@@ -118,4 +125,4 @@ Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf ho�
 - Embedded `weapons.json`, `strategies.json` và `pickup_delays.json`.
 - RPC `healthcheck` response.
 
-Realtime opcode `1`, `101`, `102`, `103`, `104`, `105`, `106`, `107` đều dùng Protobuf binary.
+Realtime opcode `1`, `101`, `102`, `103`, `104`, `105`, `106`, `107`, `108` đều dùng Protobuf binary.
