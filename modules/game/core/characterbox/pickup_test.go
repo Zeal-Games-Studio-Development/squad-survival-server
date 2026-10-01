@@ -8,7 +8,7 @@ import (
 
 func TestDefaultPickupDelays(t *testing.T) {
 	delays := DefaultDelays()
-	wantSeconds := map[int]int64{1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 5, 7: 5, 8: 6, 9: 6, 10: 6, 11: 7, 12: 7}
+	wantSeconds := map[int]int64{1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 5, 7: 5, 8: 6}
 	for count := 1; count < strategy.MaxCharacters; count++ {
 		ticks, ok := DelayTicks(delays, count, 10)
 		if !ok || ticks != wantSeconds[count]*10 {

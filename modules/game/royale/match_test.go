@@ -49,6 +49,7 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 	assertLifecycle(t, dispatcher, system.MatchPhase_MATCH_PHASE_WAITING, 10, state.WaitingEndsAtTick, true)
 
 	player := state.Players[presence.sessionID]
+	player.Level = 2
 	box := entity.NewCharacterBox("waiting-box", player.Position, entity.WeaponBow)
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {

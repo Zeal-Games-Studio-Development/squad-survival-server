@@ -30,10 +30,10 @@ func TestAssignCharacterTargetsPrioritizesRangeClass(t *testing.T) {
 	if ranged.TargetPosition != (Vector2{}) {
 		t.Fatalf("expected ranged character at center, got %+v", ranged.TargetPosition)
 	}
-	if firstMelee.TargetPosition != (Vector2{X: strategy.SlotSpacing}) {
+	if firstMelee.TargetPosition != (Vector2{X: strategy.SlotSpacing, Y: strategy.SlotSpacing}) {
 		t.Fatalf("unexpected first melee target: %+v", firstMelee.TargetPosition)
 	}
-	if secondMelee.TargetPosition != (Vector2{Y: strategy.SlotSpacing}) {
+	if secondMelee.TargetPosition != (Vector2{X: strategy.SlotSpacing, Y: -strategy.SlotSpacing}) {
 		t.Fatalf("unexpected second melee target: %+v", secondMelee.TargetPosition)
 	}
 }
@@ -51,7 +51,7 @@ func TestEqualRangeClassKeepsCharacterIndexAndRotatesWithFacing(t *testing.T) {
 	if first.TargetPosition != (Vector2{}) {
 		t.Fatalf("expected first ranged character at center, got %+v", first.TargetPosition)
 	}
-	if second.TargetPosition != (Vector2{Y: strategy.SlotSpacing}) {
+	if second.TargetPosition != (Vector2{X: -strategy.SlotSpacing, Y: strategy.SlotSpacing}) {
 		t.Fatalf("expected formation to rotate with facing, got %+v", second.TargetPosition)
 	}
 }
@@ -80,6 +80,7 @@ func TestStepCharactersMovesSoftlyWithoutOvershoot(t *testing.T) {
 
 func TestSetStrategyRejectsInsufficientCapacity(t *testing.T) {
 	player := newTestPlayer(Vector2{})
+	player.Level = 2
 	if err := player.AddCharacter(NewCharacter()); err != nil {
 		t.Fatal(err)
 	}
@@ -109,8 +110,8 @@ func TestAddCharacterEnforcesMaximum(t *testing.T) {
 	if err := player.AddCharacter(NewCharacter()); !errors.Is(err, ErrCharacterLimit) {
 		t.Fatalf("expected character limit error, got %v", err)
 	}
-	if player.CharacterCount() != 4 {
-		t.Fatalf("expected level 1 character limit 4, got %d", player.CharacterCount())
+	if player.CharacterCount() != 1 {
+		t.Fatalf("expected level 1 character limit 1, got %d", player.CharacterCount())
 	}
 
 	player.Level = progression.MaxLevel

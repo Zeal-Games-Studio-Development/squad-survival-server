@@ -463,6 +463,7 @@ func TestRosterBroadcastsOnEncounterReentryAndVersionChange(t *testing.T) {
 		}
 	}
 
+	playerB.Level = 2
 	if err := playerB.AddCharacter(entity.NewCharacter()); err != nil {
 		t.Fatal(err)
 	}
@@ -649,6 +650,8 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 	state := characterBoxTestState(1)
 	far := entity.NewPlayer("user-far", "session-far", "Far", entity.Vector2{X: 0.8}, rand.New(rand.NewSource(2)))
 	near := entity.NewPlayer("user-near", "session-near", "Near", entity.Vector2{X: 0.2}, rand.New(rand.NewSource(3)))
+	far.Level = 2
+	near.Level = 2
 	state.Players[far.SessionID] = far
 	state.Players[near.SessionID] = near
 	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
@@ -716,6 +719,7 @@ func TestCharacterBoxRemainsWhenPlayerIsAtCapacity(t *testing.T) {
 func TestCharacterBoxPickupCancelsOutsideRadiusAndAllowsRetry(t *testing.T) {
 	state := characterBoxTestState(1)
 	player := entity.NewPlayer("user-1", "session-1", "Player", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	player.Level = 2
 	state.Players[player.SessionID] = player
 	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe)
 	state.CharacterBoxes[box.ID] = box
@@ -741,6 +745,7 @@ func TestCharacterBoxPickupCancelsOutsideRadiusAndAllowsRetry(t *testing.T) {
 func TestCharacterBoxPickupCancelsWhenRuntimeCapacityIsReached(t *testing.T) {
 	state := characterBoxTestState(1)
 	player := entity.NewPlayer("user-1", "session-1", "Player", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	player.Level = 2
 	state.Players[player.SessionID] = player
 	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe)
 	state.CharacterBoxes[box.ID] = box
@@ -767,6 +772,7 @@ func TestCharacterBoxPickupCancelsWhenRuntimeCapacityIsReached(t *testing.T) {
 func TestCharacterBoxPickupAllowsOnlyOneClaimPerPlayer(t *testing.T) {
 	state := characterBoxTestState(1)
 	player := entity.NewPlayer("user-1", "session-1", "Player", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	player.Level = 2
 	state.Players[player.SessionID] = player
 	for _, id := range []string{"box:1", "box:2"} {
 		box := entity.NewCharacterBox(id, entity.Vector2{}, entity.WeaponAxe)
@@ -822,6 +828,8 @@ func TestCharacterBoxCollisionTieBreaksBySessionID(t *testing.T) {
 	state := characterBoxTestState(1)
 	playerB := entity.NewPlayer("user-b", "session-b", "B", entity.Vector2{X: 0.5}, rand.New(rand.NewSource(2)))
 	playerA := entity.NewPlayer("user-a", "session-a", "A", entity.Vector2{X: -0.5}, rand.New(rand.NewSource(3)))
+	playerA.Level = 2
+	playerB.Level = 2
 	state.Players[playerB.SessionID] = playerB
 	state.Players[playerA.SessionID] = playerA
 	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponStaff)

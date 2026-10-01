@@ -47,6 +47,7 @@ func TestPlayerUsesSlowestCharacterMoveSpeed(t *testing.T) {
 
 func TestPlayerAssignsStableUniqueCharacterIDs(t *testing.T) {
 	player := newTestPlayer(Vector2{})
+	player.Level = 2
 	initialVersion := player.RosterVersion
 	firstID := player.Characters[0].ID
 	second := NewCharacter()

@@ -6,7 +6,7 @@ import (
 )
 
 func TestDefaultStrategies(t *testing.T) {
-	if GridSize != 5 || GridCenter != 2 || MaxCharacters != 13 {
+	if GridSize != 5 || GridCenter != 2 || MaxCharacters != 9 {
 		t.Fatalf("unexpected formation constants: size=%d center=%d max=%d", GridSize, GridCenter, MaxCharacters)
 	}
 	for _, strategyName := range []string{"x-type", "plus-type"} {
@@ -16,6 +16,19 @@ func TestDefaultStrategies(t *testing.T) {
 		}
 		if definition.Capacity() != MaxCharacters {
 			t.Fatalf("expected %q capacity %d, got %d", strategyName, MaxCharacters, definition.Capacity())
+		}
+		var expectedGrid [GridSize][GridSize]uint8
+		for index := 0; index < GridSize; index++ {
+			if strategyName == "x-type" {
+				expectedGrid[index][index] = 1
+				expectedGrid[index][GridSize-1-index] = 1
+			} else {
+				expectedGrid[index][GridCenter] = 1
+				expectedGrid[GridCenter][index] = 1
+			}
+		}
+		if definition.Grid != expectedGrid {
+			t.Fatalf("unexpected %q grid: %v", strategyName, definition.Grid)
 		}
 		slots := definition.Slots()
 		if slots[0].Row != GridCenter || slots[0].Column != GridCenter || slots[0].Offset.X != 0 || slots[0].Offset.Y != 0 {

@@ -12,7 +12,6 @@ import (
 const (
 	MinLevel            = 1
 	MaxLevel            = 10
-	CharacterLevelBonus = 3
 )
 
 type Level struct {
@@ -85,7 +84,7 @@ func ClampLevel(level int) int {
 }
 
 func MaxCharactersForLevel(level int) int {
-	maximum := ClampLevel(level) + CharacterLevelBonus
+	maximum := ClampLevel(level)
 	if maximum > strategy.MaxCharacters {
 		return strategy.MaxCharacters
 	}

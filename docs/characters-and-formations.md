@@ -4,7 +4,7 @@
 
 Mỗi player trong match có progression runtime, khởi đầu ở level `1` với experience `0`. Progression chưa được lưu vào storage và chưa có nguồn nhận experience.
 
-Giới hạn character hiện tại được tính bằng `min(level + 3, 13)`: level 1 có 4 slot, level 2 có 5 slot và level 10 có 13 slot. Hằng `strategy.MaxCharacters = 13` vẫn là boundary tuyệt đối của formation. Bảng experience nằm trong `modules/game/core/progression/level_progression.json`; mỗi giá trị là experience cần thêm để sang level kế tiếp.
+Giới hạn character hiện tại được tính bằng `min(level, 9)`: level 1 có 1 slot, level 2 có 2 slot và từ level 9 trở lên có 9 slot. Hằng `strategy.MaxCharacters = 9` là giới hạn tuyệt đối của formation. Bảng experience nằm trong `modules/game/core/progression/level_progression.json`; mỗi giá trị là experience cần thêm để sang level kế tiếp.
 
 ## Character Lifecycle
 
@@ -12,7 +12,7 @@ Player mới được tạo cùng một character có weapon chọn ngẫu nhiê
 
 Character có position, target position, health/max health, damage, movement/attack stats, weapon và combat state. Khi `Health <= 0`, character bị remove trong combat tick; formation được gán lại trước snapshot tiếp theo.
 
-Mỗi player tối đa `13` character non-nil. `nil` không chiếm slot và không xuất hiện trong snapshot.
+Mỗi player tối đa `9` character non-nil. `nil` không chiếm slot và không xuất hiện trong snapshot.
 
 ## Weapon Catalog
 
@@ -36,7 +36,7 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 
 ## Strategy 5x5
 
-Strategy là mask cố định `5x5`: `1` mở slot, `0` khóa slot. Tâm là cell `[2][2]`, khoảng cách slot là `1.5 world units`. Catalog có `x-type` và `plus-type`, mỗi strategy mở 13 slot đối xứng quanh tâm. `x-type` có offset xa nhất khoảng `4.24 units`; `plus-type` có offset xa nhất `3 units`.
+Strategy là mask cố định `5x5`: `1` mở slot, `0` khóa slot. Tâm là cell `[2][2]`, khoảng cách slot là `1.5 world units`. Catalog có `x-type` (hai đường chéo) và `plus-type` (hàng và cột giữa), mỗi strategy mở 9 slot đối xứng quanh tâm. `x-type` có offset xa nhất khoảng `4.24 units`; `plus-type` có offset xa nhất `3 units`.
 
 Slot được sắp từ gần tâm ra xa, hòa thì theo row/column. Character được stable-sort theo class:
 
@@ -59,7 +59,7 @@ Character không overshoot và không teleport khi formation/facing đổi. Char
 
 ## Character Box
 
-Match duy trì Character Box tĩnh và mỗi phút refill đến target của mode. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính collision, server khóa một box cho một player và bắt đầu countdown; mỗi player chỉ được claim một box. Player phải ở trong vùng, còn sống và còn capacity theo level cho tới deadline. Delay dựa trên số character lúc bắt đầu claim: count 1–4 chờ tương ứng 1–4 giây, 5–7 chờ 5 giây, 8–10 chờ 6 giây và 11–12 chờ 7 giây. Player đã đạt giới hạn runtime không thể claim; boundary tuyệt đối vẫn là 13 character. Bảng thời gian nằm trong `modules/game/core/characterbox/pickup_delays.json`.
+Match duy trì Character Box tĩnh và mỗi phút refill đến target của mode. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính collision, server khóa một box cho một player và bắt đầu countdown; mỗi player chỉ được claim một box. Player phải ở trong vùng, còn sống và còn capacity theo level cho tới deadline. Delay dựa trên số character lúc bắt đầu claim: count 1–4 chờ tương ứng 1–4 giây, 5–7 chờ 5 giây và 8 chờ 6 giây. Player đã đạt giới hạn runtime không thể claim; giới hạn tuyệt đối là 9 character. Bảng thời gian nằm trong `modules/game/core/characterbox/pickup_delays.json`.
 
 Opcode reliable `106` broadcast `PICKUP_STARTED` và `PICKUP_CANCELLED`; client tự tính countdown từ deadline tick. Khi hoàn tất, server mới random skin, grant character và gửi `DESPAWNED`. Box đang được claim vẫn tồn tại trong world và được tính khi refill.
 
