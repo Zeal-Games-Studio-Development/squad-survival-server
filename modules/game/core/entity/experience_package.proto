@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package game.core.entity;
+
+option go_package = "squad-survival-be/modules/game/core/entity;entity";
+
+enum ExperiencePackageTier {
+  EXPERIENCE_PACKAGE_TIER_UNSPECIFIED = 0;
+  EXPERIENCE_PACKAGE_TIER_SMALL = 1;
+  EXPERIENCE_PACKAGE_TIER_MEDIUM = 2;
+  EXPERIENCE_PACKAGE_TIER_LARGE = 3;
+}
+
+message ExperiencePackageValue {
+  ExperiencePackageTier tier = 1;
+  uint64 experience = 2;
+}

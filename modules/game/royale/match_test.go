@@ -32,6 +32,38 @@ func TestMatchInitStartsWaiting(t *testing.T) {
 	}
 }
 
+func TestExperiencePickupOnlyRunsWhilePlaying(t *testing.T) {
+	match := &Match{registry: matchregistry.New()}
+	rawState, _, _ := match.MatchInit(context.Background(), testLogger{}, nil, nil, map[string]interface{}{})
+	state := rawState.(*State)
+	var item *entity.ExperiencePackage
+	for _, candidate := range state.Experience.Packages {
+		item = candidate
+		break
+	}
+	if item == nil {
+		t.Fatal("expected initial experience packages")
+	}
+	player := entity.NewPlayer("user", "session", "", item.Position, rand.New(rand.NewSource(99)))
+	state.Players[player.SessionID] = player
+	state.Presences[player.SessionID] = testPresence{userID: player.UserID, sessionID: player.SessionID}
+	if err := state.SpatialGrid.Insert(player); err != nil {
+		t.Fatal(err)
+	}
+	state.WaitingEndsAtTick = 100
+	dispatcher := &testDispatcher{}
+	match.MatchLoop(nil, nil, nil, nil, dispatcher, 1, state, nil)
+	if state.Experience.Packages[item.ID] == nil {
+		t.Fatal("waiting phase collected experience package")
+	}
+	state.Phase = PhasePlaying
+	state.PlayingEndsAtTick = 100
+	match.MatchLoop(nil, nil, nil, nil, dispatcher, 2, state, nil)
+	if state.Experience.Packages[item.ID] != nil || player.Experience != item.Value.Experience {
+		t.Fatalf("playing phase did not collect package: xp=%d", player.Experience)
+	}
+}
+
 func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 	match, state := newTestMatchState(t)
 	dispatcher := &testDispatcher{}

@@ -13,6 +13,7 @@ import (
 	"squad-survival-be/modules/game/core/characterbox"
 	"squad-survival-be/modules/game/core/combat"
 	"squad-survival-be/modules/game/core/entity"
+	"squad-survival-be/modules/game/core/experience"
 	"squad-survival-be/modules/game/core/spatial"
 	"squad-survival-be/modules/game/core/system"
 	"squad-survival-be/modules/game/core/world"
@@ -69,6 +70,7 @@ type State struct {
 	Combat              *combat.Simulation
 	RosterVersions      map[string]map[string]uint64
 	ProgressionVersions map[string]map[string]uint64
+	Experience          *experience.Manager
 	CharacterBoxes      map[string]*entity.CharacterBox
 	WeaponCatalog       []entity.Weapon
 	NextCharacterBoxID  uint64
@@ -129,6 +131,10 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 	state.spawnCharacterBoxes(initialBoxTarget)
 	if len(state.CharacterBoxes) < initialBoxTarget {
 		logger.Warn("Could not place all initial character boxes: target=%d spawned=%d", initialBoxTarget, len(state.CharacterBoxes))
+	}
+	state.Experience = experience.NewManager(state.SpatialGrid, state.random, tickRate)
+	if spawned := state.Experience.SpawnMissing(state.Players); spawned < state.Experience.TargetCount() {
+		logger.Warn("Could not place all initial experience packages: spawned=%d target=%d", spawned, state.Experience.TargetCount())
 	}
 	logger.Info("Battle royale match initialized: mode=%s max_players=%d", state.Mode, MaxPlayers)
 	return state, tickRate, state.label()
@@ -219,6 +225,7 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		state.sendCurrentCharacterBoxes(logger, dispatcher, tick, presence)
 		joined = append(joined, presence)
 	}
+	state.broadcastExperiencePackageEvents(logger, dispatcher, tick, nil)
 	state.EmptyTicks = 0
 	state.updateLabel(dispatcher)
 	if len(joined) > 0 {
@@ -272,6 +279,9 @@ func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, 
 		delete(state.SkinInventories, presence.GetSessionId())
 		state.removeRosterTracking(presence.GetSessionId())
 		state.removeProgressionTracking(presence.GetSessionId())
+		if state.Experience != nil {
+			state.Experience.RemoveObserver(presence.GetSessionId())
+		}
 		m.registry.RemoveSession(presence.GetSessionId())
 	}
 	state.broadcastCharacterBoxEvents(logger, dispatcher, tick, boxEvents, nil)
@@ -372,13 +382,25 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 		state.NextBoxRefillTick = tick + characterBoxRefillTicks
 	}
 	state.broadcastCharacterBoxEvents(logger, dispatcher, tick, boxEvents, nil)
+	collections := []experience.Collection(nil)
+	if state.Experience != nil {
+		collections = state.Experience.Collect(state.Players)
+		if state.Experience.RefillIfDue(tick, tickRate, state.Players) && len(state.Experience.Packages) < state.Experience.TargetCount() && logger != nil {
+			logger.Warn("Could not refill all experience packages: current=%d target=%d", len(state.Experience.Packages), state.Experience.TargetCount())
+		}
+	}
 	nearbyPlayers := state.queryNearbyPlayers()
 	state.broadcastRosterUpdates(logger, dispatcher, tick, nearbyPlayers)
-	state.broadcastProgressionUpdates(logger, dispatcher, tick, nearbyPlayers)
 	if state.Combat == nil {
 		state.Combat = combat.NewSimulation()
 	}
+	characterCounts := experience.CharacterCountsByUser(state.Players)
 	combatEvents := state.Combat.Step(state.Players, nearbyPlayers, tick, state.random)
+	if state.Experience != nil {
+		experience.AwardKillExperience(state.Players, characterCounts, combatEvents, state.Experience.Config)
+		state.broadcastExperiencePackageEvents(logger, dispatcher, tick, collections)
+	}
+	state.broadcastProgressionUpdates(logger, dispatcher, tick, nearbyPlayers)
 	for _, player := range state.Players {
 		if player.IsEliminated() {
 			player.Direction = entity.Vector2{}
@@ -476,6 +498,9 @@ func (s *State) startPlaying(logger runtime.Logger, dispatcher runtime.MatchDisp
 	s.Phase = PhasePlaying
 	s.PlayingEndsAtTick = tick + playingDurationTicks
 	s.NextBoxRefillTick = tick + characterBoxRefillTicks
+	if s.Experience != nil {
+		s.Experience.ResetRefill(tick, tickRate)
+	}
 	s.EmptyTicks = 0
 	s.updateLabel(dispatcher)
 	s.broadcastLifecycle(logger, dispatcher, tick, nil)
@@ -575,6 +600,9 @@ func (s *State) randomCharacterBoxSpawn() (entity.Vector2, bool) {
 		if len(s.SpatialGrid.QueryCharacterBoxes(position, characterBoxSpawnSeparation)) != 0 {
 			continue
 		}
+		if s.Experience != nil && len(s.SpatialGrid.QueryExperiencePackages(position, characterBoxSpawnSeparation)) != 0 {
+			continue
+		}
 		blocked := false
 		for _, player := range s.Players {
 			if player != nil && distanceSquared(position, player.Position) < characterBoxSpawnSeparation*characterBoxSpawnSeparation {
@@ -592,7 +620,7 @@ func (s *State) randomCharacterBoxSpawn() (entity.Vector2, bool) {
 func (s *State) randomPlayerSpawn() entity.Vector2 {
 	for range characterBoxSpawnAttempts {
 		position := world.RandomSpawn(s.random)
-		if len(s.SpatialGrid.QueryCharacterBoxes(position, characterBoxSpawnSeparation)) == 0 {
+		if len(s.SpatialGrid.QueryCharacterBoxes(position, characterBoxSpawnSeparation)) == 0 && (s.Experience == nil || len(s.SpatialGrid.QueryExperiencePackages(position, characterBoxSpawnSeparation)) == 0) {
 			return position
 		}
 	}
@@ -770,6 +798,28 @@ func (s *State) broadcastCharacterBoxEvents(logger runtime.Logger, dispatcher ru
 	}
 	if err != nil && logger != nil {
 		logger.Error("Could not send character box state: %v", err)
+	}
+}
+
+func (s *State) broadcastExperiencePackageEvents(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, collections []experience.Collection) {
+	if s.Experience == nil {
+		return
+	}
+	for sessionID, events := range s.Experience.VisibilityEvents(s.Players, collections) {
+		if len(events) == 0 {
+			continue
+		}
+		presence, ok := s.Presences[sessionID]
+		if !ok {
+			continue
+		}
+		payload, err := system.EncodeExperiencePackageStateBatch(tick, events)
+		if err == nil {
+			err = dispatcher.BroadcastMessage(system.OpExperiencePackageState, payload, []runtime.Presence{presence}, nil, true)
+		}
+		if err != nil && logger != nil {
+			logger.Error("Could not send experience package state: session_id=%s error=%v", sessionID, err)
+		}
 	}
 }
 

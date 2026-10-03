@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package game.core.system;
+
+option go_package = "squad-survival-be/modules/game/core/system;system";
+
+import "modules/game/core/entity/experience_package.proto";
+import "modules/game/core/system/vector.proto";
+
+enum ExperiencePackageEventType {
+  EXPERIENCE_PACKAGE_EVENT_TYPE_UNSPECIFIED = 0;
+  EXPERIENCE_PACKAGE_EVENT_TYPE_DETECTED = 1;
+  EXPERIENCE_PACKAGE_EVENT_TYPE_LOST = 2;
+  EXPERIENCE_PACKAGE_EVENT_TYPE_COLLECTED = 3;
+}
+
+message ExperiencePackageStateBatch {
+  int64 tick = 1;
+  repeated ExperiencePackageStateEvent events = 2;
+}
+
+message ExperiencePackageStateEvent {
+  ExperiencePackageEventType event_type = 1;
+  string package_id = 2;
+  Vector2 position = 3;
+  game.core.entity.ExperiencePackageValue value = 4;
+  string collector_user_id = 5;
+  string collector_session_id = 6;
+}

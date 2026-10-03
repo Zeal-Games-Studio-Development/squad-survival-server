@@ -97,6 +97,20 @@ func TestPlayerWithOnlyDeadCharactersIsEliminated(t *testing.T) {
 	}
 }
 
+func TestAddExperienceCarriesAcrossLevelsAndCaps(t *testing.T) {
+	player := NewPlayer("user", "session", "", Vector2{}, rand.New(rand.NewSource(1)))
+	if !player.AddExperience(350) || player.Level != 3 || player.Experience != 50 || player.ProgressionVersion != 2 {
+		t.Fatalf("unexpected progression: level=%d experience=%d version=%d", player.Level, player.Experience, player.ProgressionVersion)
+	}
+	if !player.AddExperience(10000) || player.Level != 10 || player.Experience != 0 {
+		t.Fatalf("expected max level: %+v", player)
+	}
+	version := player.ProgressionVersion
+	if player.AddExperience(10) || player.ProgressionVersion != version {
+		t.Fatal("max-level experience changed progression")
+	}
+}
+
 func TestZeroInputStopsWithoutChangingFacing(t *testing.T) {
 	player := newTestPlayer(Vector2{})
 	player.Characters = []*Character{NewCharacter()}

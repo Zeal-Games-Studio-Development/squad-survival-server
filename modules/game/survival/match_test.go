@@ -10,6 +10,7 @@ import (
 	"squad-survival-be/modules/game/core/characterbox"
 	"squad-survival-be/modules/game/core/combat"
 	"squad-survival-be/modules/game/core/entity"
+	"squad-survival-be/modules/game/core/experience"
 	"squad-survival-be/modules/game/core/progression"
 	"squad-survival-be/modules/game/core/spatial"
 	"squad-survival-be/modules/game/core/strategy"
@@ -525,6 +526,70 @@ func TestProgressionBroadcastsOnEncounterAndVersionChange(t *testing.T) {
 	playerB.MarkProgressionChanged()
 	state.broadcastProgressionUpdates(nil, dispatcher, 3, nearby)
 	assertProgressionBroadcasts(t, dispatcher.broadcasts, 2)
+}
+
+func TestExperiencePickupBroadcastsProgressionToSelfAndDetectedRemote(t *testing.T) {
+	random := rand.New(rand.NewSource(81))
+	grid := spatial.NewGrid(spatialCellSize)
+	collector := entity.NewPlayer("user-a", "session-a", "A", entity.Vector2{}, random)
+	observer := entity.NewPlayer("user-b", "session-b", "B", entity.Vector2{X: 5}, random)
+	if err := grid.Insert(collector); err != nil {
+		t.Fatal(err)
+	}
+	if err := grid.Insert(observer); err != nil {
+		t.Fatal(err)
+	}
+	manager := experience.NewManager(grid, random, tickRate)
+	item := entity.NewExperiencePackage("xp:test", collector.Position, entity.ExperiencePackageTier_EXPERIENCE_PACKAGE_TIER_SMALL, 10)
+	manager.Packages[item.ID] = item
+	if err := grid.InsertExperiencePackage(item); err != nil {
+		t.Fatal(err)
+	}
+	state := &State{
+		Players:     map[string]*entity.Player{collector.SessionID: collector, observer.SessionID: observer},
+		Presences:   map[string]runtime.Presence{collector.SessionID: testPresence{userID: collector.UserID, sessionID: collector.SessionID}, observer.SessionID: testPresence{userID: observer.UserID, sessionID: observer.SessionID}},
+		SpatialGrid: grid, Experience: manager,
+		ProgressionVersions: map[string]map[string]uint64{
+			collector.SessionID: {collector.SessionID: collector.ProgressionVersion, observer.SessionID: observer.ProgressionVersion},
+			observer.SessionID:  {collector.SessionID: collector.ProgressionVersion, observer.SessionID: observer.ProgressionVersion},
+		},
+	}
+	dispatcher := &testDispatcher{}
+	state.broadcastExperiencePackageEvents(nil, dispatcher, 1, nil)
+	dispatcher.broadcasts = nil
+	collections := manager.Collect(state.Players)
+	state.broadcastExperiencePackageEvents(nil, dispatcher, 2, collections)
+	nearby := state.queryNearbyPlayers()
+	state.broadcastProgressionUpdates(nil, dispatcher, 2, nearby)
+
+	progressionRecipients := map[string]bool{}
+	collectedRecipients := map[string]bool{}
+	for _, broadcast := range dispatcher.broadcasts {
+		recipient := broadcast.presences[0].GetSessionId()
+		switch broadcast.opCode {
+		case system.OpPlayerProgressionBatch:
+			var batch system.PlayerProgressionBatch
+			if err := proto.Unmarshal(broadcast.data, &batch); err != nil {
+				t.Fatal(err)
+			}
+			if len(batch.Players) == 1 && batch.Players[0].SessionId == collector.SessionID && batch.Players[0].Experience == 10 {
+				progressionRecipients[recipient] = true
+			}
+		case system.OpExperiencePackageState:
+			var batch system.ExperiencePackageStateBatch
+			if err := proto.Unmarshal(broadcast.data, &batch); err != nil {
+				t.Fatal(err)
+			}
+			if len(batch.Events) == 1 && batch.Events[0].EventType == system.ExperiencePackageEventType_EXPERIENCE_PACKAGE_EVENT_TYPE_COLLECTED {
+				collectedRecipients[recipient] = true
+			}
+		}
+	}
+	for _, sessionID := range []string{collector.SessionID, observer.SessionID} {
+		if !progressionRecipients[sessionID] || !collectedRecipients[sessionID] {
+			t.Fatalf("missing broadcasts for %s: progression=%v collected=%v", sessionID, progressionRecipients, collectedRecipients)
+		}
+	}
 }
 
 func assertProgressionBroadcasts(t *testing.T, broadcasts []testBroadcast, expected int) {

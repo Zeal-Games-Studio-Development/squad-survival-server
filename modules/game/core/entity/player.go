@@ -82,6 +82,29 @@ func (p *Player) MarkProgressionChanged() {
 	p.ProgressionVersion++
 }
 
+// AddExperience applies experience, carrying overflow through multiple levels.
+// It reports whether the player's public progression state changed.
+func (p *Player) AddExperience(amount uint64) bool {
+	if p == nil || amount == 0 || p.Level >= progression.MaxLevel {
+		return false
+	}
+	p.Experience += amount
+	for p.Level < progression.MaxLevel {
+		required := progression.MaxExperienceForLevel(p.Level)
+		if required == 0 || p.Experience < required {
+			break
+		}
+		p.Experience -= required
+		p.Level++
+	}
+	if p.Level >= progression.MaxLevel {
+		p.Level = progression.MaxLevel
+		p.Experience = 0
+	}
+	p.MarkProgressionChanged()
+	return true
+}
+
 func ApplyMovementInput(player *Player, input *MovementInput, tick int64) bool {
 	if player.IsEliminated() {
 		return false

@@ -10,4 +10,5 @@ const (
 	OpCharacterBoxState          int64 = 106
 	OpMatchLifecycleState        int64 = 107
 	OpPlayerProgressionBatch     int64 = 108
+	OpExperiencePackageState     int64 = 109
 )

@@ -86,5 +86,5 @@ Coordinator chọn module và capacity theo `mode`: `survival.MaxPlayers` cho Su
 - Realtime opcode dùng binary Protobuf; opcode `107` hiện chỉ được Battle Royale phát ra.
 - `CharacterRoster` mang skin numeric ID đã được server random từ snapshot inventory lúc player join.
 - Matchmaking RPC request/response và match label dùng JSON.
-- Weapon/strategy catalog, combat query buffer và Character Box pickup delay mặc định dùng embedded JSON.
+- Weapon/strategy catalog, combat query buffer, Character Box pickup delay và Experience Package config mặc định dùng embedded JSON.
 - Generated Go code được compile vào `backend.so`; `.proto`, Buf và generated C# không cần có trong runtime image.

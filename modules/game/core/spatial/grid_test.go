@@ -141,6 +141,28 @@ func TestCharacterBoxLifecycleErrors(t *testing.T) {
 	}
 }
 
+func TestExperiencePackageQueryAndRemove(t *testing.T) {
+	grid := NewGrid(20)
+	a := entity.NewExperiencePackage("xp:a", entity.Vector2{X: 0.5}, entity.ExperiencePackageTier_EXPERIENCE_PACKAGE_TIER_SMALL, 10)
+	b := entity.NewExperiencePackage("xp:b", entity.Vector2{X: 2}, entity.ExperiencePackageTier_EXPERIENCE_PACKAGE_TIER_LARGE, 20)
+	if err := grid.InsertExperiencePackage(a); err != nil {
+		t.Fatal(err)
+	}
+	if err := grid.InsertExperiencePackage(b); err != nil {
+		t.Fatal(err)
+	}
+	got := grid.QueryExperiencePackages(entity.Vector2{}, 1)
+	if len(got) != 1 || got[0] != a {
+		t.Fatalf("unexpected query: %+v", got)
+	}
+	if !grid.RemoveExperiencePackage(a.ID) || grid.RemoveExperiencePackage(a.ID) {
+		t.Fatal("unexpected remove result")
+	}
+	if err := grid.InsertExperiencePackage(nil); !errors.Is(err, ErrNilExperiencePackage) {
+		t.Fatalf("unexpected nil error: %v", err)
+	}
+}
+
 func player(sessionID string, x, y float64) *entity.Player {
 	return entity.NewPlayer(sessionID, sessionID, sessionID, entity.Vector2{X: x, Y: y}, rand.New(rand.NewSource(1)))
 }

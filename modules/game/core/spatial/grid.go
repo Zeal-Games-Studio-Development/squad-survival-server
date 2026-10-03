@@ -9,13 +9,16 @@ import (
 )
 
 var (
-	ErrNilPlayer       = errors.New("player is nil")
-	ErrEmptySessionID  = errors.New("player session ID is empty")
-	ErrPlayerExists    = errors.New("player already exists in spatial grid")
-	ErrPlayerNotFound  = errors.New("player does not exist in spatial grid")
-	ErrNilCharacterBox = errors.New("character box is nil")
-	ErrEmptyBoxID      = errors.New("character box ID is empty")
-	ErrBoxExists       = errors.New("character box already exists in spatial grid")
+	ErrNilPlayer                = errors.New("player is nil")
+	ErrEmptySessionID           = errors.New("player session ID is empty")
+	ErrPlayerExists             = errors.New("player already exists in spatial grid")
+	ErrPlayerNotFound           = errors.New("player does not exist in spatial grid")
+	ErrNilCharacterBox          = errors.New("character box is nil")
+	ErrEmptyBoxID               = errors.New("character box ID is empty")
+	ErrBoxExists                = errors.New("character box already exists in spatial grid")
+	ErrNilExperiencePackage     = errors.New("experience package is nil")
+	ErrEmptyExperiencePackageID = errors.New("experience package ID is empty")
+	ErrExperiencePackageExists  = errors.New("experience package already exists in spatial grid")
 )
 
 type cell struct {
@@ -24,11 +27,13 @@ type cell struct {
 }
 
 type Grid struct {
-	cellSize     float64
-	cells        map[cell]map[string]*entity.Player
-	locations    map[string]cell
-	boxCells     map[cell]map[string]*entity.CharacterBox
-	boxLocations map[string]cell
+	cellSize            float64
+	cells               map[cell]map[string]*entity.Player
+	locations           map[string]cell
+	boxCells            map[cell]map[string]*entity.CharacterBox
+	boxLocations        map[string]cell
+	experienceCells     map[cell]map[string]*entity.ExperiencePackage
+	experienceLocations map[string]cell
 }
 
 func NewGrid(cellSize float64) *Grid {
@@ -36,12 +41,83 @@ func NewGrid(cellSize float64) *Grid {
 		panic("spatial grid cell size must be finite and greater than zero")
 	}
 	return &Grid{
-		cellSize:     cellSize,
-		cells:        make(map[cell]map[string]*entity.Player),
-		locations:    make(map[string]cell),
-		boxCells:     make(map[cell]map[string]*entity.CharacterBox),
-		boxLocations: make(map[string]cell),
+		cellSize:            cellSize,
+		cells:               make(map[cell]map[string]*entity.Player),
+		locations:           make(map[string]cell),
+		boxCells:            make(map[cell]map[string]*entity.CharacterBox),
+		boxLocations:        make(map[string]cell),
+		experienceCells:     make(map[cell]map[string]*entity.ExperiencePackage),
+		experienceLocations: make(map[string]cell),
 	}
+}
+
+func (g *Grid) InsertExperiencePackage(item *entity.ExperiencePackage) error {
+	if item == nil {
+		return ErrNilExperiencePackage
+	}
+	if item.ID == "" {
+		return ErrEmptyExperiencePackageID
+	}
+	if _, exists := g.experienceLocations[item.ID]; exists {
+		return ErrExperiencePackageExists
+	}
+	location := g.cellAt(item.Position)
+	if g.experienceCells[location] == nil {
+		g.experienceCells[location] = make(map[string]*entity.ExperiencePackage)
+	}
+	g.experienceCells[location][item.ID] = item
+	g.experienceLocations[item.ID] = location
+	return nil
+}
+
+func (g *Grid) RemoveExperiencePackage(id string) bool {
+	location, exists := g.experienceLocations[id]
+	if !exists {
+		return false
+	}
+	delete(g.experienceLocations, id)
+	delete(g.experienceCells[location], id)
+	if len(g.experienceCells[location]) == 0 {
+		delete(g.experienceCells, location)
+	}
+	return true
+}
+
+// QueryExperiencePackages returns packages within radius ordered by distance then ID.
+func (g *Grid) QueryExperiencePackages(position entity.Vector2, radius float64) []*entity.ExperiencePackage {
+	if radius < 0 || math.IsNaN(radius) || math.IsInf(radius, 0) {
+		return nil
+	}
+	radiusSquared := radius * radius
+	minCell := g.cellAt(entity.Vector2{X: position.X - radius, Y: position.Y - radius})
+	maxCell := g.cellAt(entity.Vector2{X: position.X + radius, Y: position.Y + radius})
+	type result struct {
+		item            *entity.ExperiencePackage
+		distanceSquared float64
+	}
+	results := make([]result, 0)
+	for x := minCell.X; x <= maxCell.X; x++ {
+		for y := minCell.Y; y <= maxCell.Y; y++ {
+			for _, item := range g.experienceCells[cell{X: x, Y: y}] {
+				dx, dy := item.Position.X-position.X, item.Position.Y-position.Y
+				distance := dx*dx + dy*dy
+				if distance <= radiusSquared {
+					results = append(results, result{item, distance})
+				}
+			}
+		}
+	}
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].distanceSquared == results[j].distanceSquared {
+			return results[i].item.ID < results[j].item.ID
+		}
+		return results[i].distanceSquared < results[j].distanceSquared
+	})
+	items := make([]*entity.ExperiencePackage, len(results))
+	for i, result := range results {
+		items[i] = result.item
+	}
+	return items
 }
 
 func (g *Grid) InsertCharacterBox(box *entity.CharacterBox) error {
