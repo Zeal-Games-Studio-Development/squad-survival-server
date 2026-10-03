@@ -1,7 +1,5 @@
 package entity
 
-const ExperiencePackageCollisionRadius = 1.0
-
 // ExperiencePackage is a static, instantly collectible world entity.
 type ExperiencePackage struct {
 	ID       string

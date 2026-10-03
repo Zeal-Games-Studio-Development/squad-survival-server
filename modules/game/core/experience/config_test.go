@@ -4,7 +4,7 @@ import "testing"
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
-	wantCounts := map[string]int{"small": 180, "medium": 90, "large": 30}
+	wantCounts := map[string]int{"small": 900, "medium": 450, "large": 150}
 	wantRanges := map[string][2]uint64{"small": {10, 12}, "medium": {15, 18}, "large": {20, 22}}
 	for _, definition := range config.Packages {
 		if definition.TargetCount != wantCounts[definition.Tier] || [2]uint64{definition.MinValue, definition.MaxValue} != wantRanges[definition.Tier] {

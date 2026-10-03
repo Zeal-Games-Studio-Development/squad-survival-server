@@ -1,8 +1,8 @@
 {
   "packages": [
-    { "tier": "small", "min_value": 10, "max_value": 12, "target_count": 180 },
-    { "tier": "medium", "min_value": 15, "max_value": 18, "target_count": 90 },
-    { "tier": "large", "min_value": 20, "max_value": 22, "target_count": 30 }
+    { "tier": "small", "min_value": 10, "max_value": 12, "target_count": 900 },
+    { "tier": "medium", "min_value": 15, "max_value": 18, "target_count": 450 },
+    { "tier": "large", "min_value": 20, "max_value": 22, "target_count": 150 }
   ],
   "kill_experience_by_character_count": {
     "1": 5, "2": 10, "3": 15, "4": 20, "5": 25,
