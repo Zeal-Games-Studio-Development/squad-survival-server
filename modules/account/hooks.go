@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	goaway "github.com/TwiN/go-away"
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
@@ -44,7 +45,10 @@ func Register(initializer runtime.Initializer) error {
 	if err := initializer.RegisterBeforeAuthenticateGoogle(beforeAuthenticateGoogle); err != nil {
 		return err
 	}
-	return initializer.RegisterBeforeAuthenticateSteam(beforeAuthenticateSteam)
+	if err := initializer.RegisterBeforeAuthenticateSteam(beforeAuthenticateSteam); err != nil {
+		return err
+	}
+	return initializer.RegisterRpc(ChangeDisplayNameRPC, NewChangeDisplayNameRPC(goaway.IsProfane))
 }
 
 func beforeUpdateAccount(_ context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, in *api.UpdateAccountRequest) (*api.UpdateAccountRequest, error) {

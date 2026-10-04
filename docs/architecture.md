@@ -16,8 +16,9 @@
 | `modules/game/core/system` | Opcode, protobuf encoding và snapshots |
 | `modules/game/core/world` | Tọa độ, spawn và world boundary |
 | `modules/skin/loadout` | Đọc snapshot inventory và random character skin dùng chung cho các mode |
+| `modules/account` | Khóa client profile updates và RPC đổi display name có kiểm duyệt |
 
-`InitModule` đăng ký match `survival`, match `battle-royale`, RPC `find_or_create_match`, matchmaker callback và RPC `healthcheck`.
+`InitModule` đăng ký account hooks, match `survival`, match `battle-royale`, RPC `change_display_name`, RPC `find_or_create_match`, matchmaker callback và RPC `healthcheck`.
 
 Active match registry được tạo một lần tại `InitModule` và dùng chung cho RPC
 matchmaking cùng các Survival và Battle Royale match handler trong cùng process.

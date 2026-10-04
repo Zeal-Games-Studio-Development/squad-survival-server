@@ -154,15 +154,26 @@ func (i *recordingInitializer) RegisterBeforeAuthenticateGoogle(func(context.Con
 func (i *recordingInitializer) RegisterBeforeAuthenticateSteam(func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule, *api.AuthenticateSteamRequest) (*api.AuthenticateSteamRequest, error)) error {
 	return i.register("steam")
 }
+func (i *recordingInitializer) RegisterRpc(id string, _ func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule, string) (string, error)) error {
+	return i.register("rpc:" + id)
+}
 
 func TestRegisterInstallsAllHooks(t *testing.T) {
 	initializer := &recordingInitializer{}
 	if err := Register(initializer); err != nil {
 		t.Fatalf("register hooks: %v", err)
 	}
-	want := []string{"update_account", "apple", "custom", "device", "email", "facebook", "facebook_instant_game", "game_center", "google", "steam"}
+	want := []string{"update_account", "apple", "custom", "device", "email", "facebook", "facebook_instant_game", "game_center", "google", "steam", "rpc:" + ChangeDisplayNameRPC}
 	if !reflect.DeepEqual(initializer.calls, want) {
 		t.Fatalf("unexpected registrations: got %v want %v", initializer.calls, want)
+	}
+}
+
+func TestRegisterReturnsRPCRegistrationError(t *testing.T) {
+	wantErr := errors.New("rpc registration failed")
+	initializer := &recordingInitializer{failAt: "rpc:" + ChangeDisplayNameRPC, err: wantErr}
+	if err := Register(initializer); !errors.Is(err, wantErr) {
+		t.Fatalf("expected RPC registration error, got %v", err)
 	}
 }
 
