@@ -14,6 +14,12 @@ func TestConfigValidation(t *testing.T) {
 		`{"survival_count":1,"prefixes":[],"suffixes":["Wolf"]}`,
 		`{"battle_royale_count":1,"prefixes":["Iron"],"suffixes":[]}`,
 		`{"survival_count":1,"prefixes":[" "],"suffixes":["Wolf"]}`,
+		`{"disengage_difference_by_max_characters":{"0":1}}`,
+		`{"disengage_difference_by_max_characters":{"10":1}}`,
+		`{"disengage_difference_by_max_characters":{"3":0}}`,
+		`{"disengage_difference_by_max_characters":{"3":-1}}`,
+		`{"disengage_difference_by_max_characters":{"3":4}}`,
+		`{"disengage_difference_by_max_characters":{"3":1.5}}`,
 	} {
 		if _, err := ParseConfig([]byte(data)); err == nil {
 			t.Fatalf("accepted invalid config: %s", data)
@@ -25,6 +31,26 @@ func TestConfigValidation(t *testing.T) {
 	config := DefaultConfig()
 	if config.SurvivalCount != 8 || config.BattleRoyaleCount != 16 {
 		t.Fatalf("unexpected defaults: %+v", config)
+	}
+}
+
+func TestDisengageDifferenceDefaultsAndOverrides(t *testing.T) {
+	config, err := ParseConfig([]byte(`{"disengage_difference_by_max_characters":{"3":2}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaults := DefaultConfig()
+	for maximum, want := range []int{1, 1, 1, 1, 1, 2, 2, 2, 3} {
+		maximum++
+		if got := defaults.DisengageDifferenceByMaxCharacters[maximum]; got != want {
+			t.Fatalf("max %d: expected default %d, got %d", maximum, want, got)
+		}
+		if maximum == 3 {
+			want = 2
+		}
+		if got := config.DisengageDifferenceByMaxCharacters[maximum]; got != want {
+			t.Fatalf("max %d: expected merged value %d, got %d", maximum, want, got)
+		}
 	}
 }
 

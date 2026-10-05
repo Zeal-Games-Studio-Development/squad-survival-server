@@ -262,6 +262,13 @@ func TestAIUsesNormalPickupProgressionAndCombat(t *testing.T) {
 		t.Fatal("AI failed to collect normal experience")
 	}
 	opponent := entity.NewPlayer("ai-user:opponent:1", "ai-session:opponent:1", "Opponent", bot.Position, state.random)
+	opponent.Level = bot.Level
+	// Equal rosters make both bots choose combat under the strength policy.
+	for opponent.CharacterCount() < bot.CharacterCount() {
+		if err := opponent.AddCharacter(entity.CreateCharacter(state.random, state.WeaponCatalog)); err != nil {
+			t.Fatal(err)
+		}
+	}
 	state.Players[opponent.SessionID] = opponent
 	state.AIControllers[opponent.SessionID] = ai.NewController(opponent)
 	if err := state.SpatialGrid.Insert(opponent); err != nil {

@@ -19,10 +19,15 @@ type Controller struct {
 	TargetKind      string
 	wanderUntil     int64
 	wanderDirection entity.Vector2
+	config          Config
 }
 
 func NewController(player *entity.Player) *Controller {
-	return &Controller{Player: player}
+	return NewControllerWithConfig(player, DefaultConfig())
+}
+
+func NewControllerWithConfig(player *entity.Player, config Config) *Controller {
+	return &Controller{Player: player, config: config}
 }
 
 // Step chooses a movement target. The regular player movement and combat systems
@@ -36,7 +41,28 @@ func (c *Controller) Step(tick int64, grid *spatial.Grid, random *rand.Rand) {
 		return
 	}
 	p := c.Player
-	if p.CharacterCount() < p.MaxCharacters() {
+	count := livingCharacterCount(p)
+	opponents := grid.QueryPlayersWithinRadius(p, searchRadius)
+	if c.TargetKind == "player" {
+		for _, candidate := range opponents {
+			if candidate.SessionID != c.TargetID {
+				continue
+			}
+			enemyCount := livingCharacterCount(candidate)
+			if enemyCount > 0 && enemyCount-count < c.config.disengageDifference(p.MaxCharacters()) {
+				c.follow("player", candidate.SessionID, candidate.Position)
+				return
+			}
+			break
+		}
+	}
+	for _, candidate := range opponents {
+		if enemyCount := livingCharacterCount(candidate); enemyCount > 0 && enemyCount <= count {
+			c.follow("player", candidate.SessionID, candidate.Position)
+			return
+		}
+	}
+	if count < p.MaxCharacters() {
 		if boxes := grid.QueryCharacterBoxes(p.Position, searchRadius); len(boxes) > 0 {
 			c.follow("box", boxes[0].ID, boxes[0].Position)
 			return
@@ -45,12 +71,6 @@ func (c *Controller) Step(tick int64, grid *spatial.Grid, random *rand.Rand) {
 	if p.Level < progression.MaxLevel {
 		if packages := grid.QueryExperiencePackages(p.Position, searchRadius); len(packages) > 0 {
 			c.follow("experience", packages[0].ID, packages[0].Position)
-			return
-		}
-	}
-	for _, candidate := range grid.QueryPlayersWithinRadius(p, searchRadius) {
-		if !candidate.IsEliminated() {
-			c.follow("player", candidate.SessionID, candidate.Position)
 			return
 		}
 	}
@@ -67,6 +87,16 @@ func (c *Controller) Step(tick int64, grid *spatial.Grid, random *rand.Rand) {
 		c.wanderUntil = tick + wanderTicks
 	}
 	c.setDirection(c.wanderDirection)
+}
+
+func livingCharacterCount(player *entity.Player) int {
+	count := 0
+	for _, character := range player.Characters {
+		if character != nil && character.Health > 0 {
+			count++
+		}
+	}
+	return count
 }
 
 func (c *Controller) follow(kind, id string, position entity.Vector2) {

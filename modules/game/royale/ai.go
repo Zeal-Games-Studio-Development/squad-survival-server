@@ -31,7 +31,7 @@ func (s *State) spawnAI() {
 			panic("could not initialize AI player: " + err.Error())
 		}
 		s.Players[sessionID] = player
-		s.AIControllers[sessionID] = ai.NewController(player)
+		s.AIControllers[sessionID] = ai.NewControllerWithConfig(player, config)
 	}
 }
 

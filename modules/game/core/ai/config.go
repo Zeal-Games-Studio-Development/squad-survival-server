@@ -8,13 +8,16 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+
+	"squad-survival-be/modules/game/core/strategy"
 )
 
 type Config struct {
-	SurvivalCount     int      `json:"survival_count"`
-	BattleRoyaleCount int      `json:"battle_royale_count"`
-	Prefixes          []string `json:"prefixes"`
-	Suffixes          []string `json:"suffixes"`
+	SurvivalCount                      int         `json:"survival_count"`
+	BattleRoyaleCount                  int         `json:"battle_royale_count"`
+	Prefixes                           []string    `json:"prefixes"`
+	Suffixes                           []string    `json:"suffixes"`
+	DisengageDifferenceByMaxCharacters map[int]int `json:"disengage_difference_by_max_characters"`
 }
 
 //go:embed config.json
@@ -28,6 +31,17 @@ func ParseConfig(data []byte) (Config, error) {
 	if config.SurvivalCount < 0 || config.BattleRoyaleCount < 0 {
 		return Config{}, errors.New("AI counts must not be negative")
 	}
+	for maximum, difference := range config.DisengageDifferenceByMaxCharacters {
+		if maximum < 1 || maximum > strategy.MaxCharacters || difference < 1 || difference > maximum {
+			return Config{}, fmt.Errorf("invalid disengage difference %d for max characters %d", difference, maximum)
+		}
+	}
+	if config.DisengageDifferenceByMaxCharacters == nil {
+		config.DisengageDifferenceByMaxCharacters = make(map[int]int)
+	}
+	for maximum := 1; maximum <= strategy.MaxCharacters; maximum++ {
+		config.DisengageDifferenceByMaxCharacters[maximum] = config.disengageDifference(maximum)
+	}
 	if config.SurvivalCount > 0 || config.BattleRoyaleCount > 0 {
 		if len(config.Prefixes) == 0 || len(config.Suffixes) == 0 {
 			return Config{}, errors.New("AI names require prefixes and suffixes")
@@ -39,6 +53,13 @@ func ParseConfig(data []byte) (Config, error) {
 		}
 	}
 	return config, nil
+}
+
+func (c Config) disengageDifference(maximum int) int {
+	if difference := c.DisengageDifferenceByMaxCharacters[maximum]; difference >= 1 && difference <= maximum {
+		return difference
+	}
+	return max(1, maximum/3)
 }
 
 func DefaultConfig() Config {
