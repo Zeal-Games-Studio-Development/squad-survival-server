@@ -11,7 +11,7 @@ import (
 )
 
 const searchRadius = 120.0
-const wanderTicks = int64(30)
+const wanderTicks = 30.0
 
 type Controller struct {
 	Player          *entity.Player
