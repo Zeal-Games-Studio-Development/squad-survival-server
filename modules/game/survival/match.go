@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"squad-survival-be/modules/game/core/ai"
 	"squad-survival-be/modules/game/core/characterbox"
 	"squad-survival-be/modules/game/core/combat"
 	"squad-survival-be/modules/game/core/entity"
@@ -50,6 +51,7 @@ type State struct {
 	Mode                string
 	AllowJoinInProgress bool
 	Players             map[string]*entity.Player
+	AIControllers       map[string]*ai.Controller
 	Presences           map[string]runtime.Presence
 	Reservations        map[string]int64
 	SpatialGrid         *spatial.Grid
@@ -69,6 +71,7 @@ type State struct {
 	BoxPickupDelays     map[int]int64
 	random              *rand.Rand // Gameplay RNG: spawn, weapon, combat, and damage.
 	cosmeticRandom      *rand.Rand
+	aiRandom            *rand.Rand
 }
 
 type Label struct {
@@ -96,6 +99,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		Mode:                stringParam(params, "mode", DefaultMode),
 		AllowJoinInProgress: true,
 		Players:             make(map[string]*entity.Player),
+		AIControllers:       make(map[string]*ai.Controller),
 		Presences:           make(map[string]runtime.Presence),
 		Reservations:        make(map[string]int64),
 		SpatialGrid:         spatial.NewGrid(spatialCellSize),
@@ -112,6 +116,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		BoxPickupDelays:     characterbox.DefaultDelays(),
 		random:              rand.New(rand.NewSource(randomSeed)),
 		cosmeticRandom:      rand.New(rand.NewSource(randomSeed + 1)),
+		aiRandom:            rand.New(rand.NewSource(randomSeed + 2)),
 	}
 	initialBoxTarget := state.randomCharacterBoxTarget()
 	state.spawnCharacterBoxes(initialBoxTarget)
@@ -122,7 +127,8 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 	if spawned := state.Experience.SpawnMissing(state.Players); spawned < state.Experience.TargetCount() {
 		logger.Warn("Could not place all initial experience packages: spawned=%d target=%d", spawned, state.Experience.TargetCount())
 	}
-	logger.Info("Survival match initialized: mode=%s max_players=%d", state.Mode, MaxPlayers)
+	state.spawnAI()
+	logger.Info("Survival match initialized: mode=%s max_players=%d ai_count=%d", state.Mode, MaxPlayers, len(state.AIControllers))
 	return state, tickRate, state.label()
 }
 
@@ -136,7 +142,7 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 	if state.MatchID != "" && !m.registry.CanJoin(presence.GetUserId(), state.MatchID) {
 		return state, false, "already in another match"
 	}
-	if !state.AllowJoinInProgress && len(state.Players) > 0 {
+	if !state.AllowJoinInProgress && state.humanPlayerCount() > 0 {
 		return state, false, "match already started"
 	}
 	if state.occupiedSlots() >= MaxPlayers {
@@ -149,7 +155,7 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 
 func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, rawState interface{}, presences []runtime.Presence) interface{} {
 	state := rawState.(*State)
-	playerCount := len(state.Players)
+	playerCount := state.humanPlayerCount()
 	state.ensureSkinState()
 	userIDs := make([]string, 0, len(presences))
 	for _, presence := range presences {
@@ -209,7 +215,7 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 	state.broadcastExperiencePackageEvents(logger, dispatcher, tick, nil)
 	state.EmptyTicks = 0
 	state.updateLabel(dispatcher)
-	if len(state.Players) != playerCount {
+	if state.humanPlayerCount() != playerCount {
 		state.broadcastSnapshot(logger, dispatcher, tick)
 	}
 	return state
@@ -244,7 +250,7 @@ func resolveDisplayNames(ctx context.Context, lookup userLookup, presences []run
 
 func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, rawState interface{}, presences []runtime.Presence) interface{} {
 	state := rawState.(*State)
-	playerCount := len(state.Players)
+	playerCount := state.humanPlayerCount()
 	boxEvents := make([]system.CharacterBoxEvent, 0, len(presences))
 	for _, presence := range presences {
 		boxEvents = append(boxEvents, state.cancelBoxClaimForSession(presence.GetSessionId())...)
@@ -264,7 +270,7 @@ func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, 
 	}
 	state.broadcastCharacterBoxEvents(logger, dispatcher, tick, boxEvents, nil)
 	state.updateLabel(dispatcher)
-	if len(state.Players) != playerCount {
+	if state.humanPlayerCount() != playerCount {
 		state.broadcastSnapshot(logger, dispatcher, tick)
 	}
 	return state
@@ -282,7 +288,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 			continue
 		}
 		player, ok := state.Players[message.GetSessionId()]
-		if !ok || player.IsEliminated() {
+		if !ok || state.AIControllers[message.GetSessionId()] != nil || player.IsEliminated() {
 			continue
 		}
 		input, err := entity.DecodeMovementInput(message.GetData())
@@ -294,6 +300,9 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 
 	for _, player := range state.Players {
 		player.RemoveDeadCharacters()
+	}
+	state.stepAI(tick)
+	for _, player := range state.Players {
 		entity.StepMovement(player, tick)
 		if err := entity.StepCharacters(player); err != nil && logger != nil {
 			logger.Error("Could not update character strategy: session_id=%s error=%v", player.SessionID, err)
@@ -340,7 +349,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	state.broadcastPlayerMovementSnapshots(logger, dispatcher, tick, nearbyPlayers)
 	state.broadcastProjectileMovementSnapshots(logger, dispatcher, tick, nearbyPlayers, state.Combat.Projectiles())
 
-	if len(state.Players) == 0 && len(state.Reservations) == 0 {
+	if state.humanPlayerCount() == 0 && len(state.Reservations) == 0 {
 		state.EmptyTicks++
 		if state.EmptyTicks >= emptyMatchTTLSeconds*tickRate {
 			logger.Info("Stopping empty survival match")
@@ -406,7 +415,7 @@ func (m *Match) MatchSignal(_ context.Context, _ runtime.Logger, _ *sql.DB, _ ru
 }
 
 func (s *State) occupiedSlots() int {
-	return len(s.Players) + len(s.Reservations)
+	return s.humanPlayerCount() + len(s.Reservations)
 }
 
 func (s *State) expireReservations(tick int64) bool {
@@ -425,7 +434,7 @@ func (s *State) updateLabel(dispatcher runtime.MatchDispatcher) {
 }
 
 func (s *State) broadcastSnapshot(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64) {
-	snapshot, err := system.EncodeStateSnapshot(tick, len(s.Players))
+	snapshot, err := system.EncodeStateSnapshot(tick, s.humanPlayerCount())
 	if err == nil {
 		err = dispatcher.BroadcastMessage(system.OpStateSnapshot, snapshot, nil, nil, true)
 	}
@@ -666,7 +675,7 @@ func (s *State) broadcastExperiencePackageEvents(logger runtime.Logger, dispatch
 	if s.Experience == nil {
 		return
 	}
-	for sessionID, events := range s.Experience.VisibilityEvents(s.Players, collections) {
+	for sessionID, events := range s.Experience.VisibilityEvents(s.humanObservers(), collections) {
 		if len(events) == 0 {
 			continue
 		}
@@ -755,7 +764,7 @@ func (s *State) broadcastPlayerMovementSnapshots(logger runtime.Logger, dispatch
 	for sessionID, player := range s.Players {
 		presence, ok := s.Presences[sessionID]
 		if !ok {
-			if logger != nil {
+			if logger != nil && s.AIControllers[sessionID] == nil {
 				logger.Error("Could not send player movement snapshot: presence not found for session_id=%s", sessionID)
 			}
 			continue
@@ -775,7 +784,7 @@ func (s *State) broadcastProjectileMovementSnapshots(logger runtime.Logger, disp
 	for sessionID, player := range s.Players {
 		presence, ok := s.Presences[sessionID]
 		if !ok {
-			if logger != nil {
+			if logger != nil && s.AIControllers[sessionID] == nil {
 				logger.Error("Could not send projectile movement snapshot: presence not found for session_id=%s", sessionID)
 			}
 			continue
@@ -948,7 +957,7 @@ func (s *State) label() string {
 	label, _ := json.Marshal(Label{
 		Mode:        s.Mode,
 		Status:      "playing",
-		PlayerCount: len(s.Players),
+		PlayerCount: s.humanPlayerCount(),
 		MaxPlayers:  MaxPlayers,
 		Joinable:    s.AllowJoinInProgress && s.occupiedSlots() < MaxPlayers,
 	})

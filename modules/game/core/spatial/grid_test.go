@@ -50,6 +50,24 @@ func TestQueryPlayersFindsPlayersAcrossNegativeCells(t *testing.T) {
 	}
 }
 
+func TestQueryPlayersWithinRadiusOverridesDetectionRadius(t *testing.T) {
+	grid := NewGrid(20)
+	origin := player("origin", 0, 0)
+	edge := player("edge", 120, 0)
+	outside := player("outside", 120.1, 0)
+	for _, candidate := range []*entity.Player{origin, edge, outside} {
+		if err := grid.Insert(candidate); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := grid.QueryPlayersWithinRadius(origin, 120); len(got) != 1 || got[0] != edge {
+		t.Fatalf("unexpected players within radius 120: %+v", got)
+	}
+	if got := grid.QueryPlayers(origin); len(got) != 0 {
+		t.Fatalf("default detection radius changed: %+v", got)
+	}
+}
+
 func TestMoveUpdatesPlayerCell(t *testing.T) {
 	grid := NewGrid(20)
 	origin := player("origin", 0, 0)

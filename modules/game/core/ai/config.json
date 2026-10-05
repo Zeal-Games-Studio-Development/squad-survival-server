@@ -1,0 +1,6 @@
+{
+  "survival_count": 8,
+  "battle_royale_count": 16,
+  "prefixes": ["Shadow", "Iron", "Swift", "Wild", "Silent", "Crimson", "Frost", "Storm"],
+  "suffixes": ["Wolf", "Raven", "Hunter", "Blade", "Fox", "Ghost", "Falcon", "Knight"]
+}

@@ -249,11 +249,17 @@ func (g *Grid) Remove(sessionID string) bool {
 }
 
 func (g *Grid) QueryPlayers(player *entity.Player) []*entity.Player {
-	if player == nil || player.DetectionRadius < 0 {
+	if player == nil {
 		return nil
 	}
+	return g.QueryPlayersWithinRadius(player, player.DetectionRadius)
+}
 
-	radius := player.DetectionRadius
+// QueryPlayersWithinRadius returns nearby players ordered by distance then session ID.
+func (g *Grid) QueryPlayersWithinRadius(player *entity.Player, radius float64) []*entity.Player {
+	if player == nil || radius < 0 || math.IsNaN(radius) || math.IsInf(radius, 0) {
+		return nil
+	}
 	radiusSquared := radius * radius
 	minCell := g.cellAt(entity.Vector2{X: player.Position.X - radius, Y: player.Position.Y - radius})
 	maxCell := g.cellAt(entity.Vector2{X: player.Position.X + radius, Y: player.Position.Y + radius})

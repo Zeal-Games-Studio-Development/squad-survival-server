@@ -37,6 +37,7 @@ Tài liệu này mô tả trạng thái đã triển khai của Squad Survival S
 8. [Kiểm thử và code generation](testing.md)
 9. [Battle Royale lifecycle](battle-royale.md)
 10. [Character skin runtime](character-skins.md)
+11. [AI player và cấu hình bot](ai-players.md)
 
 ## Planned
 
