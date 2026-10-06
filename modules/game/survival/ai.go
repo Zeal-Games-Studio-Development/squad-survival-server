@@ -8,7 +8,6 @@ import (
 
 	"squad-survival-be/modules/game/core/ai"
 	"squad-survival-be/modules/game/core/entity"
-	"squad-survival-be/modules/skin/loadout"
 )
 
 func (s *State) spawnAI() {
@@ -21,12 +20,7 @@ func (s *State) spawnAI() {
 	usedNames := make(map[string]struct{}, count)
 	for index := 1; index <= count; index++ {
 		userID, sessionID := ai.IDs(namespace, index)
-		player := entity.NewPlayer(userID, sessionID, config.Name(s.cosmeticRandom, usedNames), s.randomPlayerSpawn(), s.random)
-		for _, character := range player.Characters {
-			if character != nil {
-				character.Skin = loadout.RandomSkin(s.cosmeticRandom, nil, character.Weapon.Type)
-			}
-		}
+		player := entity.NewPlayer(userID, sessionID, config.Name(s.aiRandom, usedNames), s.randomPlayerSpawn(), s.random)
 		if err := s.SpatialGrid.Insert(player); err != nil {
 			panic("could not initialize AI player: " + err.Error())
 		}

@@ -15,7 +15,6 @@
 | `modules/game/core/characterbox` | Claim model và embedded delay config cho Character Box |
 | `modules/game/core/system` | Opcode, protobuf encoding và snapshots |
 | `modules/game/core/world` | Tọa độ, spawn và world boundary |
-| `modules/skin/loadout` | Đọc snapshot inventory và random character skin dùng chung cho các mode |
 | `modules/account` | Khóa client profile updates và RPC đổi display name có kiểm duyệt |
 
 `InitModule` đăng ký account hooks, match `survival`, match `battle-royale`, RPC `change_display_name`, RPC `find_or_create_match`, matchmaker callback và RPC `healthcheck`.
@@ -25,7 +24,7 @@ matchmaking cùng các Survival và Battle Royale match handler trong cùng proc
 
 ## Authoritative State
 
-Mỗi authoritative match sở hữu state độc lập, gồm player, presence, reservation, spatial grid, combat simulation, random source và snapshot skin inventory theo session. Movement, health, formation và projectile đều do server quyết định. Combat của cả hai mode dùng player trong spatial detection làm candidate set, sau đó kiểm tra attack range chính xác giữa các character. Battle Royale bổ sung phase và deadline tick cho phòng chờ, gameplay và thời gian giữ match sau khi kết thúc.
+Mỗi authoritative match sở hữu state độc lập, gồm player, presence, reservation, spatial grid, combat simulation và random source. Movement, health, formation và projectile đều do server quyết định. Combat của cả hai mode dùng player trong spatial detection làm candidate set, sau đó kiểm tra attack range chính xác giữa các character. Battle Royale bổ sung phase và deadline tick cho phòng chờ, gameplay và thời gian giữ match sau khi kết thúc.
 
 State gameplay chỉ tồn tại trong memory. Nakama Storage/PostgreSQL hiện chưa lưu position, character health, formation hoặc projectile.
 
@@ -85,7 +84,6 @@ Coordinator chọn module và capacity theo `mode`: `survival.MaxPlayers` cho Su
 ## Dữ Liệu Và Serialization
 
 - Realtime opcode dùng binary Protobuf; opcode `107` hiện chỉ được Battle Royale phát ra.
-- `CharacterRoster` mang skin numeric ID đã được server random từ snapshot inventory lúc player join.
 - Matchmaking RPC request/response và match label dùng JSON.
 - Weapon/strategy catalog, combat query buffer, Character Box pickup delay và Experience Package config mặc định dùng embedded JSON.
 - Generated Go code được compile vào `backend.so`; `.proto`, Buf và generated C# không cần có trong runtime image.

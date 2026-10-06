@@ -1,6 +1,6 @@
 # AI player
 
-Survival và battle royale tạo bot ngay trong `MatchInit`. Bot dùng cùng `entity.Player`, random spawn, character/weapon mặc định, skin fallback, spatial grid, progression và combat của người chơi. Logic quyết định di chuyển nằm riêng trong `modules/game/core/ai.Controller`; `Player` không chứa AI behaviour.
+Survival và battle royale tạo bot ngay trong `MatchInit`. Bot dùng cùng `entity.Player`, random spawn, character/weapon mặc định, spatial grid, progression và combat của người chơi. Logic quyết định di chuyển nằm riêng trong `modules/game/core/ai.Controller`; `Player` không chứa AI behaviour.
 
 ## Cấu hình
 
@@ -28,7 +28,7 @@ Count phải không âm; `0` tắt bot của mode đó. Nếu có bot, hai danh 
 - `UserID`: `ai-user:<match-id>:<index>`, index bắt đầu từ 1.
 - `SessionID`: `ai-session:<match-id>:<index>`.
 - Character ID vẫn theo quy tắc `<user-id>:<character-sequence>`.
-- ID AI là định danh gameplay nội bộ, không phải account hay session Nakama. Bot không có presence, inventory storage hoặc active match membership.
+- ID AI là định danh gameplay nội bộ, không phải account hay session Nakama. Bot không có presence hoặc active match membership.
 - Client nhận diện bằng prefix ID; không có trường protobuf mới. Roster, movement, progression và combat vẫn gửi bot tới người thật theo vùng quan sát hiện có.
 
 `Players` chứa cả bot và người thật; `AIControllers` ánh xạ session ID tới controller. `player_count` trong label và state snapshot chỉ đếm người thật. Mỗi match nhận tối đa 32 người thật, cộng thêm số bot cấu hình. Reservation, match đầy và TTL không bị bot chiếm chỗ hoặc giữ sống.

@@ -68,14 +68,6 @@ func TestJoinAndLeaveUpdateCapacityLabel(t *testing.T) {
 	if state.Players[presence.sessionID].DisplayName != presence.userID {
 		t.Fatalf("expected username fallback, got %q", state.Players[presence.sessionID].DisplayName)
 	}
-	initialSkin := state.Players[presence.sessionID].Characters[0].Skin
-	if initialSkin.HairID < 0 || initialSkin.HairID > 1 || initialSkin.BeardID < 0 || initialSkin.BeardID > 1 ||
-		initialSkin.ChestID < 0 || initialSkin.ChestID > 1 || initialSkin.EyeID < 0 || initialSkin.EyeID > 1 || initialSkin.HelmetID < 0 || initialSkin.HelmetID > 1 {
-		t.Fatalf("initial character did not receive fallback skin: %+v", initialSkin)
-	}
-	if _, ok := state.SkinInventories[presence.sessionID]; !ok {
-		t.Fatal("expected joined player's skin inventory to be cached")
-	}
 	if dispatcher.label != `{"mode":"survival","status":"playing","player_count":1,"max_players":32,"joinable":true}` {
 		t.Fatalf("unexpected full label: %s", dispatcher.label)
 	}
@@ -94,9 +86,6 @@ func TestJoinAndLeaveUpdateCapacityLabel(t *testing.T) {
 	assertStateSnapshot(t, dispatcher, 2, 0)
 	if _, exists := state.Presences[presence.sessionID]; exists {
 		t.Fatal("expected leaving player presence to be removed")
-	}
-	if _, exists := state.SkinInventories[presence.sessionID]; exists {
-		t.Fatal("expected leaving player's skin inventory to be removed")
 	}
 	if state.SpatialGrid.Remove(presence.sessionID) {
 		t.Fatal("expected leaving player to be absent from spatial grid")
@@ -743,9 +732,6 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 	weapon, _ := state.weaponByType(entity.WeaponBow)
 	if awarded.Weapon.Type != entity.WeaponBow || awarded.MaxHealth != weapon.Health || awarded.Damage != weapon.Damage {
 		t.Fatalf("character did not receive weapon stats: %#v", awarded)
-	}
-	if awarded.Skin.HairID < 0 || awarded.Skin.HairID > 1 || awarded.Skin.WeaponID != 1 || awarded.Skin.ProjectileID != 1 {
-		t.Fatalf("character did not receive fallback bow skin: %+v", awarded.Skin)
 	}
 	if _, exists := state.CharacterBoxes[box.ID]; exists || len(state.SpatialGrid.QueryCharacterBoxes(entity.Vector2{}, 1)) != 0 {
 		t.Fatal("consumed box remains in state or spatial grid")

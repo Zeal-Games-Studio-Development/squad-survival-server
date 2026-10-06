@@ -21,7 +21,6 @@ Contract nằm trong các source schema:
 - [`state.proto`](../modules/game/core/system/state.proto)
 - [`player_movement.proto`](../modules/game/core/system/player_movement.proto)
 - [`roster.proto`](../modules/game/core/system/roster.proto)
-- [`skin.proto`](../modules/game/core/system/skin.proto)
 - [`projectile_movement.proto`](../modules/game/core/system/projectile_movement.proto)
 - [`vector.proto`](../modules/game/core/system/vector.proto)
 - [`combat.proto`](../modules/game/core/system/combat.proto)
@@ -104,8 +103,6 @@ socket.ReceivedMatchState += state => {
 
 `CharacterBoxStateBatch` dùng `PICKUP_STARTED` để gửi `box_id`, `claimant_session_id`, `started_at_tick` và `completes_at_tick`. Client suy ra countdown từ tick server, không chờ packet mỗi tick. `PICKUP_CANCELLED` mở khóa UI khi claimant rời vùng, chết hoặc leave; `DESPAWNED` xác nhận box đã được consume và character được grant. Các event này được broadcast reliable toàn match. Snapshot gửi lúc join gồm cả box và claim đang hoạt động.
 
-`CharacterRoster.skin` chứa các numeric ID để render ngoại hình và weapon của character. Client kết hợp `weapon_type` hiện có với `weapon_id`; `projectile_id` hiện chỉ dùng cho arrow của bow.
-
 ### Roster và trạng thái render
 
 `PlayerRosterBatch` chỉ đồng bộ metadata/static state khi player join, đi vào detection hoặc roster version thay đổi. Server không gửi roster removal riêng khi player leave match hoặc rời detection.
@@ -126,7 +123,7 @@ Project dùng Buf remote plugins:
 buf generate
 ```
 
-Go `.pb.go` được giữ trong backend repo. C# được tạo local tại `clients/unity/Generated/Protobuf` và bị Git ignore vì Unity nằm ở repo riêng; copy `Input.cs`, `State.cs`, `Skin.cs`, `PlayerMovement.cs`, `PlayerProgression.cs`, `ExperiencePackage.cs`, `ExperiencePackageState.cs`, `Roster.cs`, `ProjectileMovement.cs`, `Vector.cs`, `Combat.cs` sang Unity sau khi schema thay đổi.
+Go `.pb.go` được giữ trong backend repo. C# được tạo local tại `clients/unity/Generated/Protobuf` và bị Git ignore vì Unity nằm ở repo riêng; copy `Input.cs`, `State.cs`, `PlayerMovement.cs`, `PlayerProgression.cs`, `ExperiencePackage.cs`, `ExperiencePackageState.cs`, `Roster.cs`, `ProjectileMovement.cs`, `Vector.cs`, `Combat.cs` sang Unity sau khi schema thay đổi.
 
 Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf hoặc `protoc` nếu chỉ sử dụng generated `.cs`.
 

@@ -4,8 +4,6 @@ package game.core.system;
 
 option go_package = "squad-survival-be/modules/game/core/system;system";
 
-import "modules/game/core/system/skin.proto";
-
 message PlayerRosterBatch {
   int64 tick = 1;
   repeated PlayerRoster players = 2;
@@ -33,8 +31,7 @@ message CharacterRoster {
   string weapon_type = 10;
   string range_class = 11;
   string weapon_name = 12;
-  CharacterSkin skin = 13;
-  double crit_chance = 14;
-  double crit_multiplier = 15;
-  double damage_reduction = 16;
+  double crit_chance = 13;
+  double crit_multiplier = 14;
+  double damage_reduction = 15;
 }

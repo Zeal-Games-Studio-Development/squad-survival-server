@@ -10,9 +10,9 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
-func Register(initializer runtime.Initializer, service *Service, storage InitialStorageWriter) error {
+func Register(initializer runtime.Initializer, service *Service) error {
 	hook := func(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, session *api.Session) error {
-		return initializeAuthenticatedAccount(ctx, logger, nk, session, service, storage)
+		return initializeAuthenticatedAccount(ctx, logger, nk, session, service)
 	}
 
 	if err := initializer.RegisterAfterAuthenticateApple(func(ctx context.Context, l runtime.Logger, db *sql.DB, nk runtime.NakamaModule, out *api.Session, _ *api.AuthenticateAppleRequest) error {
@@ -60,7 +60,7 @@ func Register(initializer runtime.Initializer, service *Service, storage Initial
 	})
 }
 
-func initializeAuthenticatedAccount(ctx context.Context, logger runtime.Logger, store NewAccountStore, session *api.Session, service *Service, storage InitialStorageWriter) error {
+func initializeAuthenticatedAccount(ctx context.Context, logger runtime.Logger, wallet WalletUpdater, session *api.Session, service *Service) error {
 	if session == nil || !session.Created {
 		return nil
 	}
@@ -68,14 +68,14 @@ func initializeAuthenticatedAccount(ctx context.Context, logger runtime.Logger, 
 	if !ok || userID == "" {
 		return errors.New("new-account initialization: user id missing from runtime context")
 	}
-	if err := service.InitializeNewAccount(ctx, store, userID, storage); err != nil {
+	if err := service.InitializeNewAccount(ctx, wallet, userID); err != nil {
 		if logger != nil {
 			logger.Error("Could not initialize new user %s: %v", userID, err)
 		}
 		return fmt.Errorf("initialize new user %s: %w", userID, err)
 	}
 	if logger != nil {
-		logger.Info("Initialized currency and skin inventory for new user %s", userID)
+		logger.Info("Initialized currency for new user %s", userID)
 	}
 	return nil
 }

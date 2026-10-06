@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"github.com/heroiclabs/nakama-common/api"
-	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 const (
@@ -21,14 +18,6 @@ var ErrInvalidAmount = errors.New("currency amount must be greater than zero")
 // WalletUpdater is the subset of Nakama used by the economy service.
 type WalletUpdater interface {
 	WalletUpdate(ctx context.Context, userID string, changeset map[string]int64, metadata map[string]interface{}, updateLedger bool) (updated, previous map[string]int64, err error)
-}
-
-type NewAccountStore interface {
-	MultiUpdate(ctx context.Context, accountUpdates []*runtime.AccountUpdate, storageWrites []*runtime.StorageWrite, storageDeletes []*runtime.StorageDelete, walletUpdates []*runtime.WalletUpdate, updateLedger bool) ([]*api.StorageObjectAck, []*runtime.WalletUpdateResult, error)
-}
-
-type InitialStorageWriter interface {
-	InitialStorageWrite(userID string) (*runtime.StorageWrite, error)
 }
 
 type Service struct {
@@ -96,27 +85,15 @@ func (s *Service) InitialChangeset() map[string]int64 {
 	return changeset
 }
 
-func (s *Service) InitializeNewAccount(ctx context.Context, store NewAccountStore, userID string, storage InitialStorageWriter) error {
+func (s *Service) InitializeNewAccount(ctx context.Context, wallet WalletUpdater, userID string) error {
 	if userID == "" {
 		return errors.New("new-account initialization: user id is required")
 	}
-	if store == nil || storage == nil {
+	if wallet == nil {
 		return errors.New("new-account initialization dependencies are required")
 	}
-	write, err := storage.InitialStorageWrite(userID)
-	if err != nil {
-		return fmt.Errorf("build initial storage: %w", err)
-	}
-	walletUpdates := []*runtime.WalletUpdate{}
-	if changeset := s.InitialChangeset(); len(changeset) != 0 {
-		walletUpdates = append(walletUpdates, &runtime.WalletUpdate{
-			UserID: userID, Changeset: changeset,
-			Metadata: map[string]interface{}{LedgerEventKey: EventInitialCurrencyGrant},
-		})
-	}
-	_, _, err = store.MultiUpdate(ctx, nil, []*runtime.StorageWrite{write}, nil, walletUpdates, true)
-	if err != nil {
-		return fmt.Errorf("commit initial currency and skin inventory: %w", err)
+	if err := s.GrantInitialCurrency(ctx, wallet, userID); err != nil {
+		return fmt.Errorf("grant initial currency: %w", err)
 	}
 	return nil
 }

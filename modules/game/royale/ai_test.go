@@ -64,7 +64,7 @@ func TestAIInitUsesConfiguredPopulation(t *testing.T) {
 			t.Fatal("bot registered as a Nakama member")
 		}
 	}
-	if len(state.Presences) != 0 || len(state.Reservations) != 0 || len(state.SkinInventories) != 0 {
+	if len(state.Presences) != 0 || len(state.Reservations) != 0 {
 		t.Fatal("bot created human session state")
 	}
 }

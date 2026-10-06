@@ -23,8 +23,8 @@ func TestMatchInitStartsWaiting(t *testing.T) {
 	if rate != tickRate || state.Phase != PhaseWaiting || state.WaitingEndsAtTick != 0 {
 		t.Fatalf("unexpected initial lifecycle: rate=%d state=%+v", rate, state)
 	}
-	if state.random == nil || state.cosmeticRandom == nil || state.random == state.cosmeticRandom {
-		t.Fatal("gameplay and cosmetic random sources were not separated")
+	if state.random == nil || state.aiRandom == nil || state.random == state.aiRandom {
+		t.Fatal("gameplay and AI random sources were not separated")
 	}
 	want := `{"mode":"battle-royale","status":"waiting","player_count":0,"max_players":32,"joinable":true}`
 	if label != want {
@@ -73,11 +73,6 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 	if state.WaitingEndsAtTick != 10+waitingDurationTicks {
 		t.Fatalf("unexpected waiting deadline: %d", state.WaitingEndsAtTick)
 	}
-	initialSkin := state.Players[presence.sessionID].Characters[0].Skin
-	if initialSkin.HairID < 0 || initialSkin.HairID > 1 || initialSkin.BeardID < 0 || initialSkin.BeardID > 1 ||
-		initialSkin.ChestID < 0 || initialSkin.ChestID > 1 || initialSkin.EyeID < 0 || initialSkin.EyeID > 1 || initialSkin.HelmetID < 0 || initialSkin.HelmetID > 1 {
-		t.Fatalf("initial character did not receive fallback skin: %+v", initialSkin)
-	}
 	assertLifecycle(t, dispatcher, system.MatchPhase_MATCH_PHASE_WAITING, 10, state.WaitingEndsAtTick, true)
 
 	player := state.Players[presence.sessionID]
@@ -103,10 +98,6 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 	match.MatchLoop(nil, nil, nil, nil, dispatcher, state.WaitingEndsAtTick+tickRate, state, nil)
 	if len(player.Characters) != 2 {
 		t.Fatalf("character box was not awarded at deadline: %d", len(player.Characters))
-	}
-	awardedSkin := player.Characters[1].Skin
-	if awardedSkin.HairID < 0 || awardedSkin.HairID > 1 || awardedSkin.WeaponID != 1 || awardedSkin.ProjectileID != 1 {
-		t.Fatalf("awarded character did not receive fallback bow skin: %+v", awardedSkin)
 	}
 	wantPlayingLabel := `{"mode":"battle-royale","status":"playing","player_count":1,"max_players":32,"joinable":false}`
 	if dispatcher.label != wantPlayingLabel {

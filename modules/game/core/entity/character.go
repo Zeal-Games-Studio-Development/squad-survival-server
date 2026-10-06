@@ -13,7 +13,6 @@ const (
 
 type Character struct {
 	ID                 string
-	Skin               Skin
 	Weapon             Weapon
 	RangeClass         RangeClass
 	Position           Vector2
