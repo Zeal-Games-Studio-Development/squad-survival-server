@@ -39,11 +39,16 @@ type Player struct {
 }
 
 func NewPlayer(userID, sessionID, displayName string, position Vector2, random *rand.Rand) *Player {
+	return NewPlayerWithWeapon(userID, sessionID, displayName, position, RandomWeapon(random, DefaultWeaponCatalog()))
+}
+
+func NewPlayerWithWeapon(userID, sessionID, displayName string, position Vector2, weapon Weapon) *Player {
 	definition, ok := strategy.DefaultDefinition(strategy.DefaultStrategyName)
 	if !ok {
 		panic("default strategy not found: " + strategy.DefaultStrategyName)
 	}
-	character := CreateCharacter(random, DefaultWeaponCatalog())
+	character := NewCharacter()
+	character.ApplyWeapon(weapon)
 	player := &Player{
 		UserID:             userID,
 		SessionID:          sessionID,

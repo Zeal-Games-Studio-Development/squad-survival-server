@@ -8,7 +8,7 @@ Giới hạn character hiện tại được tính bằng `min(level, 9)`: level
 
 ## Character Lifecycle
 
-Player mới được tạo cùng một character có weapon chọn ngẫu nhiên từ embedded catalog. Character ID có dạng `<user_id>:<sequence>` và ổn định khi array được compact.
+Player mới vào trận với một character được chọn đều từ tám slot `squad_loadout` đã lưu của tài khoản. Character ID có dạng `<user_id>:<sequence>` và ổn định khi array được compact.
 
 Character có position, target position, health/max health, damage, movement/attack stats, weapon và combat state. Khi `Health <= 0`, character bị remove trong combat tick; formation được gán lại trước snapshot tiếp theo.
 
@@ -21,7 +21,7 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 | Field | Ý nghĩa |
 | --- | --- |
 | `type` | Loại weapon gameplay |
-| `name` | Stable key để Unity đối chiếu asset/reference |
+| `weapon_id` | ID duy nhất, ổn định để inventory, loadout và Unity đối chiếu asset/reference |
 | `range_class` | `melee` hoặc `ranged` |
 | `health` | Max health sau khi equip |
 | `damage` | Sát thương gốc cố định của mỗi đòn |
@@ -34,7 +34,13 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 | `projectile_speed` | World units mỗi giây; ranged phải lớn hơn 0 |
 | `regen_rate` | Stat đã có, chưa có regen system |
 
-`spear`, `sword`, `axe`, `blunt` là melee. `bow`, `staff`, `wand` là ranged.
+`spear`, `sword`, `axe`, `blunt` là melee. `bow`, `staff`, `wand`, `crossbow` là ranged.
+
+## Character Inventory Và Squad Loadout
+
+Nakama Storage lưu object `character_inventory/inventory` cho mỗi tài khoản mới, gồm `weapon_ids` và `squad_loadout`. Object có `permission_read=1` (chủ tài khoản được đọc) và `permission_write=0` (chỉ server được ghi). Config khởi tạo là [`initial_character_inventory.json`](../modules/game/inventory/initial_character_inventory.json); chỉ số của từng weapon lấy từ `weapons.json`. Tài khoản có sẵn trước tính năng này không được tự cấp inventory.
+
+`squad_loadout` là mapping từ tám `weapon_type` sang `weapon_id` mà tài khoản sở hữu. Mỗi ID phải đúng type của slot. Client đọc qua RPC `get_character_inventory`; RPC `set_squad_loadout` nhận toàn bộ mapping cùng storage `version` và trả snapshot/version mới. Có thể sửa trong trận, nhưng thay đổi chỉ áp dụng cho lần vào trận sau. Loadout thiếu hoặc không hợp lệ sẽ bị chặn khi tìm trận và khi join trực tiếp.
 
 ## Strategy 5x5
 
@@ -61,9 +67,11 @@ Character không overshoot và không teleport khi formation/facing đổi. Char
 
 ## Character Box
 
-Match duy trì Character Box tĩnh và mỗi phút refill đến target của mode. Box chứa một weapon type được chọn đều từ weapon catalog. Khi player đi vào bán kính collision, server khóa một box cho một player và bắt đầu countdown; mỗi player chỉ được claim một box. Player phải ở trong vùng, còn sống và còn capacity theo level cho tới deadline. Delay dựa trên số character lúc bắt đầu claim: count 1–4 chờ tương ứng 1–4 giây, 5–7 chờ 5 giây và 8 chờ 6 giây. Player đã đạt giới hạn runtime không thể claim; giới hạn tuyệt đối là 9 character. Bảng thời gian nằm trong `modules/game/core/characterbox/pickup_delays.json`.
+Match duy trì Character Box tĩnh và mỗi phút refill đến target của mode. Box chứa `weapon_type` và `weapon_id` của một mục được chọn đều từ weapon catalog. Khi player đi vào bán kính collision, server khóa một box cho một player và bắt đầu countdown; mỗi player chỉ được claim một box. Player phải ở trong vùng, còn sống và còn capacity theo level cho tới deadline. Delay dựa trên số character lúc bắt đầu claim: count 1–4 chờ tương ứng 1–4 giây, 5–7 chờ 5 giây và 8 chờ 6 giây. Player đã đạt giới hạn runtime không thể claim; giới hạn tuyệt đối là 9 character. Bảng thời gian nằm trong `modules/game/core/characterbox/pickup_delays.json`.
 
 Opcode reliable `106` broadcast `PICKUP_STARTED` và `PICKUP_CANCELLED`; client tự tính countdown từ deadline tick. Khi hoàn tất, server grant character và gửi `DESPAWNED`. Box đang được claim vẫn tồn tại trong world và được tính khi refill.
+
+Character nhận từ box chỉ tồn tại trong trận, không mở khóa `weapon_id` trong inventory tài khoản.
 
 ## Giới Hạn Hiện Tại
 

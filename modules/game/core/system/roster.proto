@@ -30,7 +30,7 @@ message CharacterRoster {
   reserved "damage_ratio";
   string weapon_type = 10;
   string range_class = 11;
-  string weapon_name = 12;
+  string weapon_id = 12;
   double crit_chance = 13;
   double crit_multiplier = 14;
   double damage_reduction = 15;

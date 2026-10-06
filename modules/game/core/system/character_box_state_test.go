@@ -27,7 +27,7 @@ func TestEncodeCharacterBoxStateBatch(t *testing.T) {
 		t.Fatalf("unexpected batch: %+v", &batch)
 	}
 	spawned := batch.Events[0]
-	if spawned.EventType != CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_SPAWNED || spawned.BoxId != box.ID || spawned.Position.X != 3 || spawned.Position.Y != -4 || spawned.Value.WeaponType != "wand" {
+	if spawned.EventType != CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_SPAWNED || spawned.BoxId != box.ID || spawned.Position.X != 3 || spawned.Position.Y != -4 || spawned.Value.WeaponType != "wand" || spawned.Value.WeaponId != "wand" {
 		t.Fatalf("unexpected spawn event: %+v", spawned)
 	}
 	started := batch.Events[1]

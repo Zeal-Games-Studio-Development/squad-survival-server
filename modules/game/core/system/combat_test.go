@@ -57,7 +57,7 @@ func TestEncodeCombatEventBatchRejectsUnknownEvent(t *testing.T) {
 
 func TestEncodeProjectileCombatEvents(t *testing.T) {
 	events := []corecombat.Event{
-		{Type: corecombat.EventProjectileSpawned, ProjectileID: "p1", AttackID: "a1", AttackerUserID: "u1", AttackerCharacterID: "c1", TargetUserID: "u2", TargetCharacterID: "c2", WeaponType: entity.WeaponBow, WeaponName: "bow", Position: entity.Vector2{X: 1}, Direction: entity.Vector2{Y: 1}, Speed: 12, Tick: 4},
+		{Type: corecombat.EventProjectileSpawned, ProjectileID: "p1", AttackID: "a1", AttackerUserID: "u1", AttackerCharacterID: "c1", TargetUserID: "u2", TargetCharacterID: "c2", WeaponType: entity.WeaponBow, WeaponID: "bow", Position: entity.Vector2{X: 1}, Direction: entity.Vector2{Y: 1}, Speed: 12, Tick: 4},
 		{Type: corecombat.EventProjectileHit, ProjectileID: "p1", AttackID: "a1", AttackerUserID: "u1", AttackerCharacterID: "c1", TargetUserID: "u2", TargetCharacterID: "c2", Position: entity.Vector2{X: 2}, Tick: 5},
 		{Type: corecombat.EventProjectileExpired, ProjectileID: "p2", AttackID: "a2", AttackerUserID: "u1", AttackerCharacterID: "c1", TargetUserID: "u2", TargetCharacterID: "c2", Position: entity.Vector2{X: 3}, Tick: 6},
 	}
@@ -69,7 +69,7 @@ func TestEncodeProjectileCombatEvents(t *testing.T) {
 	if err = proto.Unmarshal(data, &batch); err != nil {
 		t.Fatal(err)
 	}
-	if spawned := batch.Events[0].GetProjectileSpawned(); spawned == nil || spawned.ProjectileId != "p1" || spawned.WeaponName != "bow" || spawned.Speed != 12 {
+	if spawned := batch.Events[0].GetProjectileSpawned(); spawned == nil || spawned.ProjectileId != "p1" || spawned.WeaponId != "bow" || spawned.Speed != 12 {
 		t.Fatalf("unexpected projectile spawned: %+v", spawned)
 	}
 	if hit := batch.Events[1].GetProjectileHit(); hit == nil || hit.ProjectileId != "p1" || hit.Position.X != 2 {

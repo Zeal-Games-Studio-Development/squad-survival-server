@@ -48,14 +48,14 @@ func EncodeCharacterBoxStateBatch(tick int64, events []CharacterBoxEvent) ([]byt
 func characterBoxStateEventSnapshot(event CharacterBoxEvent) (*CharacterBoxStateEvent, error) {
 	switch event.Type {
 	case CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_SPAWNED:
-		if event.Box == nil || event.Box.ID == "" || event.Box.Value == nil || event.Box.Value.WeaponType == "" {
+		if event.Box == nil || event.Box.ID == "" || event.Box.Value == nil || event.Box.Value.WeaponType == "" || event.Box.Value.WeaponId == "" {
 			return nil, errors.New("spawned character box is invalid")
 		}
 		return &CharacterBoxStateEvent{
 			EventType: event.Type,
 			BoxId:     event.Box.ID,
 			Position:  vectorSnapshot(event.Box.Position),
-			Value:     &entity.CharacterBoxValue{WeaponType: event.Box.Value.WeaponType},
+			Value:     &entity.CharacterBoxValue{WeaponType: event.Box.Value.WeaponType, WeaponId: event.Box.Value.WeaponId},
 		}, nil
 	case CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_DESPAWNED:
 		if event.ID == "" {

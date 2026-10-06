@@ -13,11 +13,12 @@
 | `modules/game/core/spatial` | Spatial grid cho player detection |
 | `modules/game/core/combat` | Attack cycle, damage và projectile simulation |
 | `modules/game/core/characterbox` | Claim model và embedded delay config cho Character Box |
+| `modules/game/inventory` | Character inventory và squad loadout lưu trong Nakama Storage |
 | `modules/game/core/system` | Opcode, protobuf encoding và snapshots |
 | `modules/game/core/world` | Tọa độ, spawn và world boundary |
 | `modules/account` | Khóa client profile updates và RPC đổi display name có kiểm duyệt |
 
-`InitModule` đăng ký account hooks, match `survival`, match `battle-royale`, RPC `change_display_name`, RPC `find_or_create_match`, matchmaker callback và RPC `healthcheck`.
+`InitModule` đăng ký account hooks, match `survival`, match `battle-royale`, RPC `change_display_name`, `find_or_create_match`, `get_character_inventory`, `set_squad_loadout`, matchmaker callback và RPC `healthcheck`.
 
 Active match registry được tạo một lần tại `InitModule` và dùng chung cho RPC
 matchmaking cùng các Survival và Battle Royale match handler trong cùng process.

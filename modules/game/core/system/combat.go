@@ -29,7 +29,7 @@ func combatEventSnapshot(event corecombat.Event) (*CombatEvent, error) {
 		return &CombatEvent{Event: &CombatEvent_AttackStarted{AttackStarted: &AttackStarted{
 			AttackId: event.AttackID, AttackerUserId: event.AttackerUserID, AttackerCharacterId: event.AttackerCharacterID,
 			TargetUserId: event.TargetUserID, TargetCharacterId: event.TargetCharacterID, WeaponType: string(event.WeaponType),
-			StartTick: event.StartTick, ImpactTick: event.ImpactTick, CompleteTick: event.CompleteTick, WeaponName: event.WeaponName,
+			StartTick: event.StartTick, ImpactTick: event.ImpactTick, CompleteTick: event.CompleteTick, WeaponId: event.WeaponID,
 		}}}, nil
 	case corecombat.EventDamageApplied:
 		return &CombatEvent{Event: &CombatEvent_DamageApplied{DamageApplied: &DamageApplied{
@@ -48,7 +48,7 @@ func combatEventSnapshot(event corecombat.Event) (*CombatEvent, error) {
 			ProjectileId: event.ProjectileID, AttackId: event.AttackID,
 			AttackerUserId: event.AttackerUserID, AttackerCharacterId: event.AttackerCharacterID,
 			TargetUserId: event.TargetUserID, TargetCharacterId: event.TargetCharacterID,
-			WeaponType: string(event.WeaponType), WeaponName: event.WeaponName,
+			WeaponType: string(event.WeaponType), WeaponId: event.WeaponID,
 			Position: vectorSnapshot(event.Position), Direction: vectorSnapshot(event.Direction), Speed: event.Speed, Tick: event.Tick,
 		}}}, nil
 	case corecombat.EventProjectileHit:

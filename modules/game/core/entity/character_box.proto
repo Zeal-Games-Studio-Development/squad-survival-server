@@ -6,4 +6,5 @@ option go_package = "squad-survival-be/modules/game/core/entity;entity";
 
 message CharacterBoxValue {
   string weapon_type = 1;
+  string weapon_id = 2;
 }

@@ -24,6 +24,7 @@ const (
 type CharacterBoxValue struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WeaponType    string                 `protobuf:"bytes,1,opt,name=weapon_type,json=weaponType,proto3" json:"weapon_type,omitempty"`
+	WeaponId      string                 `protobuf:"bytes,2,opt,name=weapon_id,json=weaponId,proto3" json:"weapon_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -65,14 +66,22 @@ func (x *CharacterBoxValue) GetWeaponType() string {
 	return ""
 }
 
+func (x *CharacterBoxValue) GetWeaponId() string {
+	if x != nil {
+		return x.WeaponId
+	}
+	return ""
+}
+
 var File_modules_game_core_entity_character_box_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_entity_character_box_proto_rawDesc = "" +
 	"\n" +
-	",modules/game/core/entity/character_box.proto\x12\x10game.core.entity\"4\n" +
+	",modules/game/core/entity/character_box.proto\x12\x10game.core.entity\"Q\n" +
 	"\x11CharacterBoxValue\x12\x1f\n" +
 	"\vweapon_type\x18\x01 \x01(\tR\n" +
-	"weaponTypeB3Z1squad-survival-be/modules/game/core/entity;entityb\x06proto3"
+	"weaponType\x12\x1b\n" +
+	"\tweapon_id\x18\x02 \x01(\tR\bweaponIdB3Z1squad-survival-be/modules/game/core/entity;entityb\x06proto3"
 
 var (
 	file_modules_game_core_entity_character_box_proto_rawDescOnce sync.Once
