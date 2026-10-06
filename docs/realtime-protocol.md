@@ -33,6 +33,8 @@ Contract nằm trong các source schema:
 
 Không đổi hoặc tái sử dụng field number đã phát hành. Field bị xóa trong tương lai cần được đánh dấu `reserved`.
 
+`CharacterRoster` gửi `crit_chance`, `crit_multiplier`, `damage_reduction`; field `damage_ratio` cũ đã được `reserved`. `DamageApplied` gửi `critical` và lượng máu thực tế bị trừ trong `damage`.
+
 ## Packet Flow
 
 ```mermaid

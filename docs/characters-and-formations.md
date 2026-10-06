@@ -24,7 +24,9 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 | `name` | Stable key để Unity đối chiếu asset/reference |
 | `range_class` | `melee` hoặc `ranged` |
 | `health` | Max health sau khi equip |
-| `damage`, `damage_ratio` | Base damage và độ lệch random |
+| `damage` | Sát thương gốc cố định của mỗi đòn |
+| `crit_chance`, `crit_multiplier` | Xác suất chí mạng và hệ số nhân sát thương gốc |
+| `damage_reduction` | Tỉ lệ giảm sát thương khi nhận đòn, tối đa 60% |
 | `move_speed` | World units mỗi giây |
 | `attack_speed` | Số attack cycle mỗi giây |
 | `attack_range` | Bán kính khóa target |

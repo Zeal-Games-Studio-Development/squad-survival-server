@@ -45,6 +45,7 @@ message DamageApplied {
   double remaining_health = 7;
   int64 tick = 8;
   string projectile_id = 9;
+  bool critical = 10;
 }
 
 message CharacterDied {

@@ -1,6 +1,7 @@
 package entity
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 )
@@ -38,7 +39,7 @@ func TestWeaponReplacesAllCharacterStats(t *testing.T) {
 	weapon := Weapon{
 		Type: WeaponAxe, Name: "axe", RangeClass: RangeMelee, Health: 120, Damage: 15,
 		MoveSpeed: 4, AttackSpeed: 0.8, AttackRange: 2, ImpactRatio: 0.5,
-		RegenRate: 0.5, DamageRatio: 1.2,
+		RegenRate: 0.5, CritChance: 0.14, CritMultiplier: 1.5, DamageReduction: 0.2,
 	}
 	character := NewCharacter()
 	character.ApplyWeapon(weapon)
@@ -51,7 +52,7 @@ func TestWeaponReplacesAllCharacterStats(t *testing.T) {
 	}
 	if character.Health != 120 || character.MaxHealth != 120 || character.Damage != 15 || character.MoveSpeed != 4 ||
 		character.AttackSpeed != 0.8 || character.AttackRange != 2 || character.ImpactRatio != 0.5 ||
-		character.RegenRate != 0.5 || character.DamageRatio != 1.2 {
+		character.RegenRate != 0.5 || character.CritChance != 0.14 || character.CritMultiplier != 1.5 || character.DamageReduction != 0.2 {
 		t.Fatalf("weapon stats were not fully applied: %+v", character)
 	}
 }
@@ -117,5 +118,45 @@ func TestCreateCharacterSelectsWeaponFromCatalog(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("character received unknown weapon: %+v", character.Weapon)
+	}
+}
+
+func TestDefaultWeaponDamageStats(t *testing.T) {
+	want := map[WeaponType]float64{
+		WeaponBow: 0.12, WeaponStaff: 0.12, WeaponSpear: 0.12,
+		WeaponSword: 0.10, WeaponWand: 0.06, WeaponAxe: 0.14, WeaponBlunt: 0.18,
+	}
+	for _, weapon := range DefaultWeaponCatalog() {
+		if weapon.CritChance != want[weapon.Type] || weapon.CritMultiplier != 1.5 || weapon.DamageReduction != 0 {
+			t.Fatalf("unexpected damage stats for %q: %+v", weapon.Type, weapon)
+		}
+	}
+}
+
+func TestWeaponWithoutMultiplierUsesDefault(t *testing.T) {
+	character := NewCharacter()
+	character.ApplyWeapon(Weapon{Damage: 10})
+	if character.CritMultiplier != 1.5 {
+		t.Fatalf("missing multiplier should default to 1.5: %+v", character)
+	}
+}
+
+func TestParseWeaponCatalogValidatesDamageStats(t *testing.T) {
+	for _, test := range []struct {
+		name, field string
+	}{
+		{"negative chance", `"crit_chance":-0.1`},
+		{"chance above one", `"crit_chance":1.1`},
+		{"multiplier below one", `"crit_multiplier":0.9`},
+		{"negative reduction", `"damage_reduction":-0.1`},
+		{"reduction above cap", `"damage_reduction":0.61`},
+		{"negative damage", `"damage":-1`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data := fmt.Sprintf(`{"weapons":[{"type":"sword","name":"sword","range_class":"melee","attack_speed":1,"impact_ratio":0.5,%s}]}`, test.field)
+			if _, err := ParseWeaponCatalog([]byte(data)); err == nil {
+				t.Fatalf("invalid stat accepted: %s", test.field)
+			}
+		})
 	}
 }

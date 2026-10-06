@@ -37,14 +37,15 @@ complete_tick = start_tick + cycle_ticks
 
 ## Damage
 
-Damage được roll tại server:
+Server dùng damage gốc của vũ khí, chỉ roll xác suất chí mạng:
 
 ```text
-spread = damage * (damage_ratio - 1)
-result thuộc [max(0, damage - spread), damage + spread]
+raw_damage = damage * (critical ? crit_multiplier : 1)
+final_damage = raw_damage * (1 - min(damage_reduction, 0.6))
+damage_applied = min(target_health, final_damage)
 ```
 
-Kết quả hiện là `float64`, không làm tròn. Damage intent cùng tick được thu thập trước rồi áp theo thứ tự deterministic, nên hai character có thể hạ nhau trong cùng tick.
+`crit_chance` nằm trong `[0, 1]`; mọi vũ khí hiện có `crit_multiplier = 1.5` và `damage_reduction = 0`. Melee roll chí mạng lúc gây đòn; ranged roll lúc tạo projectile và giữ kết quả đến khi chạm. Giảm sát thương của mục tiêu được đọc lúc trúng đòn. Kết quả là `float64`, không làm tròn; máu không xuống dưới 0. Damage intent cùng tick được thu thập trước rồi áp theo thứ tự deterministic, nên hai character có thể hạ nhau trong cùng tick.
 
 ## Melee
 
@@ -73,6 +74,8 @@ Khi khoảng cách còn lại nhỏ hơn quãng đường của một tick, proj
 
 Opcode `103` phát reliable events: `AttackStarted`, `ProjectileSpawned`, `ProjectileHit`, `ProjectileExpired`, `DamageApplied`, `CharacterDied`.
 
+`DamageApplied.damage` là lượng máu thực tế đã mất sau khi giảm sát thương và giới hạn bởi máu còn lại; `DamageApplied.critical` cho biết đòn có chí mạng.
+
 Opcode `105` chứa projectile đang active để Unity reconcile visual ngay cả khi không còn event spawn trong tick hiện tại. Projectile đã spawn tiếp tục được simulate bằng lookup toàn match và không phụ thuộc candidate set dùng để acquire attack mới.
 
 ## Giới Hạn Hiện Tại
@@ -80,4 +83,4 @@ Opcode `105` chứa projectile đang active để Unity reconcile visual ngay c�
 - Projectile chưa bay theo đường thẳng cố định và target chưa thể né bằng displacement thông thường.
 - Chưa có segment-circle collision, hit radius, collision với character khác hoặc terrain.
 - Chưa có projectile lifetime/max distance.
-- Chưa có armor, critical hit, AoE, line-of-sight hoặc regen processing.
+- Chưa có armor, AoE, line-of-sight hoặc regen processing.

@@ -12,7 +12,9 @@
       "impact_ratio": 0.55,
       "projectile_speed": 12,
       "regen_rate": 0,
-      "damage_ratio": 1.2
+      "crit_chance": 0.12,
+      "crit_multiplier": 1.5,
+      "damage_reduction": 0
     },
     {
       "type": "staff",
@@ -26,7 +28,9 @@
       "impact_ratio": 0.6,
       "projectile_speed": 9,
       "regen_rate": 0.8,
-      "damage_ratio": 1.15
+      "crit_chance": 0.12,
+      "crit_multiplier": 1.5,
+      "damage_reduction": 0
     },
     {
       "type": "spear",
@@ -40,7 +44,9 @@
       "impact_ratio": 0.5,
       "projectile_speed": 0,
       "regen_rate": 0,
-      "damage_ratio": 1.1
+      "crit_chance": 0.12,
+      "crit_multiplier": 1.5,
+      "damage_reduction": 0
     },
     {
       "type": "sword",
@@ -54,7 +60,9 @@
       "impact_ratio": 0.45,
       "projectile_speed": 0,
       "regen_rate": 0.2,
-      "damage_ratio": 1.1
+      "crit_chance": 0.1,
+      "crit_multiplier": 1.5,
+      "damage_reduction": 0
     },
     {
       "type": "wand",
@@ -68,7 +76,9 @@
       "impact_ratio": 0.45,
       "projectile_speed": 11,
       "regen_rate": 1.2,
-      "damage_ratio": 1.25
+      "crit_chance": 0.06,
+      "crit_multiplier": 1.5,
+      "damage_reduction": 0
     },
     {
       "type": "axe",
@@ -82,7 +92,9 @@
       "impact_ratio": 0.6,
       "projectile_speed": 0,
       "regen_rate": 0,
-      "damage_ratio": 1.2
+      "crit_chance": 0.14,
+      "crit_multiplier": 1.5,
+      "damage_reduction": 0
     },
     {
       "type": "blunt",
@@ -96,7 +108,9 @@
       "impact_ratio": 0.65,
       "projectile_speed": 0,
       "regen_rate": 0.4,
-      "damage_ratio": 1.1
+      "crit_chance": 0.18,
+      "crit_multiplier": 1.5,
+      "damage_reduction": 0
     }
   ]
 }

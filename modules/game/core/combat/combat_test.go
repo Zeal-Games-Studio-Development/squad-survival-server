@@ -68,6 +68,45 @@ func TestRangedSpawnsAndHitsWithProjectile(t *testing.T) {
 	}
 }
 
+func TestMeleeCriticalDamageUsesTargetReduction(t *testing.T) {
+	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
+	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 1, 0.5)
+	attacker.Characters[0].AttackSpeed = 10
+	attacker.Characters[0].CritChance = 1
+	target.Characters[0].DamageReduction = 0.6
+	players := playerMap(attacker, target)
+	nearby := allNearby(players)
+	simulation := NewSimulation()
+	random := rand.New(rand.NewSource(1))
+	simulation.Step(players, nearby, 1, random)
+	event := findEvent(simulation.Step(players, nearby, 2, random), EventDamageApplied, "a:1")
+	if event == nil || !event.Critical || event.Damage != 6 || event.RemainingHealth != 94 || target.Characters[0].Health != 94 {
+		t.Fatalf("unexpected melee critical result: %+v", event)
+	}
+}
+
+func TestProjectileRetainsCriticalRollAndUsesReductionAtHit(t *testing.T) {
+	attacker := combatPlayer("a", "a:1", entity.RangeRanged, entity.Vector2{}, 10, 0.5)
+	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 2}, 1, 0.5)
+	attacker.Characters[0].AttackSpeed = 5
+	attacker.Characters[0].Weapon.ProjectileSpeed = 20
+	attacker.Characters[0].CritChance = 1
+	players := playerMap(attacker, target)
+	nearby := allNearby(players)
+	simulation := NewSimulation()
+	random := rand.New(rand.NewSource(1))
+	simulation.Step(players, nearby, 1, random)
+	simulation.Step(players, nearby, 2, random)
+	if projectiles := simulation.Projectiles(); len(projectiles) != 1 || !projectiles[0].Critical || projectiles[0].Damage != 15 {
+		t.Fatalf("projectile did not retain critical roll: %+v", projectiles)
+	}
+	target.Characters[0].DamageReduction = 0.6
+	event := findEvent(simulation.Step(players, nearby, 3, random), EventDamageApplied, "a:1")
+	if event == nil || !event.Critical || event.Damage != 6 || event.RemainingHealth != 94 {
+		t.Fatalf("unexpected projectile critical result: %+v", event)
+	}
+}
+
 func TestProjectileExpiresWhenTargetDiesBeforeHit(t *testing.T) {
 	attacker := combatPlayer("a", "a:1", entity.RangeRanged, entity.Vector2{}, 10, 0.5)
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 8}, 1, 0.5)
@@ -160,7 +199,6 @@ func TestSimultaneousImpactsCanKillBothCharacters(t *testing.T) {
 		character := player.Characters[0]
 		character.Health = 5
 		character.Damage = 10
-		character.DamageRatio = 1
 		character.AttackSpeed = 10
 	}
 	random := rand.New(rand.NewSource(1))
@@ -276,7 +314,7 @@ func combatPlayer(userID, characterID string, rangeClass entity.RangeClass, posi
 		Characters: []*entity.Character{{
 			ID: characterID, RangeClass: rangeClass, Position: position,
 			Health: 100, AttackSpeed: 2, AttackRange: attackRange, ImpactRatio: impactRatio,
-			Damage: 10, DamageRatio: 1, Weapon: entity.Weapon{Type: entity.WeaponSword, Name: "sword"},
+			Damage: 10, CritMultiplier: 1.5, Weapon: entity.Weapon{Type: entity.WeaponSword, Name: "sword"},
 		}},
 	}
 }

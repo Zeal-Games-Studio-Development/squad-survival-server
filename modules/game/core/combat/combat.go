@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 
+	"squad-survival-be/modules/game/core/damage"
 	"squad-survival-be/modules/game/core/entity"
 )
 
@@ -33,6 +34,7 @@ type Event struct {
 	Speed                                     float64
 	StartTick, ImpactTick, CompleteTick, Tick int64
 	Damage, RemainingHealth                   float64
+	Critical                                  bool
 }
 
 type Projectile struct {
@@ -43,6 +45,7 @@ type Projectile struct {
 	WeaponName                          string
 	Position, Direction                 entity.Vector2
 	Speed, Damage                       float64
+	Critical                            bool
 }
 
 type Simulation struct {
@@ -113,7 +116,8 @@ func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[s
 				s.projectiles[projectile.ID] = projectile
 				events = append(events, event)
 			} else {
-				intents = append(intents, newDamageIntent(attacker, target, attackID(character), "", tick, character.RollDamage(random)))
+				amount, critical := damage.RollAttack(character, random)
+				intents = append(intents, newDamageIntent(attacker, target, attackID(character), "", tick, amount, critical))
 			}
 		}
 		if tick >= character.AttackCompleteTick {
@@ -166,7 +170,7 @@ func (s *Simulation) stepProjectiles(lookup map[string]ownedCharacter, tick int6
 				Type: EventDamageApplied, AttackID: projectile.AttackID, ProjectileID: projectile.ID,
 				AttackerUserID: projectile.AttackerUserID, AttackerCharacterID: projectile.AttackerCharacterID,
 				TargetUserID: projectile.TargetUserID, TargetCharacterID: projectile.TargetCharacterID,
-				Tick: tick, Damage: projectile.Damage,
+				Tick: tick, Damage: projectile.Damage, Critical: projectile.Critical,
 			}})
 			delete(s.projectiles, projectile.ID)
 			continue
@@ -181,13 +185,14 @@ func (s *Simulation) stepProjectiles(lookup map[string]ownedCharacter, tick int6
 func (s *Simulation) spawnProjectile(attacker, target ownedCharacter, tick int64, random *rand.Rand) (*Projectile, Event) {
 	character := attacker.character
 	id := attackID(character) + ":projectile"
+	amount, critical := damage.RollAttack(character, random)
 	projectile := &Projectile{
 		ID: id, AttackID: attackID(character),
 		AttackerUserID: attacker.owner.UserID, AttackerCharacterID: character.ID,
 		TargetUserID: target.owner.UserID, TargetCharacterID: target.character.ID,
 		WeaponType: character.Weapon.Type, WeaponName: character.Weapon.Name,
 		Position: character.Position, Speed: character.Weapon.ProjectileSpeed,
-		Damage: character.RollDamage(random),
+		Damage: amount, Critical: critical,
 	}
 	projectile.Direction = directionTo(projectile.Position, target.character.Position)
 	return projectile, projectileEvent(EventProjectileSpawned, projectile, tick)
@@ -203,12 +208,12 @@ func projectileEvent(eventType EventType, projectile *Projectile, tick int64) Ev
 	}
 }
 
-func newDamageIntent(attacker, target ownedCharacter, attackID, projectileID string, tick int64, damage float64) damageIntent {
+func newDamageIntent(attacker, target ownedCharacter, attackID, projectileID string, tick int64, amount float64, critical bool) damageIntent {
 	return damageIntent{target: target.character, event: Event{
 		Type: EventDamageApplied, AttackID: attackID, ProjectileID: projectileID,
 		AttackerUserID: attacker.owner.UserID, AttackerCharacterID: attacker.character.ID,
 		TargetUserID: target.owner.UserID, TargetCharacterID: target.character.ID,
-		Tick: tick, Damage: damage,
+		Tick: tick, Damage: amount, Critical: critical,
 	}}
 }
 
@@ -223,14 +228,14 @@ func sortDamageIntents(intents []damageIntent) {
 
 func applyDamage(intents []damageIntent, tick int64) []Event {
 	events := make([]Event, 0, len(intents)*2)
-	dead := make(map[*entity.Character]bool)
 	for _, intent := range intents {
-		wasAlive := intent.target.Health > 0
-		intent.target.Health -= intent.event.Damage
-		intent.event.RemainingHealth = math.Max(0, intent.target.Health)
+		if intent.target == nil || intent.target.Health <= 0 {
+			continue
+		}
+		var died bool
+		intent.event.Damage, intent.event.RemainingHealth, died = damage.Apply(intent.target, intent.event.Damage)
 		events = append(events, intent.event)
-		if wasAlive && intent.target.Health <= 0 && !dead[intent.target] {
-			dead[intent.target] = true
+		if died {
 			death := intent.event
 			death.Type, death.Tick, death.Damage, death.RemainingHealth = EventCharacterDied, tick, 0, 0
 			events = append(events, death)

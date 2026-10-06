@@ -35,7 +35,8 @@ func TestEncodePlayerRosterBatch(t *testing.T) {
 	if character.CharacterId != source.ID || character.Health != source.Health || character.MaxHealth != source.MaxHealth ||
 		character.Damage != source.Damage || character.MoveSpeed != source.MoveSpeed ||
 		character.AttackSpeed != source.AttackSpeed || character.AttackRange != source.AttackRange ||
-		character.RegenRate != source.RegenRate || character.DamageRatio != source.DamageRatio ||
+		character.RegenRate != source.RegenRate || character.CritChance != source.CritChance ||
+		character.CritMultiplier != source.CritMultiplier || character.DamageReduction != source.DamageReduction ||
 		character.WeaponType != string(source.Weapon.Type) || character.RangeClass != string(source.RangeClass) || character.WeaponName != source.Weapon.Name {
 		t.Fatalf("unexpected character roster: %+v", character)
 	}

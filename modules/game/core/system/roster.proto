@@ -28,9 +28,13 @@ message CharacterRoster {
   double attack_speed = 6;
   double attack_range = 7;
   double regen_rate = 8;
-  double damage_ratio = 9;
+  reserved 9;
+  reserved "damage_ratio";
   string weapon_type = 10;
   string range_class = 11;
   string weapon_name = 12;
   CharacterSkin skin = 13;
+  double crit_chance = 14;
+  double crit_multiplier = 15;
+  double damage_reduction = 16;
 }

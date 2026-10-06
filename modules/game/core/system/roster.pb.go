@@ -150,22 +150,24 @@ func (x *PlayerRoster) GetCharacters() []*CharacterRoster {
 }
 
 type CharacterRoster struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CharacterId   string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
-	Health        float64                `protobuf:"fixed64,2,opt,name=health,proto3" json:"health,omitempty"`
-	MaxHealth     float64                `protobuf:"fixed64,3,opt,name=max_health,json=maxHealth,proto3" json:"max_health,omitempty"`
-	Damage        float64                `protobuf:"fixed64,4,opt,name=damage,proto3" json:"damage,omitempty"`
-	MoveSpeed     float64                `protobuf:"fixed64,5,opt,name=move_speed,json=moveSpeed,proto3" json:"move_speed,omitempty"`
-	AttackSpeed   float64                `protobuf:"fixed64,6,opt,name=attack_speed,json=attackSpeed,proto3" json:"attack_speed,omitempty"`
-	AttackRange   float64                `protobuf:"fixed64,7,opt,name=attack_range,json=attackRange,proto3" json:"attack_range,omitempty"`
-	RegenRate     float64                `protobuf:"fixed64,8,opt,name=regen_rate,json=regenRate,proto3" json:"regen_rate,omitempty"`
-	DamageRatio   float64                `protobuf:"fixed64,9,opt,name=damage_ratio,json=damageRatio,proto3" json:"damage_ratio,omitempty"`
-	WeaponType    string                 `protobuf:"bytes,10,opt,name=weapon_type,json=weaponType,proto3" json:"weapon_type,omitempty"`
-	RangeClass    string                 `protobuf:"bytes,11,opt,name=range_class,json=rangeClass,proto3" json:"range_class,omitempty"`
-	WeaponName    string                 `protobuf:"bytes,12,opt,name=weapon_name,json=weaponName,proto3" json:"weapon_name,omitempty"`
-	Skin          *CharacterSkin         `protobuf:"bytes,13,opt,name=skin,proto3" json:"skin,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	CharacterId     string                 `protobuf:"bytes,1,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
+	Health          float64                `protobuf:"fixed64,2,opt,name=health,proto3" json:"health,omitempty"`
+	MaxHealth       float64                `protobuf:"fixed64,3,opt,name=max_health,json=maxHealth,proto3" json:"max_health,omitempty"`
+	Damage          float64                `protobuf:"fixed64,4,opt,name=damage,proto3" json:"damage,omitempty"`
+	MoveSpeed       float64                `protobuf:"fixed64,5,opt,name=move_speed,json=moveSpeed,proto3" json:"move_speed,omitempty"`
+	AttackSpeed     float64                `protobuf:"fixed64,6,opt,name=attack_speed,json=attackSpeed,proto3" json:"attack_speed,omitempty"`
+	AttackRange     float64                `protobuf:"fixed64,7,opt,name=attack_range,json=attackRange,proto3" json:"attack_range,omitempty"`
+	RegenRate       float64                `protobuf:"fixed64,8,opt,name=regen_rate,json=regenRate,proto3" json:"regen_rate,omitempty"`
+	WeaponType      string                 `protobuf:"bytes,10,opt,name=weapon_type,json=weaponType,proto3" json:"weapon_type,omitempty"`
+	RangeClass      string                 `protobuf:"bytes,11,opt,name=range_class,json=rangeClass,proto3" json:"range_class,omitempty"`
+	WeaponName      string                 `protobuf:"bytes,12,opt,name=weapon_name,json=weaponName,proto3" json:"weapon_name,omitempty"`
+	Skin            *CharacterSkin         `protobuf:"bytes,13,opt,name=skin,proto3" json:"skin,omitempty"`
+	CritChance      float64                `protobuf:"fixed64,14,opt,name=crit_chance,json=critChance,proto3" json:"crit_chance,omitempty"`
+	CritMultiplier  float64                `protobuf:"fixed64,15,opt,name=crit_multiplier,json=critMultiplier,proto3" json:"crit_multiplier,omitempty"`
+	DamageReduction float64                `protobuf:"fixed64,16,opt,name=damage_reduction,json=damageReduction,proto3" json:"damage_reduction,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CharacterRoster) Reset() {
@@ -254,13 +256,6 @@ func (x *CharacterRoster) GetRegenRate() float64 {
 	return 0
 }
 
-func (x *CharacterRoster) GetDamageRatio() float64 {
-	if x != nil {
-		return x.DamageRatio
-	}
-	return 0
-}
-
 func (x *CharacterRoster) GetWeaponType() string {
 	if x != nil {
 		return x.WeaponType
@@ -289,6 +284,27 @@ func (x *CharacterRoster) GetSkin() *CharacterSkin {
 	return nil
 }
 
+func (x *CharacterRoster) GetCritChance() float64 {
+	if x != nil {
+		return x.CritChance
+	}
+	return 0
+}
+
+func (x *CharacterRoster) GetCritMultiplier() float64 {
+	if x != nil {
+		return x.CritMultiplier
+	}
+	return 0
+}
+
+func (x *CharacterRoster) GetDamageReduction() float64 {
+	if x != nil {
+		return x.DamageReduction
+	}
+	return 0
+}
+
 var File_modules_game_core_system_roster_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_roster_proto_rawDesc = "" +
@@ -305,7 +321,7 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\x0eroster_version\x18\x04 \x01(\x04R\rrosterVersion\x12A\n" +
 	"\n" +
 	"characters\x18\x05 \x03(\v2!.game.core.system.CharacterRosterR\n" +
-	"characters\"\xc2\x03\n" +
+	"characters\"\xa8\x04\n" +
 	"\x0fCharacterRoster\x12!\n" +
 	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12\x16\n" +
 	"\x06health\x18\x02 \x01(\x01R\x06health\x12\x1d\n" +
@@ -317,8 +333,7 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\fattack_speed\x18\x06 \x01(\x01R\vattackSpeed\x12!\n" +
 	"\fattack_range\x18\a \x01(\x01R\vattackRange\x12\x1d\n" +
 	"\n" +
-	"regen_rate\x18\b \x01(\x01R\tregenRate\x12!\n" +
-	"\fdamage_ratio\x18\t \x01(\x01R\vdamageRatio\x12\x1f\n" +
+	"regen_rate\x18\b \x01(\x01R\tregenRate\x12\x1f\n" +
 	"\vweapon_type\x18\n" +
 	" \x01(\tR\n" +
 	"weaponType\x12\x1f\n" +
@@ -326,7 +341,12 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"rangeClass\x12\x1f\n" +
 	"\vweapon_name\x18\f \x01(\tR\n" +
 	"weaponName\x123\n" +
-	"\x04skin\x18\r \x01(\v2\x1f.game.core.system.CharacterSkinR\x04skinB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
+	"\x04skin\x18\r \x01(\v2\x1f.game.core.system.CharacterSkinR\x04skin\x12\x1f\n" +
+	"\vcrit_chance\x18\x0e \x01(\x01R\n" +
+	"critChance\x12'\n" +
+	"\x0fcrit_multiplier\x18\x0f \x01(\x01R\x0ecritMultiplier\x12)\n" +
+	"\x10damage_reduction\x18\x10 \x01(\x01R\x0fdamageReductionJ\x04\b\t\x10\n" +
+	"R\fdamage_ratioB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
 
 var (
 	file_modules_game_core_system_roster_proto_rawDescOnce sync.Once

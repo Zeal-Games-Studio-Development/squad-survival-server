@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 )
 
@@ -38,7 +39,9 @@ type Weapon struct {
 	ImpactRatio     float64    `json:"impact_ratio"`
 	ProjectileSpeed float64    `json:"projectile_speed"`
 	RegenRate       float64    `json:"regen_rate"`
-	DamageRatio     float64    `json:"damage_ratio"`
+	CritChance      float64    `json:"crit_chance"`
+	CritMultiplier  float64    `json:"crit_multiplier"`
+	DamageReduction float64    `json:"damage_reduction"`
 }
 
 type WeaponCatalog struct {
@@ -56,7 +59,8 @@ func ParseWeaponCatalog(data []byte) ([]Weapon, error) {
 	if len(catalog.Weapons) == 0 {
 		return nil, errors.New("weapon catalog has no weapons")
 	}
-	for _, weapon := range catalog.Weapons {
+	for index := range catalog.Weapons {
+		weapon := &catalog.Weapons[index]
 		if weapon.Type == "" {
 			return nil, errors.New("weapon type is required")
 		}
@@ -77,6 +81,21 @@ func ParseWeaponCatalog(data []byte) ([]Weapon, error) {
 		}
 		if !isFinite(weapon.ProjectileSpeed) || weapon.ProjectileSpeed < 0 || weapon.RangeClass == RangeRanged && weapon.ProjectileSpeed == 0 {
 			return nil, errors.New("ranged weapon projectile speed must be finite and greater than zero")
+		}
+		if !isFinite(weapon.Damage) || weapon.Damage < 0 {
+			return nil, fmt.Errorf("weapon %q damage must be finite and non-negative", weapon.Type)
+		}
+		if !isFinite(weapon.CritChance) || weapon.CritChance < 0 || weapon.CritChance > 1 {
+			return nil, fmt.Errorf("weapon %q crit chance must be within [0, 1]", weapon.Type)
+		}
+		if weapon.CritMultiplier == 0 {
+			weapon.CritMultiplier = DefaultCritMultiplier
+		}
+		if !isFinite(weapon.CritMultiplier) || weapon.CritMultiplier < 1 {
+			return nil, fmt.Errorf("weapon %q crit multiplier must be at least 1", weapon.Type)
+		}
+		if !isFinite(weapon.DamageReduction) || weapon.DamageReduction < 0 || weapon.DamageReduction > 0.6 {
+			return nil, fmt.Errorf("weapon %q damage reduction must be within [0, 0.6]", weapon.Type)
 		}
 	}
 	return catalog.Weapons, nil

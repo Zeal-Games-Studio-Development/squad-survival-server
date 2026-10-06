@@ -30,8 +30,10 @@ func playerRoster(player *entity.Player) *PlayerRoster {
 			Health:      character.Health, MaxHealth: character.MaxHealth,
 			Damage: character.Damage, MoveSpeed: character.MoveSpeed,
 			AttackSpeed: character.AttackSpeed, AttackRange: character.AttackRange,
-			RegenRate: character.RegenRate, DamageRatio: character.DamageRatio,
-			WeaponType: string(character.Weapon.Type), RangeClass: string(character.RangeClass),
+			RegenRate:  character.RegenRate,
+			CritChance: character.CritChance, CritMultiplier: character.CritMultiplier,
+			DamageReduction: character.DamageReduction,
+			WeaponType:      string(character.Weapon.Type), RangeClass: string(character.RangeClass),
 			WeaponName: character.Weapon.Name,
 			Skin: &CharacterSkin{
 				HairId: int32(character.Skin.HairID), BeardId: int32(character.Skin.BeardID),

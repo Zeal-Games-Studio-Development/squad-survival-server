@@ -36,6 +36,7 @@ func combatEventSnapshot(event corecombat.Event) (*CombatEvent, error) {
 			AttackId: event.AttackID, AttackerUserId: event.AttackerUserID, AttackerCharacterId: event.AttackerCharacterID,
 			TargetUserId: event.TargetUserID, TargetCharacterId: event.TargetCharacterID,
 			Damage: event.Damage, RemainingHealth: event.RemainingHealth, Tick: event.Tick, ProjectileId: event.ProjectileID,
+			Critical: event.Critical,
 		}}}, nil
 	case corecombat.EventCharacterDied:
 		return &CombatEvent{Event: &CombatEvent_CharacterDied{CharacterDied: &CharacterDied{

@@ -19,7 +19,7 @@ func TestEncodeCombatEventBatch(t *testing.T) {
 		{
 			Type: corecombat.EventDamageApplied, AttackID: "a:1:1",
 			AttackerUserID: "a", AttackerCharacterID: "a:1", TargetUserID: "b", TargetCharacterID: "b:1",
-			Damage: 11, RemainingHealth: 89, Tick: 12,
+			Damage: 11, RemainingHealth: 89, Tick: 12, Critical: true,
 		},
 		{
 			Type: corecombat.EventCharacterDied, AttackID: "a:1:1",
@@ -41,7 +41,7 @@ func TestEncodeCombatEventBatch(t *testing.T) {
 	if started := batch.Events[0].GetAttackStarted(); started == nil || started.AttackId != "a:1:1" || started.ImpactTick != 12 {
 		t.Fatalf("unexpected attack started event: %+v", started)
 	}
-	if damage := batch.Events[1].GetDamageApplied(); damage == nil || damage.Damage != 11 || damage.RemainingHealth != 89 {
+	if damage := batch.Events[1].GetDamageApplied(); damage == nil || damage.Damage != 11 || damage.RemainingHealth != 89 || !damage.Critical {
 		t.Fatalf("unexpected damage event: %+v", damage)
 	}
 	if died := batch.Events[2].GetCharacterDied(); died == nil || died.KillerCharacterId != "a:1" || died.TargetCharacterId != "b:1" {

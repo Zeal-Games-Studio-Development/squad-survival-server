@@ -346,6 +346,7 @@ type DamageApplied struct {
 	RemainingHealth     float64                `protobuf:"fixed64,7,opt,name=remaining_health,json=remainingHealth,proto3" json:"remaining_health,omitempty"`
 	Tick                int64                  `protobuf:"varint,8,opt,name=tick,proto3" json:"tick,omitempty"`
 	ProjectileId        string                 `protobuf:"bytes,9,opt,name=projectile_id,json=projectileId,proto3" json:"projectile_id,omitempty"`
+	Critical            bool                   `protobuf:"varint,10,opt,name=critical,proto3" json:"critical,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -441,6 +442,13 @@ func (x *DamageApplied) GetProjectileId() string {
 		return x.ProjectileId
 	}
 	return ""
+}
+
+func (x *DamageApplied) GetCritical() bool {
+	if x != nil {
+		return x.Critical
+	}
+	return false
 }
 
 type CharacterDied struct {
@@ -898,7 +906,7 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\rcomplete_tick\x18\t \x01(\x03R\fcompleteTick\x12\x1f\n" +
 	"\vweapon_name\x18\n" +
 	" \x01(\tR\n" +
-	"weaponName\"\xdc\x02\n" +
+	"weaponName\"\xf8\x02\n" +
 	"\rDamageApplied\x12\x1b\n" +
 	"\tattack_id\x18\x01 \x01(\tR\battackId\x12(\n" +
 	"\x10attacker_user_id\x18\x02 \x01(\tR\x0eattackerUserId\x122\n" +
@@ -908,7 +916,9 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\x06damage\x18\x06 \x01(\x01R\x06damage\x12)\n" +
 	"\x10remaining_health\x18\a \x01(\x01R\x0fremainingHealth\x12\x12\n" +
 	"\x04tick\x18\b \x01(\x03R\x04tick\x12#\n" +
-	"\rprojectile_id\x18\t \x01(\tR\fprojectileId\"\x91\x02\n" +
+	"\rprojectile_id\x18\t \x01(\tR\fprojectileId\x12\x1a\n" +
+	"\bcritical\x18\n" +
+	" \x01(\bR\bcritical\"\x91\x02\n" +
 	"\rCharacterDied\x12\x1b\n" +
 	"\tattack_id\x18\x01 \x01(\tR\battackId\x12$\n" +
 	"\x0ekiller_user_id\x18\x02 \x01(\tR\fkillerUserId\x12.\n" +
