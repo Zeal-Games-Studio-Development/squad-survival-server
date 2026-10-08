@@ -18,6 +18,7 @@ import (
 	"squad-survival-be/modules/game/core/spatial"
 	"squad-survival-be/modules/game/core/system"
 	"squad-survival-be/modules/game/core/world"
+	"squad-survival-be/modules/game/inventory"
 	"squad-survival-be/modules/game/matchregistry"
 
 	"github.com/heroiclabs/nakama-common/api"
@@ -44,7 +45,8 @@ const (
 )
 
 type Match struct {
-	registry *matchregistry.Registry
+	registry  *matchregistry.Registry
+	inventory *inventory.Service
 }
 
 type Phase string
@@ -91,9 +93,13 @@ type Label struct {
 	Joinable    bool   `json:"joinable"`
 }
 
-func NewMatchHandler(registry *matchregistry.Registry) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule) (runtime.Match, error) {
+func NewMatchHandler(registry *matchregistry.Registry, inventoryService ...*inventory.Service) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule) (runtime.Match, error) {
 	return func(_ context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule) (runtime.Match, error) {
-		return &Match{registry: registry}, nil
+		match := &Match{registry: registry}
+		if len(inventoryService) > 0 {
+			match.inventory = inventoryService[0]
+		}
+		return match, nil
 	}
 }
 
@@ -138,7 +144,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 	return state, tickRate, state.label()
 }
 
-func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, _ runtime.MatchDispatcher, tick int64, rawState interface{}, presence runtime.Presence, _ map[string]string) (interface{}, bool, string) {
+func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, _ runtime.MatchDispatcher, tick int64, rawState interface{}, presence runtime.Presence, _ map[string]string) (interface{}, bool, string) {
 	state := rawState.(*State)
 	state.expireReservations(tick)
 
@@ -153,6 +159,11 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 	}
 	if state.occupiedSlots() >= MaxPlayers {
 		return state, false, "match is full"
+	}
+	if m.inventory != nil {
+		if _, err := m.inventory.Load(ctx, nk, presence.GetUserId()); err != nil {
+			return state, false, "invalid squad loadout"
+		}
 	}
 
 	state.Reservations[presence.GetSessionId()] = tick + reservationTTLSeconds*tickRate
@@ -172,6 +183,26 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		if _, exists := state.Players[presence.GetSessionId()]; exists {
 			continue
 		}
+		// Load the player's squad loadout from storage to determine their starting weapon.
+		var starter entity.Weapon
+		var loadout map[string]string
+		if m.inventory != nil {
+			snapshot, loadErr := m.inventory.Load(ctx, nk, presence.GetUserId())
+			if loadErr == nil {
+				starter, loadErr = m.inventory.Starter(snapshot, state.random)
+				loadout = snapshot.SquadLoadout
+			}
+			if loadErr != nil {
+				if logger != nil {
+					logger.Error("Could not load squad loadout: user_id=%s error=%v", presence.GetUserId(), loadErr)
+				}
+				if kickErr := dispatcher.MatchKick([]runtime.Presence{presence}); kickErr != nil && logger != nil {
+					logger.Error("Could not kick presence with invalid loadout: %v", kickErr)
+				}
+				continue
+			}
+		}
+		// Register the player in the match registry to prevent duplicate presences.
 		if state.MatchID != "" && !m.registry.Add(presence.GetUserId(), presence.GetSessionId(), state.MatchID) {
 			if logger != nil {
 				logger.Error("Could not register active match membership: user_id=%s session_id=%s match_id=%s", presence.GetUserId(), presence.GetSessionId(), state.MatchID)
@@ -181,13 +212,14 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 			}
 			continue
 		}
-		player := entity.NewPlayer(
-			presence.GetUserId(),
-			presence.GetSessionId(),
-			displayNames[presence.GetUserId()],
-			state.randomPlayerSpawn(),
-			state.random,
-		)
+		position := state.randomPlayerSpawn()
+		var player *entity.Player
+		if m.inventory != nil {
+			player = entity.NewPlayerWithWeapon(presence.GetUserId(), presence.GetSessionId(), displayNames[presence.GetUserId()], position, starter)
+			player.SetSquadLoadout(loadout)
+		} else {
+			player = entity.NewPlayer(presence.GetUserId(), presence.GetSessionId(), displayNames[presence.GetUserId()], position, state.random)
+		}
 		if err = state.SpatialGrid.Insert(player); err != nil {
 			m.registry.RemoveSession(presence.GetSessionId())
 			if logger != nil {
@@ -545,6 +577,14 @@ func (s *State) spawnCharacterBoxes(target int) []system.CharacterBoxEvent {
 	if target <= len(s.CharacterBoxes) || len(s.WeaponCatalog) == 0 {
 		return nil
 	}
+	weaponTypes := make([]entity.WeaponType, 0, len(s.WeaponCatalog))
+	seenTypes := make(map[entity.WeaponType]bool, len(s.WeaponCatalog))
+	for _, weapon := range s.WeaponCatalog {
+		if !seenTypes[weapon.Type] {
+			weaponTypes = append(weaponTypes, weapon.Type)
+			seenTypes[weapon.Type] = true
+		}
+	}
 	events := make([]system.CharacterBoxEvent, 0, target-len(s.CharacterBoxes))
 	for len(s.CharacterBoxes) < target {
 		position, ok := s.randomCharacterBoxSpawn()
@@ -552,8 +592,8 @@ func (s *State) spawnCharacterBoxes(target int) []system.CharacterBoxEvent {
 			break
 		}
 		s.NextCharacterBoxID++
-		weapon := s.WeaponCatalog[s.random.Intn(len(s.WeaponCatalog))]
-		box := entity.NewCharacterBox("box:"+strconv.FormatUint(s.NextCharacterBoxID, 10), position, weapon.Type)
+		weaponType := weaponTypes[s.random.Intn(len(weaponTypes))]
+		box := entity.NewCharacterBox("box:"+strconv.FormatUint(s.NextCharacterBoxID, 10), position, weaponType)
 		if err := s.SpatialGrid.InsertCharacterBox(box); err != nil {
 			continue
 		}
@@ -633,10 +673,10 @@ func (s *State) collectCharacterBoxes(tick int64, logger runtime.Logger) []syste
 		if tick < claim.CompletesAtTick {
 			continue
 		}
-		weapon, ok := s.weaponByType(box.WeaponType())
+		weapon, ok := s.weaponForBox(player, box)
 		if !ok {
 			if logger != nil {
-				logger.Error("Character box has unknown weapon: box_id=%s weapon_type=%s", box.ID, box.WeaponType())
+				logger.Error("Character box has no loadout weapon: box_id=%s user_id=%s weapon_type=%s", box.ID, player.UserID, box.WeaponType())
 			}
 			events = append(events, s.cancelBoxClaim(boxID)...)
 			continue
@@ -729,13 +769,21 @@ func (s *State) cancelAllBoxClaims() []system.CharacterBoxEvent {
 	return events
 }
 
-func (s *State) weaponByType(weaponType entity.WeaponType) (entity.Weapon, bool) {
+func (s *State) weaponByID(weaponID string) (entity.Weapon, bool) {
 	for _, weapon := range s.WeaponCatalog {
-		if weapon.Type == weaponType {
+		if weapon.ID == weaponID {
 			return weapon, true
 		}
 	}
 	return entity.Weapon{}, false
+}
+
+func (s *State) weaponForBox(player *entity.Player, box *entity.CharacterBox) (entity.Weapon, bool) {
+	if player == nil || box == nil {
+		return entity.Weapon{}, false
+	}
+	weapon, ok := s.weaponByID(player.SquadLoadout[box.WeaponType()])
+	return weapon, ok && weapon.Type == box.WeaponType()
 }
 
 func (s *State) sendCurrentCharacterBoxes(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, presence runtime.Presence) {

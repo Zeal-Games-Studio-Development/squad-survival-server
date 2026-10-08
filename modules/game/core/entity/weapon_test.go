@@ -3,20 +3,21 @@ package entity
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 )
 
 func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	weapons := DefaultWeaponCatalog()
-	if len(weapons) != 7 {
-		t.Fatalf("expected 7 weapons, got %d", len(weapons))
+	if len(weapons) != 8 {
+		t.Fatalf("expected 8 weapons, got %d", len(weapons))
 	}
 
 	found := make(map[WeaponType]bool, len(weapons))
 	for _, weapon := range weapons {
 		found[weapon.Type] = true
-		if weapon.Name == "" {
-			t.Fatalf("weapon %q has no name", weapon.Type)
+		if weapon.ID == "" {
+			t.Fatalf("weapon %q has no id", weapon.Type)
 		}
 		if !weapon.RangeClass.Valid() {
 			t.Fatalf("weapon %q has invalid range class %q", weapon.Type, weapon.RangeClass)
@@ -27,7 +28,7 @@ func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	}
 	for _, weaponType := range []WeaponType{
 		WeaponBow, WeaponStaff, WeaponSpear,
-		WeaponSword, WeaponWand, WeaponAxe, WeaponBlunt,
+		WeaponSword, WeaponWand, WeaponAxe, WeaponBlunt, WeaponCrossbow,
 	} {
 		if !found[weaponType] {
 			t.Fatalf("missing weapon type %q", weaponType)
@@ -35,9 +36,16 @@ func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	}
 }
 
+func TestParseWeaponCatalogRejectsDuplicateWeaponID(t *testing.T) {
+	data := []byte(`{"weapons":[{"type":"bow","weapon_id":"same","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10},{"type":"crossbow","weapon_id":"same","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)
+	if _, err := ParseWeaponCatalog(data); err == nil || !strings.Contains(err.Error(), "duplicate weapon id") {
+		t.Fatalf("expected duplicate weapon id error, got %v", err)
+	}
+}
+
 func TestWeaponReplacesAllCharacterStats(t *testing.T) {
 	weapon := Weapon{
-		Type: WeaponAxe, Name: "axe", RangeClass: RangeMelee, Health: 120, Damage: 15,
+		Type: WeaponAxe, ID: "axe", RangeClass: RangeMelee, Health: 120, Damage: 15,
 		MoveSpeed: 4, AttackSpeed: 0.8, AttackRange: 2, ImpactRatio: 0.5,
 		RegenRate: 0.5, CritChance: 0.14, CritMultiplier: 1.5, DamageReduction: 0.2,
 	}
@@ -124,7 +132,7 @@ func TestCreateCharacterSelectsWeaponFromCatalog(t *testing.T) {
 func TestDefaultWeaponDamageStats(t *testing.T) {
 	want := map[WeaponType]float64{
 		WeaponBow: 0.12, WeaponStaff: 0.12, WeaponSpear: 0.12,
-		WeaponSword: 0.10, WeaponWand: 0.06, WeaponAxe: 0.14, WeaponBlunt: 0.18,
+		WeaponSword: 0.10, WeaponWand: 0.06, WeaponAxe: 0.14, WeaponBlunt: 0.18, WeaponCrossbow: 0.12,
 	}
 	for _, weapon := range DefaultWeaponCatalog() {
 		if weapon.CritChance != want[weapon.Type] || weapon.CritMultiplier != 1.5 || weapon.DamageReduction != 0 {

@@ -32,7 +32,7 @@ message AttackStarted {
   int64 start_tick = 7;
   int64 impact_tick = 8;
   int64 complete_tick = 9;
-  string weapon_name = 10;
+  string weapon_id = 10;
 }
 
 message DamageApplied {
@@ -66,7 +66,7 @@ message ProjectileSpawned {
   string target_user_id = 5;
   string target_character_id = 6;
   string weapon_type = 7;
-  string weapon_name = 8;
+  string weapon_id = 8;
   Vector2 position = 9;
   Vector2 direction = 10;
   double speed = 11;

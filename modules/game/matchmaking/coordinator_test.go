@@ -5,10 +5,44 @@ import (
 	"encoding/json"
 	"testing"
 
+	"squad-survival-be/modules/game/inventory"
 	"squad-survival-be/modules/game/matchregistry"
 
+	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
 )
+
+type inventoryModule struct{ runtime.NakamaModule }
+
+func (inventoryModule) StorageRead(_ context.Context, _ []*runtime.StorageRead) ([]*api.StorageObject, error) {
+	return nil, nil
+}
+
+type matchmakerEntry struct {
+	runtime.MatchmakerEntry
+	presence runtime.Presence
+}
+
+func (e matchmakerEntry) GetPresence() runtime.Presence { return e.presence }
+
+type matchmakerPresence struct {
+	runtime.Presence
+	userID string
+}
+
+func (p matchmakerPresence) GetUserId() string { return p.userID }
+
+func TestInventoryGatesBothMatchmakingPaths(t *testing.T) {
+	service := inventory.DefaultService()
+	ctx := context.WithValue(context.Background(), runtime.RUNTIME_CTX_USER_ID, "user-1")
+	if _, err := findOrCreateRPC(ctx, nil, nil, inventoryModule{}, "", matchregistry.New(), service); err == nil {
+		t.Fatal("RPC accepted missing inventory")
+	}
+	entry := matchmakerEntry{presence: matchmakerPresence{userID: "user-1"}}
+	if _, err := matched(context.Background(), nil, inventoryModule{}, []runtime.MatchmakerEntry{entry}, service); err == nil {
+		t.Fatal("matchmaker accepted missing inventory")
+	}
+}
 
 func TestMatchQueryUsesNakamaBooleanToken(t *testing.T) {
 	query := matchQuery(Request{Mode: "survival"})

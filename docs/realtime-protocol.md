@@ -34,6 +34,8 @@ Không đổi hoặc tái sử dụng field number đã phát hành. Field bị 
 
 `CharacterRoster` gửi `crit_chance`, `crit_multiplier`, `damage_reduction`; field `damage_ratio` cũ đã được `reserved`. `DamageApplied` gửi `critical` và lượng máu thực tế bị trừ trong `damage`.
 
+`CharacterRoster`, `AttackStarted` và `ProjectileSpawned` dùng `weapon_id` thay cho `weapon_name` tại cùng field number protobuf. `CharacterBoxValue` chỉ gửi `weapon_type` ở field 1; `weapon_id` được chọn theo loadout của người nhặt và xuất hiện trong roster của character mới. Client cần regenerate protobuf; client cũ có thể đọc ID thành `weapon_name`.
+
 ## Packet Flow
 
 ```mermaid
@@ -129,7 +131,7 @@ Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf ho�
 
 ## JSON Còn Được Dùng Ở Đâu
 
-- RPC `find_or_create_match` request/response.
+- RPC `find_or_create_match`, `get_character_inventory`, `set_squad_loadout` request/response. `set_squad_loadout` nhận `{ "squad_loadout": { "bow": "bow", ... }, "version": "..." }`; cả hai RPC inventory trả `weapon_ids`, `squad_loadout` và `version`.
 - Match label cho `MatchList` query.
 - Embedded `weapons.json`, `strategies.json` và `pickup_delays.json`.
 - RPC `healthcheck` response.

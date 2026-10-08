@@ -2,6 +2,7 @@ package survival
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"sort"
@@ -15,12 +16,72 @@ import (
 	"squad-survival-be/modules/game/core/spatial"
 	"squad-survival-be/modules/game/core/strategy"
 	"squad-survival-be/modules/game/core/system"
+	"squad-survival-be/modules/game/inventory"
 	"squad-survival-be/modules/game/matchregistry"
 
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"google.golang.org/protobuf/proto"
 )
+
+type inventoryTestModule struct {
+	runtime.NakamaModule
+	value string
+}
+
+func (m inventoryTestModule) StorageRead(_ context.Context, _ []*runtime.StorageRead) ([]*api.StorageObject, error) {
+	if m.value == "" {
+		return nil, nil
+	}
+	return []*api.StorageObject{{Value: m.value, Version: "v1"}}, nil
+}
+
+func (m inventoryTestModule) UsersGetId(_ context.Context, _ []string, _ []string) ([]*api.User, error) {
+	return nil, nil
+}
+
+func TestInventoryGatesJoinAndProvidesStarter(t *testing.T) {
+	service := inventory.DefaultService()
+	match := &Match{inventory: service}
+	presence := testPresence{userID: "user-1", sessionID: "session-1"}
+	state := &State{AllowJoinInProgress: true, Players: make(map[string]*entity.Player), Presences: make(map[string]runtime.Presence), Reservations: make(map[string]int64), SpatialGrid: spatial.NewGrid(spatialCellSize), random: rand.New(rand.NewSource(1))}
+	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, inventoryTestModule{}, nil, 0, state, presence, nil); allowed || reason != "invalid squad loadout" {
+		t.Fatalf("missing inventory accepted: %v %s", allowed, reason)
+	}
+	data, err := service.InitialData()
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := json.Marshal(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	module := inventoryTestModule{value: string(value)}
+	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, module, nil, 0, state, presence, nil); !allowed || reason != "" {
+		t.Fatalf("valid inventory rejected: %v %s", allowed, reason)
+	}
+	match.MatchJoin(context.Background(), nil, nil, module, &testDispatcher{}, 0, state, []runtime.Presence{presence})
+	player := state.Players[presence.sessionID]
+	if player == nil || len(player.Characters) != 1 {
+		t.Fatalf("player did not join with one character: %+v", player)
+	}
+	weapon := player.Characters[0].Weapon
+	if data.SquadLoadout[string(weapon.Type)] != weapon.ID {
+		t.Fatalf("starter not selected from loadout: %+v", weapon)
+	}
+}
+
+func TestCharacterBoxResolvesWeaponVariantByID(t *testing.T) {
+	weapons := entity.DefaultWeaponCatalog()
+	variant := weapons[0]
+	variant.ID = "bow_rare"
+	variant.Damage = 99
+	state := &State{WeaponCatalog: append(weapons, variant)}
+	selected, ok := state.weaponByID("bow_rare")
+	if !ok || selected.Damage != 99 || selected.Type != entity.WeaponBow {
+		t.Fatalf("wrong weapon variant selected: %+v", selected)
+	}
+}
 
 func TestJoinAttemptReservesAndExpiresSlot(t *testing.T) {
 	match := &Match{}
@@ -686,8 +747,15 @@ func TestCharacterBoxInitialSpawnIsValid(t *testing.T) {
 			t.Fatalf("invalid character box: %#v", box)
 		}
 		seen[id] = true
-		if _, ok := state.weaponByType(box.WeaponType()); !ok {
-			t.Fatalf("box has unknown weapon: %#v", box)
+		known := false
+		for _, weapon := range state.WeaponCatalog {
+			if weapon.Type == box.WeaponType() {
+				known = true
+				break
+			}
+		}
+		if !known {
+			t.Fatalf("box has unknown weapon type: %#v", box)
 		}
 		boxes = append(boxes, box)
 	}
@@ -706,9 +774,17 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 	near := entity.NewPlayer("user-near", "session-near", "Near", entity.Vector2{X: 0.2}, rand.New(rand.NewSource(3)))
 	far.Level = 2
 	near.Level = 2
+	variant := state.WeaponCatalog[0]
+	variant.ID = "bow_rare"
+	variant.Damage = 99
+	state.WeaponCatalog = append(state.WeaponCatalog, variant)
+	near.SquadLoadout[entity.WeaponBow] = variant.ID
 	state.Players[far.SessionID] = far
 	state.Players[near.SessionID] = near
 	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
+	if farWeapon, ok := state.weaponForBox(far, box); !ok || farWeapon.ID != "bow" {
+		t.Fatalf("far player's bow loadout was not used: %+v", farWeapon)
+	}
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
@@ -729,8 +805,7 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 		t.Fatalf("wrong player received box: far=%d near=%d version=%d", len(far.Characters), len(near.Characters), near.RosterVersion)
 	}
 	awarded := near.Characters[len(near.Characters)-1]
-	weapon, _ := state.weaponByType(entity.WeaponBow)
-	if awarded.Weapon.Type != entity.WeaponBow || awarded.MaxHealth != weapon.Health || awarded.Damage != weapon.Damage {
+	if awarded.Weapon.Type != entity.WeaponBow || awarded.Weapon.ID != variant.ID || awarded.MaxHealth != variant.Health || awarded.Damage != variant.Damage {
 		t.Fatalf("character did not receive weapon stats: %#v", awarded)
 	}
 	if _, exists := state.CharacterBoxes[box.ID]; exists || len(state.SpatialGrid.QueryCharacterBoxes(entity.Vector2{}, 1)) != 0 {

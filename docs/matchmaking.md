@@ -30,6 +30,8 @@ Nếu user đã join một authoritative match, RPC trả lại chính `match_id
 
 `mode` mặc định là `survival` và chỉ nhận 1-32 ký tự chữ, số, `_` hoặc `-`.
 
+Server chỉ tìm/tạo match khi tài khoản có `squad_loadout` hợp lệ với đủ tám weapon type. Callback matchmaker kiểm tra từng thành viên trước khi trả match ID; `MatchJoinAttempt` và lúc tạo player kiểm tra lại để chặn join trực tiếp hoặc dữ liệu đã thay đổi. RPC vẫn trả match đang tham gia với `already_joined=true` mà không tìm match mới.
+
 ## Find Or Create
 
 Khi cho phép join in progress, coordinator tìm tối đa 20 authoritative match có label phù hợp, còn đủ slot và `joinable=true`. Danh sách được sắp theo size giảm dần để backfill match đông nhất trước.

@@ -230,7 +230,7 @@ type AttackStarted struct {
 	StartTick           int64                  `protobuf:"varint,7,opt,name=start_tick,json=startTick,proto3" json:"start_tick,omitempty"`
 	ImpactTick          int64                  `protobuf:"varint,8,opt,name=impact_tick,json=impactTick,proto3" json:"impact_tick,omitempty"`
 	CompleteTick        int64                  `protobuf:"varint,9,opt,name=complete_tick,json=completeTick,proto3" json:"complete_tick,omitempty"`
-	WeaponName          string                 `protobuf:"bytes,10,opt,name=weapon_name,json=weaponName,proto3" json:"weapon_name,omitempty"`
+	WeaponId            string                 `protobuf:"bytes,10,opt,name=weapon_id,json=weaponId,proto3" json:"weapon_id,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -328,9 +328,9 @@ func (x *AttackStarted) GetCompleteTick() int64 {
 	return 0
 }
 
-func (x *AttackStarted) GetWeaponName() string {
+func (x *AttackStarted) GetWeaponId() string {
 	if x != nil {
-		return x.WeaponName
+		return x.WeaponId
 	}
 	return ""
 }
@@ -552,7 +552,7 @@ type ProjectileSpawned struct {
 	TargetUserId        string                 `protobuf:"bytes,5,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
 	TargetCharacterId   string                 `protobuf:"bytes,6,opt,name=target_character_id,json=targetCharacterId,proto3" json:"target_character_id,omitempty"`
 	WeaponType          string                 `protobuf:"bytes,7,opt,name=weapon_type,json=weaponType,proto3" json:"weapon_type,omitempty"`
-	WeaponName          string                 `protobuf:"bytes,8,opt,name=weapon_name,json=weaponName,proto3" json:"weapon_name,omitempty"`
+	WeaponId            string                 `protobuf:"bytes,8,opt,name=weapon_id,json=weaponId,proto3" json:"weapon_id,omitempty"`
 	Position            *Vector2               `protobuf:"bytes,9,opt,name=position,proto3" json:"position,omitempty"`
 	Direction           *Vector2               `protobuf:"bytes,10,opt,name=direction,proto3" json:"direction,omitempty"`
 	Speed               float64                `protobuf:"fixed64,11,opt,name=speed,proto3" json:"speed,omitempty"`
@@ -640,9 +640,9 @@ func (x *ProjectileSpawned) GetWeaponType() string {
 	return ""
 }
 
-func (x *ProjectileSpawned) GetWeaponName() string {
+func (x *ProjectileSpawned) GetWeaponId() string {
 	if x != nil {
-		return x.WeaponName
+		return x.WeaponId
 	}
 	return ""
 }
@@ -890,7 +890,7 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\x12projectile_spawned\x18\x04 \x01(\v2#.game.core.system.ProjectileSpawnedH\x00R\x11projectileSpawned\x12H\n" +
 	"\x0eprojectile_hit\x18\x05 \x01(\v2\x1f.game.core.system.ProjectileHitH\x00R\rprojectileHit\x12T\n" +
 	"\x12projectile_expired\x18\x06 \x01(\v2#.game.core.system.ProjectileExpiredH\x00R\x11projectileExpiredB\a\n" +
-	"\x05event\"\x87\x03\n" +
+	"\x05event\"\x83\x03\n" +
 	"\rAttackStarted\x12\x1b\n" +
 	"\tattack_id\x18\x01 \x01(\tR\battackId\x12(\n" +
 	"\x10attacker_user_id\x18\x02 \x01(\tR\x0eattackerUserId\x122\n" +
@@ -903,10 +903,9 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"start_tick\x18\a \x01(\x03R\tstartTick\x12\x1f\n" +
 	"\vimpact_tick\x18\b \x01(\x03R\n" +
 	"impactTick\x12#\n" +
-	"\rcomplete_tick\x18\t \x01(\x03R\fcompleteTick\x12\x1f\n" +
-	"\vweapon_name\x18\n" +
-	" \x01(\tR\n" +
-	"weaponName\"\xf8\x02\n" +
+	"\rcomplete_tick\x18\t \x01(\x03R\fcompleteTick\x12\x1b\n" +
+	"\tweapon_id\x18\n" +
+	" \x01(\tR\bweaponId\"\xf8\x02\n" +
 	"\rDamageApplied\x12\x1b\n" +
 	"\tattack_id\x18\x01 \x01(\tR\battackId\x12(\n" +
 	"\x10attacker_user_id\x18\x02 \x01(\tR\x0eattackerUserId\x122\n" +
@@ -926,7 +925,7 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12.\n" +
 	"\x13target_character_id\x18\x05 \x01(\tR\x11targetCharacterId\x12\x12\n" +
 	"\x04tick\x18\x06 \x01(\x03R\x04tick\x12#\n" +
-	"\rprojectile_id\x18\a \x01(\tR\fprojectileId\"\xe5\x03\n" +
+	"\rprojectile_id\x18\a \x01(\tR\fprojectileId\"\xe1\x03\n" +
 	"\x11ProjectileSpawned\x12#\n" +
 	"\rprojectile_id\x18\x01 \x01(\tR\fprojectileId\x12\x1b\n" +
 	"\tattack_id\x18\x02 \x01(\tR\battackId\x12(\n" +
@@ -935,9 +934,8 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\x0etarget_user_id\x18\x05 \x01(\tR\ftargetUserId\x12.\n" +
 	"\x13target_character_id\x18\x06 \x01(\tR\x11targetCharacterId\x12\x1f\n" +
 	"\vweapon_type\x18\a \x01(\tR\n" +
-	"weaponType\x12\x1f\n" +
-	"\vweapon_name\x18\b \x01(\tR\n" +
-	"weaponName\x125\n" +
+	"weaponType\x12\x1b\n" +
+	"\tweapon_id\x18\b \x01(\tR\bweaponId\x125\n" +
 	"\bposition\x18\t \x01(\v2\x19.game.core.system.Vector2R\bposition\x127\n" +
 	"\tdirection\x18\n" +
 	" \x01(\v2\x19.game.core.system.Vector2R\tdirection\x12\x14\n" +

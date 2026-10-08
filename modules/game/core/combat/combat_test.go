@@ -42,7 +42,7 @@ func TestRangedSpawnsAndHitsWithProjectile(t *testing.T) {
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 2}, 1, 0.5)
 	attacker.Characters[0].AttackSpeed = 5
 	attacker.Characters[0].Weapon.ProjectileSpeed = 20
-	attacker.Characters[0].Weapon.Name = "bow"
+	attacker.Characters[0].Weapon.ID = "bow"
 	attacker.Characters[0].Weapon.Type = entity.WeaponBow
 	random := rand.New(rand.NewSource(1))
 	players := playerMap(attacker, target)
@@ -111,7 +111,7 @@ func TestProjectileExpiresWhenTargetDiesBeforeHit(t *testing.T) {
 	attacker := combatPlayer("a", "a:1", entity.RangeRanged, entity.Vector2{}, 10, 0.5)
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 8}, 1, 0.5)
 	attacker.Characters[0].AttackSpeed = 5
-	attacker.Characters[0].Weapon = entity.Weapon{Type: entity.WeaponBow, Name: "bow", ProjectileSpeed: 10}
+	attacker.Characters[0].Weapon = entity.Weapon{Type: entity.WeaponBow, ID: "bow", ProjectileSpeed: 10}
 	random := rand.New(rand.NewSource(1))
 	players := playerMap(attacker, target)
 	simulation := NewSimulation()
@@ -293,7 +293,7 @@ func TestProjectileContinuesAfterTargetLeavesCandidateSet(t *testing.T) {
 	attacker := combatPlayer("a", "a:1", entity.RangeRanged, entity.Vector2{}, 10, 0.5)
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 2}, 1, 0.5)
 	attacker.Characters[0].AttackSpeed = 5
-	attacker.Characters[0].Weapon = entity.Weapon{Type: entity.WeaponBow, Name: "bow", ProjectileSpeed: 20}
+	attacker.Characters[0].Weapon = entity.Weapon{Type: entity.WeaponBow, ID: "bow", ProjectileSpeed: 20}
 	players := playerMap(attacker, target)
 	nearby := allNearby(players)
 	simulation := NewSimulation()
@@ -314,7 +314,7 @@ func combatPlayer(userID, characterID string, rangeClass entity.RangeClass, posi
 		Characters: []*entity.Character{{
 			ID: characterID, RangeClass: rangeClass, Position: position,
 			Health: 100, AttackSpeed: 2, AttackRange: attackRange, ImpactRatio: impactRatio,
-			Damage: 10, CritMultiplier: 1.5, Weapon: entity.Weapon{Type: entity.WeaponSword, Name: "sword"},
+			Damage: 10, CritMultiplier: 1.5, Weapon: entity.Weapon{Type: entity.WeaponSword, ID: "sword"},
 		}},
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"sort"
 	"sync"
 
+	"squad-survival-be/modules/game/inventory"
 	"squad-survival-be/modules/game/matchregistry"
 	"squad-survival-be/modules/game/royale"
 	"squad-survival-be/modules/game/survival"
@@ -33,13 +34,17 @@ type Response struct {
 	AlreadyJoined bool   `json:"already_joined"`
 }
 
-func NewFindOrCreateRPC(registry *matchregistry.Registry) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule, string) (string, error) {
+func NewFindOrCreateRPC(registry *matchregistry.Registry, inventoryService ...*inventory.Service) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule, string) (string, error) {
 	return func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
-		return findOrCreateRPC(ctx, logger, db, nk, payload, registry)
+		var service *inventory.Service
+		if len(inventoryService) > 0 {
+			service = inventoryService[0]
+		}
+		return findOrCreateRPC(ctx, logger, db, nk, payload, registry, service)
 	}
 }
 
-func findOrCreateRPC(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, payload string, registry *matchregistry.Registry) (string, error) {
+func findOrCreateRPC(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, payload string, registry *matchregistry.Registry, inventoryService ...*inventory.Service) (string, error) {
 	request, err := parseRequest(payload)
 	if err != nil {
 		return "", err
@@ -48,6 +53,13 @@ func findOrCreateRPC(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk r
 		if matchID, active := registry.MatchForUser(userID); active {
 			return encodeResponse(Response{MatchID: matchID, AlreadyJoined: true})
 		}
+		if len(inventoryService) > 0 && inventoryService[0] != nil {
+			if _, err := inventoryService[0].Load(ctx, nk, userID); err != nil {
+				return "", fmt.Errorf("invalid squad loadout: %w", err)
+			}
+		}
+	} else if len(inventoryService) > 0 && inventoryService[0] != nil {
+		return "", errors.New("authentication required")
 	}
 
 	matchID, created, err := findOrCreate(ctx, logger, nk, request, 1)
@@ -67,8 +79,34 @@ func encodeResponse(value Response) (string, error) {
 }
 
 func Matched(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, entries []runtime.MatchmakerEntry) (string, error) {
+	return matched(ctx, logger, nk, entries, nil)
+}
+
+func NewMatched(service *inventory.Service) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule, []runtime.MatchmakerEntry) (string, error) {
+	return func(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, entries []runtime.MatchmakerEntry) (string, error) {
+		return matched(ctx, logger, nk, entries, service)
+	}
+}
+
+func matched(ctx context.Context, logger runtime.Logger, nk runtime.NakamaModule, entries []runtime.MatchmakerEntry, service *inventory.Service) (string, error) {
 	if len(entries) == 0 {
 		return "", errors.New("matchmaker returned no entries")
+	}
+	if service != nil {
+		seen := make(map[string]bool, len(entries))
+		for _, entry := range entries {
+			if entry == nil || entry.GetPresence() == nil {
+				return "", errors.New("matchmaker entry has no presence")
+			}
+			userID := entry.GetPresence().GetUserId()
+			if seen[userID] {
+				continue
+			}
+			seen[userID] = true
+			if _, err := service.Load(ctx, nk, userID); err != nil {
+				return "", fmt.Errorf("invalid squad loadout for user %s: %w", userID, err)
+			}
+		}
 	}
 
 	request := requestFromProperties(entries[0].GetProperties())
