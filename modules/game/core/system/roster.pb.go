@@ -159,12 +159,14 @@ type CharacterRoster struct {
 	AttackSpeed     float64                `protobuf:"fixed64,6,opt,name=attack_speed,json=attackSpeed,proto3" json:"attack_speed,omitempty"`
 	AttackRange     float64                `protobuf:"fixed64,7,opt,name=attack_range,json=attackRange,proto3" json:"attack_range,omitempty"`
 	RegenRate       float64                `protobuf:"fixed64,8,opt,name=regen_rate,json=regenRate,proto3" json:"regen_rate,omitempty"`
-	WeaponType      string                 `protobuf:"bytes,10,opt,name=weapon_type,json=weaponType,proto3" json:"weapon_type,omitempty"`
-	RangeClass      string                 `protobuf:"bytes,11,opt,name=range_class,json=rangeClass,proto3" json:"range_class,omitempty"`
-	WeaponId        string                 `protobuf:"bytes,12,opt,name=weapon_id,json=weaponId,proto3" json:"weapon_id,omitempty"`
-	CritChance      float64                `protobuf:"fixed64,13,opt,name=crit_chance,json=critChance,proto3" json:"crit_chance,omitempty"`
-	CritMultiplier  float64                `protobuf:"fixed64,14,opt,name=crit_multiplier,json=critMultiplier,proto3" json:"crit_multiplier,omitempty"`
-	DamageReduction float64                `protobuf:"fixed64,15,opt,name=damage_reduction,json=damageReduction,proto3" json:"damage_reduction,omitempty"`
+	WeaponType      string                 `protobuf:"bytes,9,opt,name=weapon_type,json=weaponType,proto3" json:"weapon_type,omitempty"`
+	RangeClass      string                 `protobuf:"bytes,10,opt,name=range_class,json=rangeClass,proto3" json:"range_class,omitempty"`
+	WeaponId        string                 `protobuf:"bytes,11,opt,name=weapon_id,json=weaponId,proto3" json:"weapon_id,omitempty"`
+	CritChance      float64                `protobuf:"fixed64,12,opt,name=crit_chance,json=critChance,proto3" json:"crit_chance,omitempty"`
+	CritMultiplier  float64                `protobuf:"fixed64,13,opt,name=crit_multiplier,json=critMultiplier,proto3" json:"crit_multiplier,omitempty"`
+	DamageReduction float64                `protobuf:"fixed64,14,opt,name=damage_reduction,json=damageReduction,proto3" json:"damage_reduction,omitempty"`
+	AttackCount     int32                  `protobuf:"varint,15,opt,name=attack_count,json=attackCount,proto3" json:"attack_count,omitempty"`
+	CooldownScale   float64                `protobuf:"fixed64,16,opt,name=cooldown_scale,json=cooldownScale,proto3" json:"cooldown_scale,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -297,6 +299,20 @@ func (x *CharacterRoster) GetDamageReduction() float64 {
 	return 0
 }
 
+func (x *CharacterRoster) GetAttackCount() int32 {
+	if x != nil {
+		return x.AttackCount
+	}
+	return 0
+}
+
+func (x *CharacterRoster) GetCooldownScale() float64 {
+	if x != nil {
+		return x.CooldownScale
+	}
+	return 0
+}
+
 var File_modules_game_core_system_roster_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_roster_proto_rawDesc = "" +
@@ -313,7 +329,7 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\x0eroster_version\x18\x04 \x01(\x04R\rrosterVersion\x12A\n" +
 	"\n" +
 	"characters\x18\x05 \x03(\v2!.game.core.system.CharacterRosterR\n" +
-	"characters\"\xef\x03\n" +
+	"characters\"\xa5\x04\n" +
 	"\x0fCharacterRoster\x12!\n" +
 	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12\x16\n" +
 	"\x06health\x18\x02 \x01(\x01R\x06health\x12\x1d\n" +
@@ -326,17 +342,18 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\fattack_range\x18\a \x01(\x01R\vattackRange\x12\x1d\n" +
 	"\n" +
 	"regen_rate\x18\b \x01(\x01R\tregenRate\x12\x1f\n" +
-	"\vweapon_type\x18\n" +
-	" \x01(\tR\n" +
+	"\vweapon_type\x18\t \x01(\tR\n" +
 	"weaponType\x12\x1f\n" +
-	"\vrange_class\x18\v \x01(\tR\n" +
+	"\vrange_class\x18\n" +
+	" \x01(\tR\n" +
 	"rangeClass\x12\x1b\n" +
-	"\tweapon_id\x18\f \x01(\tR\bweaponId\x12\x1f\n" +
-	"\vcrit_chance\x18\r \x01(\x01R\n" +
+	"\tweapon_id\x18\v \x01(\tR\bweaponId\x12\x1f\n" +
+	"\vcrit_chance\x18\f \x01(\x01R\n" +
 	"critChance\x12'\n" +
-	"\x0fcrit_multiplier\x18\x0e \x01(\x01R\x0ecritMultiplier\x12)\n" +
-	"\x10damage_reduction\x18\x0f \x01(\x01R\x0fdamageReductionJ\x04\b\t\x10\n" +
-	"R\fdamage_ratioB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
+	"\x0fcrit_multiplier\x18\r \x01(\x01R\x0ecritMultiplier\x12)\n" +
+	"\x10damage_reduction\x18\x0e \x01(\x01R\x0fdamageReduction\x12!\n" +
+	"\fattack_count\x18\x0f \x01(\x05R\vattackCount\x12%\n" +
+	"\x0ecooldown_scale\x18\x10 \x01(\x01R\rcooldownScaleB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
 
 var (
 	file_modules_game_core_system_roster_proto_rawDescOnce sync.Once

@@ -13,6 +13,8 @@ import (
 type EventType uint8
 
 const AttackMovementThreshold = 0.2
+const BasicAttackHitDelayTicks int64 = 2
+const spearLineRadius = 0.6
 
 const (
 	EventAttackStarted EventType = iota + 1
@@ -26,6 +28,10 @@ const (
 type Event struct {
 	Type                                      EventType
 	AttackID, ProjectileID                    string
+	HitID                                     string
+	HitIndex                                  int
+	Tags                                      []entity.ActionTag
+	AttackCount                               int
 	AttackerUserID, AttackerCharacterID       string
 	TargetUserID, TargetCharacterID           string
 	WeaponType                                entity.WeaponType
@@ -38,14 +44,19 @@ type Event struct {
 }
 
 type Projectile struct {
-	ID, AttackID                        string
-	AttackerUserID, AttackerCharacterID string
-	TargetUserID, TargetCharacterID     string
-	WeaponType                          entity.WeaponType
-	WeaponID                            string
-	Position, Direction                 entity.Vector2
-	Speed, Damage                       float64
-	Critical                            bool
+	ID, AttackID                                        string
+	HitID                                               string
+	HitIndex                                            int
+	Tags                                                []entity.ActionTag
+	AttackerUserID, AttackerCharacterID                 string
+	TargetUserID, TargetCharacterID                     string
+	WeaponType                                          entity.WeaponType
+	WeaponID                                            string
+	Position, Direction                                 entity.Vector2
+	Speed, Damage                                       float64
+	BaseDamage, CritChance, CritMultiplier, AttackRange float64
+	Origin                                              entity.Vector2
+	Critical                                            bool
 }
 
 type Simulation struct {
@@ -57,8 +68,9 @@ type ownedCharacter struct {
 	character *entity.Character
 }
 type damageIntent struct {
-	event  Event
-	target *entity.Character
+	event      Event
+	target     *entity.Character
+	projectile *Projectile
 }
 
 func NewSimulation() *Simulation {
@@ -91,6 +103,13 @@ func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[s
 		random = rand.New(rand.NewSource(tick))
 	}
 	characters := sortedCharacters(players)
+	for _, character := range characters {
+		if character.character.Health > 0 && (!character.character.CooldownTickSet || character.character.LastCooldownTick != tick) {
+			character.character.AdvanceCooldowns(entity.CooldownTicks, "")
+			character.character.LastCooldownTick = tick
+			character.character.CooldownTickSet = true
+		}
+	}
 	lookup := characterLookup(characters)
 	candidates := candidateCharactersBySession(nearbyPlayers)
 	intents, events := s.stepProjectiles(lookup, tick)
@@ -109,24 +128,37 @@ func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[s
 			character.ResetAttack()
 			continue
 		}
-		if !character.AttackImpacted && tick >= character.AttackImpactTick {
+		if character.AttackHitsEmitted < actionAttackCount(character) && tick >= character.AttackImpactTick+int64(character.AttackHitsEmitted)*BasicAttackHitDelayTicks {
 			character.AttackImpacted = true
 			if character.RangeClass == entity.RangeRanged {
-				projectile, event := s.spawnProjectile(attacker, target, tick, random)
+				hit := character.AttackHitsEmitted + 1
+				projectile, event := s.spawnProjectile(attacker, target, tick, hit, random)
 				s.projectiles[projectile.ID] = projectile
 				events = append(events, event)
+				character.AttackHitsEmitted++
+			} else if character.Weapon.Type == entity.WeaponSpear {
+				for index, candidate := range spearTargets(attacker, candidates[attacker.owner.SessionID]) {
+					amount, critical := damage.RollAttackAgainst(character, candidate.character, random)
+					if actionAttackCount(character) > 1 {
+						amount *= 1.5 * float64(actionAttackCount(character))
+					}
+					intents = append(intents, newDamageIntent(attacker, candidate, attackID(character), index+1, "", actionTags(character), tick, amount, critical))
+				}
+				character.AttackHitsEmitted = actionAttackCount(character)
 			} else {
-				amount, critical := damage.RollAttack(character, random)
-				intents = append(intents, newDamageIntent(attacker, target, attackID(character), "", tick, amount, critical))
+				hit := character.AttackHitsEmitted + 1
+				amount, critical := damage.RollAttackAgainst(character, target.character, random)
+				intents = append(intents, newDamageIntent(attacker, target, attackID(character), hit, "", actionTags(character), tick, amount, critical))
+				character.AttackHitsEmitted++
 			}
 		}
-		if tick >= character.AttackCompleteTick {
+		if tick >= character.AttackCompleteTick && character.AttackHitsEmitted >= actionAttackCount(character) {
 			character.ResetAttack()
 		}
 	}
 
 	sortDamageIntents(intents)
-	events = append(events, applyDamage(intents, tick)...)
+	events = append(events, applyDamage(intents, tick, random)...)
 	for _, player := range players {
 		player.RemoveDeadCharacters()
 	}
@@ -166,11 +198,16 @@ func (s *Simulation) stepProjectiles(lookup map[string]ownedCharacter, tick int6
 		if distance == 0 || distance <= maximumDistance {
 			projectile.Position = target.character.Position
 			events = append(events, projectileEvent(EventProjectileHit, projectile, tick))
-			intents = append(intents, damageIntent{target: target.character, event: Event{
-				Type: EventDamageApplied, AttackID: projectile.AttackID, ProjectileID: projectile.ID,
+			amount, critical := projectile.Damage, projectile.Critical
+			if projectile.WeaponType == entity.WeaponBow && projectile.AttackRange > 0 {
+				factor := 1 + math.Min(1, math.Hypot(target.character.Position.X-projectile.Origin.X, target.character.Position.Y-projectile.Origin.Y)/projectile.AttackRange)
+				amount *= factor
+			}
+			intents = append(intents, damageIntent{target: target.character, projectile: projectile, event: Event{
+				Type: EventDamageApplied, AttackID: projectile.AttackID, ProjectileID: projectile.ID, HitID: projectile.HitID, HitIndex: projectile.HitIndex, Tags: projectile.Tags,
 				AttackerUserID: projectile.AttackerUserID, AttackerCharacterID: projectile.AttackerCharacterID,
 				TargetUserID: projectile.TargetUserID, TargetCharacterID: projectile.TargetCharacterID,
-				Tick: tick, Damage: projectile.Damage, Critical: projectile.Critical,
+				Tick: tick, Damage: amount, Critical: critical,
 			}})
 			delete(s.projectiles, projectile.ID)
 			continue
@@ -182,17 +219,20 @@ func (s *Simulation) stepProjectiles(lookup map[string]ownedCharacter, tick int6
 	return intents, events
 }
 
-func (s *Simulation) spawnProjectile(attacker, target ownedCharacter, tick int64, random *rand.Rand) (*Projectile, Event) {
+func (s *Simulation) spawnProjectile(attacker, target ownedCharacter, tick int64, hit int, random *rand.Rand) (*Projectile, Event) {
 	character := attacker.character
-	id := attackID(character) + ":projectile"
-	amount, critical := damage.RollAttack(character, random)
+	id := attackID(character) + ":projectile:" + strconv.Itoa(hit)
+	amount, critical := character.Damage, false
+	if character.Weapon.Type != entity.WeaponCrossbow {
+		amount, critical = damage.RollAttack(character, random)
+	}
 	projectile := &Projectile{
-		ID: id, AttackID: attackID(character),
+		ID: id, AttackID: attackID(character), HitID: hitID(attackID(character), hit), HitIndex: hit, Tags: actionTags(character),
 		AttackerUserID: attacker.owner.UserID, AttackerCharacterID: character.ID,
 		TargetUserID: target.owner.UserID, TargetCharacterID: target.character.ID,
 		WeaponType: character.Weapon.Type, WeaponID: character.Weapon.ID,
-		Position: character.Position, Speed: character.Weapon.ProjectileSpeed,
-		Damage: amount, Critical: critical,
+		Position: character.Position, Origin: character.Position, Speed: character.Weapon.ProjectileSpeed,
+		Damage: amount, BaseDamage: character.Damage, CritChance: character.CritChance, CritMultiplier: character.CritMultiplier, AttackRange: character.AttackRange, Critical: critical,
 	}
 	projectile.Direction = directionTo(projectile.Position, target.character.Position)
 	return projectile, projectileEvent(EventProjectileSpawned, projectile, tick)
@@ -200,7 +240,7 @@ func (s *Simulation) spawnProjectile(attacker, target ownedCharacter, tick int64
 
 func projectileEvent(eventType EventType, projectile *Projectile, tick int64) Event {
 	return Event{
-		Type: eventType, AttackID: projectile.AttackID, ProjectileID: projectile.ID,
+		Type: eventType, AttackID: projectile.AttackID, ProjectileID: projectile.ID, HitID: projectile.HitID, HitIndex: projectile.HitIndex, Tags: projectile.Tags,
 		AttackerUserID: projectile.AttackerUserID, AttackerCharacterID: projectile.AttackerCharacterID,
 		TargetUserID: projectile.TargetUserID, TargetCharacterID: projectile.TargetCharacterID,
 		WeaponType: projectile.WeaponType, WeaponID: projectile.WeaponID,
@@ -208,9 +248,9 @@ func projectileEvent(eventType EventType, projectile *Projectile, tick int64) Ev
 	}
 }
 
-func newDamageIntent(attacker, target ownedCharacter, attackID, projectileID string, tick int64, amount float64, critical bool) damageIntent {
+func newDamageIntent(attacker, target ownedCharacter, attackID string, hitIndex int, projectileID string, tags []entity.ActionTag, tick int64, amount float64, critical bool) damageIntent {
 	return damageIntent{target: target.character, event: Event{
-		Type: EventDamageApplied, AttackID: attackID, ProjectileID: projectileID,
+		Type: EventDamageApplied, AttackID: attackID, HitID: hitID(attackID, hitIndex), HitIndex: hitIndex, ProjectileID: projectileID, Tags: tags,
 		AttackerUserID: attacker.owner.UserID, AttackerCharacterID: attacker.character.ID,
 		TargetUserID: target.owner.UserID, TargetCharacterID: target.character.ID,
 		Tick: tick, Damage: amount, Critical: critical,
@@ -220,20 +260,30 @@ func newDamageIntent(attacker, target ownedCharacter, attackID, projectileID str
 func sortDamageIntents(intents []damageIntent) {
 	sort.Slice(intents, func(i, j int) bool {
 		if intents[i].event.AttackerCharacterID == intents[j].event.AttackerCharacterID {
+			if intents[i].event.AttackID == intents[j].event.AttackID {
+				return intents[i].event.HitIndex < intents[j].event.HitIndex
+			}
 			return intents[i].event.AttackID < intents[j].event.AttackID
 		}
 		return intents[i].event.AttackerCharacterID < intents[j].event.AttackerCharacterID
 	})
 }
 
-func applyDamage(intents []damageIntent, tick int64) []Event {
+func applyDamage(intents []damageIntent, tick int64, random *rand.Rand) []Event {
 	events := make([]Event, 0, len(intents)*2)
 	for _, intent := range intents {
 		if intent.target == nil || intent.target.Health <= 0 {
 			continue
 		}
+		if projectile := intent.projectile; projectile != nil && projectile.WeaponType == entity.WeaponCrossbow {
+			attacker := &entity.Character{Weapon: entity.Weapon{Type: entity.WeaponCrossbow}, Damage: projectile.BaseDamage, CritChance: projectile.CritChance, CritMultiplier: projectile.CritMultiplier}
+			intent.event.Damage, intent.event.Critical = damage.RollAttackAgainst(attacker, intent.target, random)
+		}
 		var died bool
-		intent.event.Damage, intent.event.RemainingHealth, died = damage.Apply(intent.target, intent.event.Damage)
+		intent.event.Damage, intent.event.RemainingHealth, died = damage.ApplyTagged(intent.target, intent.event.Damage, intent.event.Tags)
+		if intent.event.Damage > 0 {
+			intent.target.AdvanceCooldowns(entity.CooldownDamageReceived, intent.event.AttackID)
+		}
 		events = append(events, intent.event)
 		if died {
 			death := intent.event
@@ -258,11 +308,24 @@ func startAttack(attacker, target ownedCharacter, tick int64) Event {
 		impactOffset = cycleTicks
 	}
 	character.AttackSequence++
+	character.AttackActionCount = character.AttackCount
+	if character.AttackActionCount < 1 {
+		character.AttackActionCount = 1
+	}
+	character.AttackDirection = directionTo(character.Position, target.character.Position)
+	character.AttackHitsEmitted = 0
+	character.AdvanceCooldowns(entity.CooldownAttackActions, attackID(character))
 	character.TargetUserID, character.TargetCharacterID = target.owner.UserID, target.character.ID
 	character.AttackStartTick, character.AttackImpactTick = tick, tick+impactOffset
 	character.AttackCompleteTick, character.AttackImpacted = tick+cycleTicks, false
+	if character.Weapon.Type != entity.WeaponSpear {
+		lastHitTick := character.AttackImpactTick + int64(character.AttackActionCount-1)*BasicAttackHitDelayTicks
+		if lastHitTick > character.AttackCompleteTick {
+			character.AttackCompleteTick = lastHitTick
+		}
+	}
 	return Event{
-		Type: EventAttackStarted, AttackID: attackID(character),
+		Type: EventAttackStarted, AttackID: attackID(character), Tags: actionTags(character), AttackCount: character.AttackActionCount,
 		AttackerUserID: attacker.owner.UserID, AttackerCharacterID: character.ID,
 		TargetUserID: target.owner.UserID, TargetCharacterID: target.character.ID,
 		WeaponType: character.Weapon.Type, WeaponID: character.Weapon.ID,
@@ -398,4 +461,52 @@ func characterLookup(characters []ownedCharacter) map[string]ownedCharacter {
 func targetKey(userID, characterID string) string { return userID + "\x00" + characterID }
 func attackID(character *entity.Character) string {
 	return character.ID + ":" + strconv.FormatUint(character.AttackSequence, 10)
+}
+
+func hitID(actionID string, index int) string {
+	return actionID + ":hit:" + strconv.Itoa(index)
+}
+
+func actionAttackCount(character *entity.Character) int {
+	if character.AttackActionCount > 0 {
+		return character.AttackActionCount
+	}
+	return 1
+}
+
+func actionTags(character *entity.Character) []entity.ActionTag {
+	tags := []entity.ActionTag{entity.TagBasicAttack}
+	if character.Weapon.Type == entity.WeaponSpear {
+		return append(tags, entity.TagAOE)
+	}
+	if character.RangeClass == entity.RangeRanged {
+		return append(tags, entity.TagProjectile)
+	}
+	return tags
+}
+
+func spearTargets(attacker ownedCharacter, candidates []ownedCharacter) []ownedCharacter {
+	character := attacker.character
+	direction := character.AttackDirection
+	if direction.X == 0 && direction.Y == 0 {
+		direction = attacker.owner.Facing
+		if direction.X == 0 && direction.Y == 0 {
+			direction = entity.Vector2{X: 1}
+		}
+	}
+	result := make([]ownedCharacter, 0)
+	for _, candidate := range candidates {
+		if !validTarget(attacker, candidate) {
+			continue
+		}
+		dx := candidate.character.Position.X - character.Position.X
+		dy := candidate.character.Position.Y - character.Position.Y
+		along := dx*direction.X + dy*direction.Y
+		across := dx*direction.Y - dy*direction.X
+		if along >= 0 && along <= character.AttackRange && math.Abs(across) <= spearLineRadius {
+			result = append(result, candidate)
+		}
+	}
+	sort.Slice(result, func(i, j int) bool { return targetLess(result[i], result[j]) })
+	return result
 }

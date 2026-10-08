@@ -33,7 +33,8 @@ func playerRoster(player *entity.Player) *PlayerRoster {
 			RegenRate:  character.RegenRate,
 			CritChance: character.CritChance, CritMultiplier: character.CritMultiplier,
 			DamageReduction: character.DamageReduction,
-			WeaponType:      string(character.Weapon.Type), RangeClass: string(character.RangeClass),
+			AttackCount:     int32(character.AttackCount), CooldownScale: character.CooldownScale,
+			WeaponType: string(character.Weapon.Type), RangeClass: string(character.RangeClass),
 			WeaponId: character.Weapon.ID,
 		})
 	}

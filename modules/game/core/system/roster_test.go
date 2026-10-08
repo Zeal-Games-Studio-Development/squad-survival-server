@@ -7,6 +7,7 @@ import (
 	"squad-survival-be/modules/game/core/entity"
 
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 func TestEncodePlayerRosterBatch(t *testing.T) {
@@ -36,7 +37,30 @@ func TestEncodePlayerRosterBatch(t *testing.T) {
 		character.AttackSpeed != source.AttackSpeed || character.AttackRange != source.AttackRange ||
 		character.RegenRate != source.RegenRate || character.CritChance != source.CritChance ||
 		character.CritMultiplier != source.CritMultiplier || character.DamageReduction != source.DamageReduction ||
-		character.WeaponType != string(source.Weapon.Type) || character.RangeClass != string(source.RangeClass) || character.WeaponId != source.Weapon.ID {
+		character.WeaponType != string(source.Weapon.Type) || character.RangeClass != string(source.RangeClass) || character.WeaponId != source.Weapon.ID ||
+		character.AttackCount != int32(source.AttackCount) || character.CooldownScale != source.CooldownScale {
 		t.Fatalf("unexpected character roster: %+v", character)
+	}
+}
+
+func TestCharacterRosterFieldNumbers(t *testing.T) {
+	descriptor := (&CharacterRoster{}).ProtoReflect().Descriptor()
+	if descriptor.ReservedRanges().Len() != 0 || descriptor.ReservedNames().Len() != 0 {
+		t.Fatal("character roster still reserves the old damage_ratio field")
+	}
+	for name, number := range map[string]protoreflect.FieldNumber{
+		"weapon_type":      9,
+		"range_class":      10,
+		"weapon_id":        11,
+		"crit_chance":      12,
+		"crit_multiplier":  13,
+		"damage_reduction": 14,
+		"attack_count":     15,
+		"cooldown_scale":   16,
+	} {
+		field := descriptor.Fields().ByName(protoreflect.Name(name))
+		if field == nil || field.Number() != number {
+			t.Fatalf("%s must use field number %d, got %v", name, number, field)
+		}
 	}
 }

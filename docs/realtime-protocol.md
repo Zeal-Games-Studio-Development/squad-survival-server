@@ -30,9 +30,11 @@ Contract nằm trong các source schema:
 - [`experience_package.proto`](../modules/game/core/entity/experience_package.proto)
 - [`experience_package_state.proto`](../modules/game/core/system/experience_package_state.proto)
 
-Không đổi hoặc tái sử dụng field number đã phát hành. Field bị xóa trong tương lai cần được đánh dấu `reserved`.
+`CharacterRoster` đã đổi field number từ 9 trở đi trong giai đoạn development. Client cần generate lại schema trước khi đọc roster mới.
 
-`CharacterRoster` gửi `crit_chance`, `crit_multiplier`, `damage_reduction`; field `damage_ratio` cũ đã được `reserved`. `DamageApplied` gửi `critical` và lượng máu thực tế bị trừ trong `damage`.
+`CharacterRoster` gửi `crit_chance`, `crit_multiplier`, `damage_reduction`, `attack_count`, `cooldown_scale`; `damage_ratio` đã được bỏ khỏi schema và không còn `reserved`. `DamageApplied` gửi `critical` và lượng máu thực tế bị trừ trong `damage`.
+
+Combat event dùng `action_id` chung cho một lượt đánh và `hit_id` riêng cho từng hit/projectile. `AttackStarted` gửi `attack_count`; các event có `tags` (`basic_attack`, `aoe`, `projectile`; dành `skill` cho tương lai). Tên field cũ `attack_id` đã đổi trực tiếp thành `action_id` tại cùng field number; Unity phải regenerate `Combat.cs`.
 
 `CharacterRoster`, `AttackStarted` và `ProjectileSpawned` dùng `weapon_id` thay cho `weapon_name` tại cùng field number protobuf. `CharacterBoxValue` chỉ gửi `weapon_type` ở field 1; `weapon_id` được chọn theo loadout của người nhặt và xuất hiện trong roster của character mới. Client cần regenerate protobuf; client cũ có thể đọc ID thành `weapon_name`.
 

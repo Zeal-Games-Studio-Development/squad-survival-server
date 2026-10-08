@@ -21,6 +21,7 @@ const (
 	WeaponAxe      WeaponType = "axe"
 	WeaponBlunt    WeaponType = "blunt"
 	WeaponCrossbow WeaponType = "crossbow"
+	WeaponShield   WeaponType = "shield"
 )
 
 const (
@@ -36,6 +37,8 @@ type Weapon struct {
 	Damage          float64    `json:"damage"`
 	MoveSpeed       float64    `json:"move_speed"` // World units per second.
 	AttackSpeed     float64    `json:"attack_speed"`
+	AttackCount     int        `json:"attack_count"`
+	CooldownScale   float64    `json:"cooldown_scale"`
 	AttackRange     float64    `json:"attack_range"`
 	ImpactRatio     float64    `json:"impact_ratio"`
 	ProjectileSpeed float64    `json:"projectile_speed"`
@@ -57,12 +60,24 @@ func ParseWeaponCatalog(data []byte) ([]Weapon, error) {
 	if err := json.Unmarshal(data, &catalog); err != nil {
 		return nil, err
 	}
+	var fields struct {
+		Weapons []map[string]json.RawMessage `json:"weapons"`
+	}
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
 	if len(catalog.Weapons) == 0 {
 		return nil, errors.New("weapon catalog has no weapons")
 	}
 	seenIDs := make(map[string]struct{}, len(catalog.Weapons))
 	for index := range catalog.Weapons {
 		weapon := &catalog.Weapons[index]
+		if _, specified := fields.Weapons[index]["attack_count"]; !specified {
+			weapon.AttackCount = 1
+		}
+		if _, specified := fields.Weapons[index]["cooldown_scale"]; !specified {
+			weapon.CooldownScale = 1
+		}
 		if weapon.Type == "" {
 			return nil, errors.New("weapon type is required")
 		}
@@ -81,6 +96,12 @@ func ParseWeaponCatalog(data []byte) ([]Weapon, error) {
 		}
 		if !isFinite(weapon.AttackSpeed) || weapon.AttackSpeed <= 0 {
 			return nil, errors.New("weapon attack speed must be finite and greater than zero")
+		}
+		if weapon.AttackCount < 1 {
+			return nil, errors.New("weapon attack count must be at least one")
+		}
+		if !isFinite(weapon.CooldownScale) || weapon.CooldownScale <= 0 {
+			return nil, errors.New("weapon cooldown scale must be finite and greater than zero")
 		}
 		if !isFinite(weapon.ImpactRatio) || weapon.ImpactRatio <= 0 || weapon.ImpactRatio > 1 {
 			return nil, errors.New("weapon impact ratio must be finite and within (0, 1]")

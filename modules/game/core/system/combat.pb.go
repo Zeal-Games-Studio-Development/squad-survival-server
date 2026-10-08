@@ -221,7 +221,7 @@ func (*CombatEvent_ProjectileExpired) isCombatEvent_Event() {}
 
 type AttackStarted struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
-	AttackId            string                 `protobuf:"bytes,1,opt,name=attack_id,json=attackId,proto3" json:"attack_id,omitempty"`
+	ActionId            string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	AttackerUserId      string                 `protobuf:"bytes,2,opt,name=attacker_user_id,json=attackerUserId,proto3" json:"attacker_user_id,omitempty"`
 	AttackerCharacterId string                 `protobuf:"bytes,3,opt,name=attacker_character_id,json=attackerCharacterId,proto3" json:"attacker_character_id,omitempty"`
 	TargetUserId        string                 `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
@@ -231,6 +231,8 @@ type AttackStarted struct {
 	ImpactTick          int64                  `protobuf:"varint,8,opt,name=impact_tick,json=impactTick,proto3" json:"impact_tick,omitempty"`
 	CompleteTick        int64                  `protobuf:"varint,9,opt,name=complete_tick,json=completeTick,proto3" json:"complete_tick,omitempty"`
 	WeaponId            string                 `protobuf:"bytes,10,opt,name=weapon_id,json=weaponId,proto3" json:"weapon_id,omitempty"`
+	AttackCount         int32                  `protobuf:"varint,11,opt,name=attack_count,json=attackCount,proto3" json:"attack_count,omitempty"`
+	Tags                []string               `protobuf:"bytes,12,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -265,9 +267,9 @@ func (*AttackStarted) Descriptor() ([]byte, []int) {
 	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *AttackStarted) GetAttackId() string {
+func (x *AttackStarted) GetActionId() string {
 	if x != nil {
-		return x.AttackId
+		return x.ActionId
 	}
 	return ""
 }
@@ -335,9 +337,23 @@ func (x *AttackStarted) GetWeaponId() string {
 	return ""
 }
 
+func (x *AttackStarted) GetAttackCount() int32 {
+	if x != nil {
+		return x.AttackCount
+	}
+	return 0
+}
+
+func (x *AttackStarted) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type DamageApplied struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
-	AttackId            string                 `protobuf:"bytes,1,opt,name=attack_id,json=attackId,proto3" json:"attack_id,omitempty"`
+	ActionId            string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	AttackerUserId      string                 `protobuf:"bytes,2,opt,name=attacker_user_id,json=attackerUserId,proto3" json:"attacker_user_id,omitempty"`
 	AttackerCharacterId string                 `protobuf:"bytes,3,opt,name=attacker_character_id,json=attackerCharacterId,proto3" json:"attacker_character_id,omitempty"`
 	TargetUserId        string                 `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
@@ -347,6 +363,8 @@ type DamageApplied struct {
 	Tick                int64                  `protobuf:"varint,8,opt,name=tick,proto3" json:"tick,omitempty"`
 	ProjectileId        string                 `protobuf:"bytes,9,opt,name=projectile_id,json=projectileId,proto3" json:"projectile_id,omitempty"`
 	Critical            bool                   `protobuf:"varint,10,opt,name=critical,proto3" json:"critical,omitempty"`
+	HitId               string                 `protobuf:"bytes,11,opt,name=hit_id,json=hitId,proto3" json:"hit_id,omitempty"`
+	Tags                []string               `protobuf:"bytes,12,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -381,9 +399,9 @@ func (*DamageApplied) Descriptor() ([]byte, []int) {
 	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *DamageApplied) GetAttackId() string {
+func (x *DamageApplied) GetActionId() string {
 	if x != nil {
-		return x.AttackId
+		return x.ActionId
 	}
 	return ""
 }
@@ -451,15 +469,31 @@ func (x *DamageApplied) GetCritical() bool {
 	return false
 }
 
+func (x *DamageApplied) GetHitId() string {
+	if x != nil {
+		return x.HitId
+	}
+	return ""
+}
+
+func (x *DamageApplied) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type CharacterDied struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	AttackId          string                 `protobuf:"bytes,1,opt,name=attack_id,json=attackId,proto3" json:"attack_id,omitempty"`
+	ActionId          string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	KillerUserId      string                 `protobuf:"bytes,2,opt,name=killer_user_id,json=killerUserId,proto3" json:"killer_user_id,omitempty"`
 	KillerCharacterId string                 `protobuf:"bytes,3,opt,name=killer_character_id,json=killerCharacterId,proto3" json:"killer_character_id,omitempty"`
 	TargetUserId      string                 `protobuf:"bytes,4,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
 	TargetCharacterId string                 `protobuf:"bytes,5,opt,name=target_character_id,json=targetCharacterId,proto3" json:"target_character_id,omitempty"`
 	Tick              int64                  `protobuf:"varint,6,opt,name=tick,proto3" json:"tick,omitempty"`
 	ProjectileId      string                 `protobuf:"bytes,7,opt,name=projectile_id,json=projectileId,proto3" json:"projectile_id,omitempty"`
+	HitId             string                 `protobuf:"bytes,8,opt,name=hit_id,json=hitId,proto3" json:"hit_id,omitempty"`
+	Tags              []string               `protobuf:"bytes,9,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -494,9 +528,9 @@ func (*CharacterDied) Descriptor() ([]byte, []int) {
 	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *CharacterDied) GetAttackId() string {
+func (x *CharacterDied) GetActionId() string {
 	if x != nil {
-		return x.AttackId
+		return x.ActionId
 	}
 	return ""
 }
@@ -543,10 +577,24 @@ func (x *CharacterDied) GetProjectileId() string {
 	return ""
 }
 
+func (x *CharacterDied) GetHitId() string {
+	if x != nil {
+		return x.HitId
+	}
+	return ""
+}
+
+func (x *CharacterDied) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type ProjectileSpawned struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	ProjectileId        string                 `protobuf:"bytes,1,opt,name=projectile_id,json=projectileId,proto3" json:"projectile_id,omitempty"`
-	AttackId            string                 `protobuf:"bytes,2,opt,name=attack_id,json=attackId,proto3" json:"attack_id,omitempty"`
+	ActionId            string                 `protobuf:"bytes,2,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	AttackerUserId      string                 `protobuf:"bytes,3,opt,name=attacker_user_id,json=attackerUserId,proto3" json:"attacker_user_id,omitempty"`
 	AttackerCharacterId string                 `protobuf:"bytes,4,opt,name=attacker_character_id,json=attackerCharacterId,proto3" json:"attacker_character_id,omitempty"`
 	TargetUserId        string                 `protobuf:"bytes,5,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
@@ -557,6 +605,8 @@ type ProjectileSpawned struct {
 	Direction           *Vector2               `protobuf:"bytes,10,opt,name=direction,proto3" json:"direction,omitempty"`
 	Speed               float64                `protobuf:"fixed64,11,opt,name=speed,proto3" json:"speed,omitempty"`
 	Tick                int64                  `protobuf:"varint,12,opt,name=tick,proto3" json:"tick,omitempty"`
+	HitId               string                 `protobuf:"bytes,13,opt,name=hit_id,json=hitId,proto3" json:"hit_id,omitempty"`
+	Tags                []string               `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -598,9 +648,9 @@ func (x *ProjectileSpawned) GetProjectileId() string {
 	return ""
 }
 
-func (x *ProjectileSpawned) GetAttackId() string {
+func (x *ProjectileSpawned) GetActionId() string {
 	if x != nil {
-		return x.AttackId
+		return x.ActionId
 	}
 	return ""
 }
@@ -675,16 +725,32 @@ func (x *ProjectileSpawned) GetTick() int64 {
 	return 0
 }
 
+func (x *ProjectileSpawned) GetHitId() string {
+	if x != nil {
+		return x.HitId
+	}
+	return ""
+}
+
+func (x *ProjectileSpawned) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type ProjectileHit struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	ProjectileId        string                 `protobuf:"bytes,1,opt,name=projectile_id,json=projectileId,proto3" json:"projectile_id,omitempty"`
-	AttackId            string                 `protobuf:"bytes,2,opt,name=attack_id,json=attackId,proto3" json:"attack_id,omitempty"`
+	ActionId            string                 `protobuf:"bytes,2,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	AttackerUserId      string                 `protobuf:"bytes,3,opt,name=attacker_user_id,json=attackerUserId,proto3" json:"attacker_user_id,omitempty"`
 	AttackerCharacterId string                 `protobuf:"bytes,4,opt,name=attacker_character_id,json=attackerCharacterId,proto3" json:"attacker_character_id,omitempty"`
 	TargetUserId        string                 `protobuf:"bytes,5,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
 	TargetCharacterId   string                 `protobuf:"bytes,6,opt,name=target_character_id,json=targetCharacterId,proto3" json:"target_character_id,omitempty"`
 	Position            *Vector2               `protobuf:"bytes,7,opt,name=position,proto3" json:"position,omitempty"`
 	Tick                int64                  `protobuf:"varint,8,opt,name=tick,proto3" json:"tick,omitempty"`
+	HitId               string                 `protobuf:"bytes,9,opt,name=hit_id,json=hitId,proto3" json:"hit_id,omitempty"`
+	Tags                []string               `protobuf:"bytes,10,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -726,9 +792,9 @@ func (x *ProjectileHit) GetProjectileId() string {
 	return ""
 }
 
-func (x *ProjectileHit) GetAttackId() string {
+func (x *ProjectileHit) GetActionId() string {
 	if x != nil {
-		return x.AttackId
+		return x.ActionId
 	}
 	return ""
 }
@@ -775,16 +841,32 @@ func (x *ProjectileHit) GetTick() int64 {
 	return 0
 }
 
+func (x *ProjectileHit) GetHitId() string {
+	if x != nil {
+		return x.HitId
+	}
+	return ""
+}
+
+func (x *ProjectileHit) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type ProjectileExpired struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	ProjectileId        string                 `protobuf:"bytes,1,opt,name=projectile_id,json=projectileId,proto3" json:"projectile_id,omitempty"`
-	AttackId            string                 `protobuf:"bytes,2,opt,name=attack_id,json=attackId,proto3" json:"attack_id,omitempty"`
+	ActionId            string                 `protobuf:"bytes,2,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
 	AttackerUserId      string                 `protobuf:"bytes,3,opt,name=attacker_user_id,json=attackerUserId,proto3" json:"attacker_user_id,omitempty"`
 	AttackerCharacterId string                 `protobuf:"bytes,4,opt,name=attacker_character_id,json=attackerCharacterId,proto3" json:"attacker_character_id,omitempty"`
 	TargetUserId        string                 `protobuf:"bytes,5,opt,name=target_user_id,json=targetUserId,proto3" json:"target_user_id,omitempty"`
 	TargetCharacterId   string                 `protobuf:"bytes,6,opt,name=target_character_id,json=targetCharacterId,proto3" json:"target_character_id,omitempty"`
 	Position            *Vector2               `protobuf:"bytes,7,opt,name=position,proto3" json:"position,omitempty"`
 	Tick                int64                  `protobuf:"varint,8,opt,name=tick,proto3" json:"tick,omitempty"`
+	HitId               string                 `protobuf:"bytes,9,opt,name=hit_id,json=hitId,proto3" json:"hit_id,omitempty"`
+	Tags                []string               `protobuf:"bytes,10,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -826,9 +908,9 @@ func (x *ProjectileExpired) GetProjectileId() string {
 	return ""
 }
 
-func (x *ProjectileExpired) GetAttackId() string {
+func (x *ProjectileExpired) GetActionId() string {
 	if x != nil {
-		return x.AttackId
+		return x.ActionId
 	}
 	return ""
 }
@@ -875,6 +957,20 @@ func (x *ProjectileExpired) GetTick() int64 {
 	return 0
 }
 
+func (x *ProjectileExpired) GetHitId() string {
+	if x != nil {
+		return x.HitId
+	}
+	return ""
+}
+
+func (x *ProjectileExpired) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 var File_modules_game_core_system_combat_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_combat_proto_rawDesc = "" +
@@ -890,9 +986,9 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\x12projectile_spawned\x18\x04 \x01(\v2#.game.core.system.ProjectileSpawnedH\x00R\x11projectileSpawned\x12H\n" +
 	"\x0eprojectile_hit\x18\x05 \x01(\v2\x1f.game.core.system.ProjectileHitH\x00R\rprojectileHit\x12T\n" +
 	"\x12projectile_expired\x18\x06 \x01(\v2#.game.core.system.ProjectileExpiredH\x00R\x11projectileExpiredB\a\n" +
-	"\x05event\"\x83\x03\n" +
+	"\x05event\"\xba\x03\n" +
 	"\rAttackStarted\x12\x1b\n" +
-	"\tattack_id\x18\x01 \x01(\tR\battackId\x12(\n" +
+	"\taction_id\x18\x01 \x01(\tR\bactionId\x12(\n" +
 	"\x10attacker_user_id\x18\x02 \x01(\tR\x0eattackerUserId\x122\n" +
 	"\x15attacker_character_id\x18\x03 \x01(\tR\x13attackerCharacterId\x12$\n" +
 	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12.\n" +
@@ -905,9 +1001,11 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"impactTick\x12#\n" +
 	"\rcomplete_tick\x18\t \x01(\x03R\fcompleteTick\x12\x1b\n" +
 	"\tweapon_id\x18\n" +
-	" \x01(\tR\bweaponId\"\xf8\x02\n" +
+	" \x01(\tR\bweaponId\x12!\n" +
+	"\fattack_count\x18\v \x01(\x05R\vattackCount\x12\x12\n" +
+	"\x04tags\x18\f \x03(\tR\x04tags\"\xa3\x03\n" +
 	"\rDamageApplied\x12\x1b\n" +
-	"\tattack_id\x18\x01 \x01(\tR\battackId\x12(\n" +
+	"\taction_id\x18\x01 \x01(\tR\bactionId\x12(\n" +
 	"\x10attacker_user_id\x18\x02 \x01(\tR\x0eattackerUserId\x122\n" +
 	"\x15attacker_character_id\x18\x03 \x01(\tR\x13attackerCharacterId\x12$\n" +
 	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12.\n" +
@@ -917,18 +1015,22 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\x04tick\x18\b \x01(\x03R\x04tick\x12#\n" +
 	"\rprojectile_id\x18\t \x01(\tR\fprojectileId\x12\x1a\n" +
 	"\bcritical\x18\n" +
-	" \x01(\bR\bcritical\"\x91\x02\n" +
+	" \x01(\bR\bcritical\x12\x15\n" +
+	"\x06hit_id\x18\v \x01(\tR\x05hitId\x12\x12\n" +
+	"\x04tags\x18\f \x03(\tR\x04tags\"\xbc\x02\n" +
 	"\rCharacterDied\x12\x1b\n" +
-	"\tattack_id\x18\x01 \x01(\tR\battackId\x12$\n" +
+	"\taction_id\x18\x01 \x01(\tR\bactionId\x12$\n" +
 	"\x0ekiller_user_id\x18\x02 \x01(\tR\fkillerUserId\x12.\n" +
 	"\x13killer_character_id\x18\x03 \x01(\tR\x11killerCharacterId\x12$\n" +
 	"\x0etarget_user_id\x18\x04 \x01(\tR\ftargetUserId\x12.\n" +
 	"\x13target_character_id\x18\x05 \x01(\tR\x11targetCharacterId\x12\x12\n" +
 	"\x04tick\x18\x06 \x01(\x03R\x04tick\x12#\n" +
-	"\rprojectile_id\x18\a \x01(\tR\fprojectileId\"\xe1\x03\n" +
+	"\rprojectile_id\x18\a \x01(\tR\fprojectileId\x12\x15\n" +
+	"\x06hit_id\x18\b \x01(\tR\x05hitId\x12\x12\n" +
+	"\x04tags\x18\t \x03(\tR\x04tags\"\x8c\x04\n" +
 	"\x11ProjectileSpawned\x12#\n" +
 	"\rprojectile_id\x18\x01 \x01(\tR\fprojectileId\x12\x1b\n" +
-	"\tattack_id\x18\x02 \x01(\tR\battackId\x12(\n" +
+	"\taction_id\x18\x02 \x01(\tR\bactionId\x12(\n" +
 	"\x10attacker_user_id\x18\x03 \x01(\tR\x0eattackerUserId\x122\n" +
 	"\x15attacker_character_id\x18\x04 \x01(\tR\x13attackerCharacterId\x12$\n" +
 	"\x0etarget_user_id\x18\x05 \x01(\tR\ftargetUserId\x12.\n" +
@@ -940,25 +1042,33 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\tdirection\x18\n" +
 	" \x01(\v2\x19.game.core.system.Vector2R\tdirection\x12\x14\n" +
 	"\x05speed\x18\v \x01(\x01R\x05speed\x12\x12\n" +
-	"\x04tick\x18\f \x01(\x03R\x04tick\"\xd0\x02\n" +
+	"\x04tick\x18\f \x01(\x03R\x04tick\x12\x15\n" +
+	"\x06hit_id\x18\r \x01(\tR\x05hitId\x12\x12\n" +
+	"\x04tags\x18\x0e \x03(\tR\x04tags\"\xfb\x02\n" +
 	"\rProjectileHit\x12#\n" +
 	"\rprojectile_id\x18\x01 \x01(\tR\fprojectileId\x12\x1b\n" +
-	"\tattack_id\x18\x02 \x01(\tR\battackId\x12(\n" +
+	"\taction_id\x18\x02 \x01(\tR\bactionId\x12(\n" +
 	"\x10attacker_user_id\x18\x03 \x01(\tR\x0eattackerUserId\x122\n" +
 	"\x15attacker_character_id\x18\x04 \x01(\tR\x13attackerCharacterId\x12$\n" +
 	"\x0etarget_user_id\x18\x05 \x01(\tR\ftargetUserId\x12.\n" +
 	"\x13target_character_id\x18\x06 \x01(\tR\x11targetCharacterId\x125\n" +
 	"\bposition\x18\a \x01(\v2\x19.game.core.system.Vector2R\bposition\x12\x12\n" +
-	"\x04tick\x18\b \x01(\x03R\x04tick\"\xd4\x02\n" +
+	"\x04tick\x18\b \x01(\x03R\x04tick\x12\x15\n" +
+	"\x06hit_id\x18\t \x01(\tR\x05hitId\x12\x12\n" +
+	"\x04tags\x18\n" +
+	" \x03(\tR\x04tags\"\xff\x02\n" +
 	"\x11ProjectileExpired\x12#\n" +
 	"\rprojectile_id\x18\x01 \x01(\tR\fprojectileId\x12\x1b\n" +
-	"\tattack_id\x18\x02 \x01(\tR\battackId\x12(\n" +
+	"\taction_id\x18\x02 \x01(\tR\bactionId\x12(\n" +
 	"\x10attacker_user_id\x18\x03 \x01(\tR\x0eattackerUserId\x122\n" +
 	"\x15attacker_character_id\x18\x04 \x01(\tR\x13attackerCharacterId\x12$\n" +
 	"\x0etarget_user_id\x18\x05 \x01(\tR\ftargetUserId\x12.\n" +
 	"\x13target_character_id\x18\x06 \x01(\tR\x11targetCharacterId\x125\n" +
 	"\bposition\x18\a \x01(\v2\x19.game.core.system.Vector2R\bposition\x12\x12\n" +
-	"\x04tick\x18\b \x01(\x03R\x04tickB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
+	"\x04tick\x18\b \x01(\x03R\x04tick\x12\x15\n" +
+	"\x06hit_id\x18\t \x01(\tR\x05hitId\x12\x12\n" +
+	"\x04tags\x18\n" +
+	" \x03(\tR\x04tagsB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
 
 var (
 	file_modules_game_core_system_combat_proto_rawDescOnce sync.Once

@@ -22,6 +22,8 @@ type Character struct {
 	Damage             float64
 	MoveSpeed          float64 // World units per second.
 	AttackSpeed        float64
+	AttackCount        int
+	CooldownScale      float64
 	AttackRange        float64
 	ImpactRatio        float64
 	RegenRate          float64
@@ -35,6 +37,12 @@ type Character struct {
 	AttackImpactTick   int64
 	AttackCompleteTick int64
 	AttackImpacted     bool
+	AttackActionCount  int
+	AttackHitsEmitted  int
+	AttackDirection    Vector2
+	Cooldowns          map[string]*Cooldown
+	LastCooldownTick   int64
+	CooldownTickSet    bool
 }
 
 func CreateCharacter(random *rand.Rand, weapons []Weapon) *Character {
@@ -51,6 +59,14 @@ func (c *Character) ApplyWeapon(weapon Weapon) {
 	c.Damage = weapon.Damage
 	c.MoveSpeed = weapon.MoveSpeed
 	c.AttackSpeed = weapon.AttackSpeed
+	c.AttackCount = weapon.AttackCount
+	if c.AttackCount < 1 {
+		c.AttackCount = 1
+	}
+	c.CooldownScale = weapon.CooldownScale
+	if c.CooldownScale <= 0 {
+		c.CooldownScale = 1
+	}
 	c.AttackRange = weapon.AttackRange
 	c.ImpactRatio = weapon.ImpactRatio
 	c.RegenRate = weapon.RegenRate
@@ -69,6 +85,9 @@ func (c *Character) ResetAttack() {
 	c.AttackImpactTick = 0
 	c.AttackCompleteTick = 0
 	c.AttackImpacted = false
+	c.AttackActionCount = 0
+	c.AttackHitsEmitted = 0
+	c.AttackDirection = Vector2{}
 }
 
 func NewCharacter() *Character {
@@ -78,6 +97,8 @@ func NewCharacter() *Character {
 		Damage:         DefaultDamage,
 		MoveSpeed:      DefaultMoveSpeed,
 		AttackSpeed:    DefaultAttackSpeed,
+		AttackCount:    1,
+		CooldownScale:  1,
 		RegenRate:      DefaultRegenRate,
 		CritMultiplier: DefaultCritMultiplier,
 	}

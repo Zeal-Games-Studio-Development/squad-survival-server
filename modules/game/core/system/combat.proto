@@ -23,7 +23,7 @@ message CombatEvent {
 }
 
 message AttackStarted {
-  string attack_id = 1;
+  string action_id = 1;
   string attacker_user_id = 2;
   string attacker_character_id = 3;
   string target_user_id = 4;
@@ -33,10 +33,12 @@ message AttackStarted {
   int64 impact_tick = 8;
   int64 complete_tick = 9;
   string weapon_id = 10;
+  int32 attack_count = 11;
+  repeated string tags = 12;
 }
 
 message DamageApplied {
-  string attack_id = 1;
+  string action_id = 1;
   string attacker_user_id = 2;
   string attacker_character_id = 3;
   string target_user_id = 4;
@@ -46,21 +48,25 @@ message DamageApplied {
   int64 tick = 8;
   string projectile_id = 9;
   bool critical = 10;
+  string hit_id = 11;
+  repeated string tags = 12;
 }
 
 message CharacterDied {
-  string attack_id = 1;
+  string action_id = 1;
   string killer_user_id = 2;
   string killer_character_id = 3;
   string target_user_id = 4;
   string target_character_id = 5;
   int64 tick = 6;
   string projectile_id = 7;
+  string hit_id = 8;
+  repeated string tags = 9;
 }
 
 message ProjectileSpawned {
   string projectile_id = 1;
-  string attack_id = 2;
+  string action_id = 2;
   string attacker_user_id = 3;
   string attacker_character_id = 4;
   string target_user_id = 5;
@@ -71,26 +77,32 @@ message ProjectileSpawned {
   Vector2 direction = 10;
   double speed = 11;
   int64 tick = 12;
+  string hit_id = 13;
+  repeated string tags = 14;
 }
 
 message ProjectileHit {
   string projectile_id = 1;
-  string attack_id = 2;
+  string action_id = 2;
   string attacker_user_id = 3;
   string attacker_character_id = 4;
   string target_user_id = 5;
   string target_character_id = 6;
   Vector2 position = 7;
   int64 tick = 8;
+  string hit_id = 9;
+  repeated string tags = 10;
 }
 
 message ProjectileExpired {
   string projectile_id = 1;
-  string attack_id = 2;
+  string action_id = 2;
   string attacker_user_id = 3;
   string attacker_character_id = 4;
   string target_user_id = 5;
   string target_character_id = 6;
   Vector2 position = 7;
   int64 tick = 8;
+  string hit_id = 9;
+  repeated string tags = 10;
 }

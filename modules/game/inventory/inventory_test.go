@@ -56,7 +56,7 @@ func TestInitialInventoryAndLoadout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(snapshot.WeaponIDs) != 8 || len(snapshot.SquadLoadout) != 8 {
+	if len(snapshot.WeaponIDs) != 9 || len(snapshot.SquadLoadout) != 9 {
 		t.Fatalf("unexpected initial inventory: %+v", snapshot)
 	}
 	for _, weapon := range entity.DefaultWeaponCatalog() {
@@ -73,11 +73,11 @@ func TestSetLoadoutValidatesOwnershipTypeCompletenessAndVersion(t *testing.T) {
 	weapons := entity.DefaultWeaponCatalog()
 	variant := weapons[0]
 	variant.ID = "bow_rare"
-	service, err := NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "wand", "axe", "blunt", "crossbow", "bow_rare"})
+	service, err := NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "wand", "axe", "blunt", "crossbow", "shield", "bow_rare"})
 	if err == nil {
 		t.Fatal("initial config must not contain duplicate type")
 	}
-	service, err = NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "wand", "axe", "blunt", "crossbow"})
+	service, err = NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "wand", "axe", "blunt", "crossbow", "shield"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestRPCRejectsInvalidPayload(t *testing.T) {
 	if err := json.Unmarshal([]byte(response), &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Version == "" || len(snapshot.WeaponIDs) != 8 {
+	if snapshot.Version == "" || len(snapshot.WeaponIDs) != 9 {
 		t.Fatalf("invalid RPC response: %+v", snapshot)
 	}
 }

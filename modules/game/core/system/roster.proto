@@ -26,12 +26,12 @@ message CharacterRoster {
   double attack_speed = 6;
   double attack_range = 7;
   double regen_rate = 8;
-  reserved 9;
-  reserved "damage_ratio";
-  string weapon_type = 10;
-  string range_class = 11;
-  string weapon_id = 12;
-  double crit_chance = 13;
-  double crit_multiplier = 14;
-  double damage_reduction = 15;
+  string weapon_type = 9;
+  string range_class = 10;
+  string weapon_id = 11;
+  double crit_chance = 12;
+  double crit_multiplier = 13;
+  double damage_reduction = 14;
+  int32 attack_count = 15;
+  double cooldown_scale = 16;
 }

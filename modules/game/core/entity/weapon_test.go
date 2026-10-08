@@ -9,8 +9,8 @@ import (
 
 func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	weapons := DefaultWeaponCatalog()
-	if len(weapons) != 8 {
-		t.Fatalf("expected 8 weapons, got %d", len(weapons))
+	if len(weapons) != 9 {
+		t.Fatalf("expected 9 weapons, got %d", len(weapons))
 	}
 
 	found := make(map[WeaponType]bool, len(weapons))
@@ -28,7 +28,7 @@ func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	}
 	for _, weaponType := range []WeaponType{
 		WeaponBow, WeaponStaff, WeaponSpear,
-		WeaponSword, WeaponWand, WeaponAxe, WeaponBlunt, WeaponCrossbow,
+		WeaponSword, WeaponWand, WeaponAxe, WeaponBlunt, WeaponCrossbow, WeaponShield,
 	} {
 		if !found[weaponType] {
 			t.Fatalf("missing weapon type %q", weaponType)
@@ -132,11 +132,36 @@ func TestCreateCharacterSelectsWeaponFromCatalog(t *testing.T) {
 func TestDefaultWeaponDamageStats(t *testing.T) {
 	want := map[WeaponType]float64{
 		WeaponBow: 0.12, WeaponStaff: 0.12, WeaponSpear: 0.12,
-		WeaponSword: 0.10, WeaponWand: 0.06, WeaponAxe: 0.14, WeaponBlunt: 0.18, WeaponCrossbow: 0.12,
+		WeaponSword: 0.10, WeaponWand: 0.06, WeaponAxe: 0.14, WeaponBlunt: 0.18, WeaponCrossbow: 0.12, WeaponShield: 0.08,
 	}
 	for _, weapon := range DefaultWeaponCatalog() {
-		if weapon.CritChance != want[weapon.Type] || weapon.CritMultiplier != 1.5 || weapon.DamageReduction != 0 {
+		reduction := 0.0
+		if weapon.Type == WeaponShield {
+			reduction = 0.1
+		}
+		if weapon.CritChance != want[weapon.Type] || weapon.CritMultiplier != 1.5 || weapon.DamageReduction != reduction {
 			t.Fatalf("unexpected damage stats for %q: %+v", weapon.Type, weapon)
+		}
+	}
+}
+
+func TestWeaponAttackAndCooldownStats(t *testing.T) {
+	for _, weapon := range DefaultWeaponCatalog() {
+		if weapon.AttackCount != 1 {
+			t.Fatalf("%s attack count=%d", weapon.Type, weapon.AttackCount)
+		}
+		wantScale := 1.0
+		if weapon.Type == WeaponStaff {
+			wantScale = 1.25
+		}
+		if weapon.CooldownScale != wantScale {
+			t.Fatalf("%s cooldown scale=%f", weapon.Type, weapon.CooldownScale)
+		}
+	}
+	for _, field := range []string{`"attack_count":0`, `"attack_count":-1`, `"cooldown_scale":0`, `"cooldown_scale":-1`} {
+		data := fmt.Sprintf(`{"weapons":[{"type":"sword","weapon_id":"sword","range_class":"melee","attack_speed":1,"impact_ratio":0.5,%s}]}`, field)
+		if _, err := ParseWeaponCatalog([]byte(data)); err == nil {
+			t.Fatalf("invalid stat accepted: %s", field)
 		}
 	}
 }
