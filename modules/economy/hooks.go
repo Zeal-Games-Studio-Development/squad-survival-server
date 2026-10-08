@@ -10,9 +10,19 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 )
 
-func Register(initializer runtime.Initializer, service *Service) error {
+func Register(initializer runtime.Initializer, service *Service, afterNewAccount ...func(context.Context, runtime.Logger, runtime.NakamaModule, *api.Session) error) error {
 	hook := func(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, session *api.Session) error {
-		return initializeAuthenticatedAccount(ctx, logger, nk, session, service)
+		if err := initializeAuthenticatedAccount(ctx, logger, nk, session, service); err != nil {
+			return err
+		}
+		if session != nil && session.Created {
+			for _, callback := range afterNewAccount {
+				if err := callback(ctx, logger, nk, session); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
 	}
 
 	if err := initializer.RegisterAfterAuthenticateApple(func(ctx context.Context, l runtime.Logger, db *sql.DB, nk runtime.NakamaModule, out *api.Session, _ *api.AuthenticateAppleRequest) error {

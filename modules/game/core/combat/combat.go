@@ -29,7 +29,7 @@ type Event struct {
 	AttackerUserID, AttackerCharacterID       string
 	TargetUserID, TargetCharacterID           string
 	WeaponType                                entity.WeaponType
-	WeaponName                                string
+	WeaponID                                  string
 	Position, Direction                       entity.Vector2
 	Speed                                     float64
 	StartTick, ImpactTick, CompleteTick, Tick int64
@@ -42,7 +42,7 @@ type Projectile struct {
 	AttackerUserID, AttackerCharacterID string
 	TargetUserID, TargetCharacterID     string
 	WeaponType                          entity.WeaponType
-	WeaponName                          string
+	WeaponID                            string
 	Position, Direction                 entity.Vector2
 	Speed, Damage                       float64
 	Critical                            bool
@@ -190,7 +190,7 @@ func (s *Simulation) spawnProjectile(attacker, target ownedCharacter, tick int64
 		ID: id, AttackID: attackID(character),
 		AttackerUserID: attacker.owner.UserID, AttackerCharacterID: character.ID,
 		TargetUserID: target.owner.UserID, TargetCharacterID: target.character.ID,
-		WeaponType: character.Weapon.Type, WeaponName: character.Weapon.Name,
+		WeaponType: character.Weapon.Type, WeaponID: character.Weapon.ID,
 		Position: character.Position, Speed: character.Weapon.ProjectileSpeed,
 		Damage: amount, Critical: critical,
 	}
@@ -203,7 +203,7 @@ func projectileEvent(eventType EventType, projectile *Projectile, tick int64) Ev
 		Type: eventType, AttackID: projectile.AttackID, ProjectileID: projectile.ID,
 		AttackerUserID: projectile.AttackerUserID, AttackerCharacterID: projectile.AttackerCharacterID,
 		TargetUserID: projectile.TargetUserID, TargetCharacterID: projectile.TargetCharacterID,
-		WeaponType: projectile.WeaponType, WeaponName: projectile.WeaponName,
+		WeaponType: projectile.WeaponType, WeaponID: projectile.WeaponID,
 		Position: projectile.Position, Direction: projectile.Direction, Speed: projectile.Speed, Tick: tick,
 	}
 }
@@ -265,7 +265,7 @@ func startAttack(attacker, target ownedCharacter, tick int64) Event {
 		Type: EventAttackStarted, AttackID: attackID(character),
 		AttackerUserID: attacker.owner.UserID, AttackerCharacterID: character.ID,
 		TargetUserID: target.owner.UserID, TargetCharacterID: target.character.ID,
-		WeaponType: character.Weapon.Type, WeaponName: character.Weapon.Name,
+		WeaponType: character.Weapon.Type, WeaponID: character.Weapon.ID,
 		StartTick: character.AttackStartTick, ImpactTick: character.AttackImpactTick,
 		CompleteTick: character.AttackCompleteTick, Tick: tick,
 	}

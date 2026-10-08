@@ -2,6 +2,7 @@ package royale
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -9,11 +10,63 @@ import (
 	"squad-survival-be/modules/game/core/characterbox"
 	"squad-survival-be/modules/game/core/entity"
 	"squad-survival-be/modules/game/core/system"
+	"squad-survival-be/modules/game/inventory"
 	"squad-survival-be/modules/game/matchregistry"
 
+	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"google.golang.org/protobuf/proto"
 )
+
+type inventoryTestModule struct {
+	runtime.NakamaModule
+	value string
+}
+
+func (m inventoryTestModule) StorageRead(_ context.Context, _ []*runtime.StorageRead) ([]*api.StorageObject, error) {
+	if m.value == "" {
+		return nil, nil
+	}
+	return []*api.StorageObject{{Value: m.value, Version: "v1"}}, nil
+}
+
+func TestInventoryGatesBattleRoyaleJoin(t *testing.T) {
+	service := inventory.DefaultService()
+	match, state := newTestMatchState(t)
+	match.inventory = service
+	presence := testPresence{userID: "user-1", sessionID: "session-1"}
+	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, inventoryTestModule{}, nil, 0, state, presence, nil); allowed || reason != "invalid squad loadout" {
+		t.Fatalf("missing inventory accepted: %v %s", allowed, reason)
+	}
+	data, err := service.InitialData()
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err := json.Marshal(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, inventoryTestModule{value: string(value)}, nil, 0, state, presence, nil); !allowed || reason != "" {
+		t.Fatalf("valid inventory rejected: %v %s", allowed, reason)
+	}
+}
+
+func TestCharacterBoxUsesCollectorLoadout(t *testing.T) {
+	weapons := entity.DefaultWeaponCatalog()
+	variant := weapons[0]
+	variant.ID = "bow_rare"
+	variant.Damage = 99
+	state := &State{WeaponCatalog: append(weapons, variant)}
+	box := entity.NewCharacterBox("box", entity.Vector2{}, entity.WeaponBow)
+	first := entity.NewPlayer("first", "first", "", entity.Vector2{}, rand.New(rand.NewSource(1)))
+	second := entity.NewPlayer("second", "second", "", entity.Vector2{}, rand.New(rand.NewSource(2)))
+	second.SquadLoadout[entity.WeaponBow] = variant.ID
+	firstWeapon, firstOK := state.weaponForBox(first, box)
+	secondWeapon, secondOK := state.weaponForBox(second, box)
+	if !firstOK || !secondOK || firstWeapon.ID != "bow" || secondWeapon.ID != variant.ID || secondWeapon.Damage != 99 {
+		t.Fatalf("box ignored player loadouts: first=%+v second=%+v", firstWeapon, secondWeapon)
+	}
+}
 
 func TestMatchInitStartsWaiting(t *testing.T) {
 	match := &Match{registry: matchregistry.New()}

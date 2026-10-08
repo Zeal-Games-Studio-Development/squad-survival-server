@@ -2,7 +2,7 @@
   "weapons": [
     {
       "type": "bow",
-      "name": "bow",
+      "weapon_id": "bow",
       "range_class": "ranged",
       "health": 85,
       "damage": 11,
@@ -18,7 +18,7 @@
     },
     {
       "type": "staff",
-      "name": "staff",
+      "weapon_id": "staff",
       "range_class": "ranged",
       "health": 105,
       "damage": 13,
@@ -34,7 +34,7 @@
     },
     {
       "type": "spear",
-      "name": "spear",
+      "weapon_id": "spear",
       "range_class": "melee",
       "health": 110,
       "damage": 12,
@@ -50,7 +50,7 @@
     },
     {
       "type": "sword",
-      "name": "sword",
+      "weapon_id": "sword",
       "range_class": "melee",
       "health": 115,
       "damage": 11,
@@ -66,7 +66,7 @@
     },
     {
       "type": "wand",
-      "name": "wand",
+      "weapon_id": "wand",
       "range_class": "ranged",
       "health": 80,
       "damage": 15,
@@ -82,7 +82,7 @@
     },
     {
       "type": "axe",
-      "name": "axe",
+      "weapon_id": "axe",
       "range_class": "melee",
       "health": 125,
       "damage": 16,
@@ -98,7 +98,7 @@
     },
     {
       "type": "blunt",
-      "name": "blunt",
+      "weapon_id": "blunt",
       "range_class": "melee",
       "health": 135,
       "damage": 14,
@@ -109,6 +109,22 @@
       "projectile_speed": 0,
       "regen_rate": 0.4,
       "crit_chance": 0.18,
+      "crit_multiplier": 1.5,
+      "damage_reduction": 0
+    },
+    {
+      "type": "crossbow",
+      "weapon_id": "crossbow",
+      "range_class": "ranged",
+      "health": 85,
+      "damage": 11,
+      "move_speed": 5.3,
+      "attack_speed": 1.15,
+      "attack_range": 8,
+      "impact_ratio": 0.55,
+      "projectile_speed": 12,
+      "regen_rate": 0,
+      "crit_chance": 0.12,
       "crit_multiplier": 1.5,
       "damage_reduction": 0
     }

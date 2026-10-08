@@ -29,6 +29,7 @@ type Player struct {
 	HasSequence           bool
 	LastInputTick         int64
 	Characters            []*Character
+	SquadLoadout          map[WeaponType]string
 	DetectionRadius       float64
 	Strategy              strategy.Definition
 	RosterVersion         uint64
@@ -39,11 +40,16 @@ type Player struct {
 }
 
 func NewPlayer(userID, sessionID, displayName string, position Vector2, random *rand.Rand) *Player {
+	return NewPlayerWithWeapon(userID, sessionID, displayName, position, RandomWeapon(random, DefaultWeaponCatalog()))
+}
+
+func NewPlayerWithWeapon(userID, sessionID, displayName string, position Vector2, weapon Weapon) *Player {
 	definition, ok := strategy.DefaultDefinition(strategy.DefaultStrategyName)
 	if !ok {
 		panic("default strategy not found: " + strategy.DefaultStrategyName)
 	}
-	character := CreateCharacter(random, DefaultWeaponCatalog())
+	character := NewCharacter()
+	character.ApplyWeapon(weapon)
 	player := &Player{
 		UserID:             userID,
 		SessionID:          sessionID,
@@ -51,6 +57,7 @@ func NewPlayer(userID, sessionID, displayName string, position Vector2, random *
 		Position:           world.ClampToPlayArea(position),
 		Facing:             Vector2{X: 1},
 		Characters:         []*Character{character},
+		SquadLoadout:       defaultSquadLoadout(),
 		DetectionRadius:    DefaultDetectionRadius,
 		Strategy:           definition,
 		RosterVersion:      1,
@@ -69,6 +76,23 @@ func NewPlayer(userID, sessionID, displayName string, position Vector2, random *
 		}
 	}
 	return player
+}
+
+func defaultSquadLoadout() map[WeaponType]string {
+	loadout := make(map[WeaponType]string)
+	for _, weapon := range DefaultWeaponCatalog() {
+		if _, exists := loadout[weapon.Type]; !exists {
+			loadout[weapon.Type] = weapon.ID
+		}
+	}
+	return loadout
+}
+
+func (p *Player) SetSquadLoadout(loadout map[string]string) {
+	p.SquadLoadout = make(map[WeaponType]string, len(loadout))
+	for weaponType, weaponID := range loadout {
+		p.SquadLoadout[WeaponType(weaponType)] = weaponID
+	}
 }
 
 func (p *Player) MaxCharacters() int {

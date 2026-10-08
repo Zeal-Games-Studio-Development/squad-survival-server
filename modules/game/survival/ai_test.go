@@ -240,12 +240,16 @@ func TestAIUsesNormalPickupProgressionAndCombat(t *testing.T) {
 	if err := state.SpatialGrid.Insert(opponent); err != nil {
 		t.Fatal(err)
 	}
-	victim := opponent.Characters[0]
-	initialHealth := victim.Health
+	initialHealth := make(map[*entity.Character]float64, len(opponent.Characters))
+	for _, character := range opponent.Characters {
+		initialHealth[character] = character.Health
+	}
 	for tick := int64(21); tick <= 50; tick++ {
 		match.MatchLoop(nil, aiTestLogger{}, nil, nil, dispatcher, tick, state, nil)
-		if victim.Health < initialHealth {
-			return
+		for character, health := range initialHealth {
+			if character.Health < health {
+				return
+			}
 		}
 	}
 	t.Fatal("AI did not participate in automatic combat")

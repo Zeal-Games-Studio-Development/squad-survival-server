@@ -13,13 +13,14 @@ type WeaponType string
 type RangeClass string
 
 const (
-	WeaponBow   WeaponType = "bow"
-	WeaponStaff WeaponType = "staff"
-	WeaponSpear WeaponType = "spear"
-	WeaponSword WeaponType = "sword"
-	WeaponWand  WeaponType = "wand"
-	WeaponAxe   WeaponType = "axe"
-	WeaponBlunt WeaponType = "blunt"
+	WeaponBow      WeaponType = "bow"
+	WeaponStaff    WeaponType = "staff"
+	WeaponSpear    WeaponType = "spear"
+	WeaponSword    WeaponType = "sword"
+	WeaponWand     WeaponType = "wand"
+	WeaponAxe      WeaponType = "axe"
+	WeaponBlunt    WeaponType = "blunt"
+	WeaponCrossbow WeaponType = "crossbow"
 )
 
 const (
@@ -29,7 +30,7 @@ const (
 
 type Weapon struct {
 	Type            WeaponType `json:"type"`
-	Name            string     `json:"name"`
+	ID              string     `json:"weapon_id"`
 	RangeClass      RangeClass `json:"range_class"`
 	Health          float64    `json:"health"`
 	Damage          float64    `json:"damage"`
@@ -59,14 +60,19 @@ func ParseWeaponCatalog(data []byte) ([]Weapon, error) {
 	if len(catalog.Weapons) == 0 {
 		return nil, errors.New("weapon catalog has no weapons")
 	}
+	seenIDs := make(map[string]struct{}, len(catalog.Weapons))
 	for index := range catalog.Weapons {
 		weapon := &catalog.Weapons[index]
 		if weapon.Type == "" {
 			return nil, errors.New("weapon type is required")
 		}
-		if weapon.Name == "" {
-			return nil, errors.New("weapon name is required")
+		if weapon.ID == "" {
+			return nil, errors.New("weapon id is required")
 		}
+		if _, exists := seenIDs[weapon.ID]; exists {
+			return nil, fmt.Errorf("duplicate weapon id %q", weapon.ID)
+		}
+		seenIDs[weapon.ID] = struct{}{}
 		if !weapon.RangeClass.Valid() {
 			return nil, errors.New("weapon range class must be melee or ranged")
 		}

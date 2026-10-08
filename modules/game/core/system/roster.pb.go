@@ -161,7 +161,7 @@ type CharacterRoster struct {
 	RegenRate       float64                `protobuf:"fixed64,8,opt,name=regen_rate,json=regenRate,proto3" json:"regen_rate,omitempty"`
 	WeaponType      string                 `protobuf:"bytes,10,opt,name=weapon_type,json=weaponType,proto3" json:"weapon_type,omitempty"`
 	RangeClass      string                 `protobuf:"bytes,11,opt,name=range_class,json=rangeClass,proto3" json:"range_class,omitempty"`
-	WeaponName      string                 `protobuf:"bytes,12,opt,name=weapon_name,json=weaponName,proto3" json:"weapon_name,omitempty"`
+	WeaponId        string                 `protobuf:"bytes,12,opt,name=weapon_id,json=weaponId,proto3" json:"weapon_id,omitempty"`
 	CritChance      float64                `protobuf:"fixed64,13,opt,name=crit_chance,json=critChance,proto3" json:"crit_chance,omitempty"`
 	CritMultiplier  float64                `protobuf:"fixed64,14,opt,name=crit_multiplier,json=critMultiplier,proto3" json:"crit_multiplier,omitempty"`
 	DamageReduction float64                `protobuf:"fixed64,15,opt,name=damage_reduction,json=damageReduction,proto3" json:"damage_reduction,omitempty"`
@@ -269,9 +269,9 @@ func (x *CharacterRoster) GetRangeClass() string {
 	return ""
 }
 
-func (x *CharacterRoster) GetWeaponName() string {
+func (x *CharacterRoster) GetWeaponId() string {
 	if x != nil {
-		return x.WeaponName
+		return x.WeaponId
 	}
 	return ""
 }
@@ -313,7 +313,7 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\x0eroster_version\x18\x04 \x01(\x04R\rrosterVersion\x12A\n" +
 	"\n" +
 	"characters\x18\x05 \x03(\v2!.game.core.system.CharacterRosterR\n" +
-	"characters\"\xf3\x03\n" +
+	"characters\"\xef\x03\n" +
 	"\x0fCharacterRoster\x12!\n" +
 	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12\x16\n" +
 	"\x06health\x18\x02 \x01(\x01R\x06health\x12\x1d\n" +
@@ -330,9 +330,8 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	" \x01(\tR\n" +
 	"weaponType\x12\x1f\n" +
 	"\vrange_class\x18\v \x01(\tR\n" +
-	"rangeClass\x12\x1f\n" +
-	"\vweapon_name\x18\f \x01(\tR\n" +
-	"weaponName\x12\x1f\n" +
+	"rangeClass\x12\x1b\n" +
+	"\tweapon_id\x18\f \x01(\tR\bweaponId\x12\x1f\n" +
 	"\vcrit_chance\x18\r \x01(\x01R\n" +
 	"critChance\x12'\n" +
 	"\x0fcrit_multiplier\x18\x0e \x01(\x01R\x0ecritMultiplier\x12)\n" +

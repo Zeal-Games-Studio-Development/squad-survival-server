@@ -48,7 +48,7 @@ func benchmarkPlayers(playerCount, characterCount int) map[string]*entity.Player
 			player.Characters = append(player.Characters, &entity.Character{
 				ID: fmt.Sprintf("%s:%d", player.UserID, characterIndex), Position: entity.Vector2{X: float64(playerIndex % 4), Y: float64(playerIndex / 4)},
 				Health: 100, Damage: 1, CritMultiplier: 1.5, AttackSpeed: 1, AttackRange: 8, ImpactRatio: 0.5,
-				RangeClass: entity.RangeMelee, Weapon: entity.Weapon{Type: entity.WeaponSword, Name: "sword"},
+				RangeClass: entity.RangeMelee, Weapon: entity.Weapon{Type: entity.WeaponSword, ID: "sword"},
 			})
 		}
 		players[sessionID] = player

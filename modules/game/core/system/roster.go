@@ -34,7 +34,7 @@ func playerRoster(player *entity.Player) *PlayerRoster {
 			CritChance: character.CritChance, CritMultiplier: character.CritMultiplier,
 			DamageReduction: character.DamageReduction,
 			WeaponType:      string(character.Weapon.Type), RangeClass: string(character.RangeClass),
-			WeaponName: character.Weapon.Name,
+			WeaponId: character.Weapon.ID,
 		})
 	}
 	return &PlayerRoster{
