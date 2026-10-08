@@ -22,6 +22,7 @@ Tài liệu này mô tả trạng thái đã triển khai của Squad Survival S
 | Spatial detection theo vùng tròn | Hoàn thành |
 | Character, weapon và formation 5x5 | Hoàn thành |
 | Melee combat, ranged projectile và combat events | Hoàn thành |
+| Skill tự động theo weapon ID và sword quét hình nón | Hoàn thành |
 | Realtime protocol bằng Protobuf | Hoàn thành |
 | Generate Go và C# từ cùng schema | Hoàn thành |
 
@@ -37,6 +38,7 @@ Tài liệu này mô tả trạng thái đã triển khai của Squad Survival S
 8. [Kiểm thử và code generation](testing.md)
 9. [Battle Royale lifecycle](battle-royale.md)
 10. [AI player và cấu hình bot](ai-players.md)
+11. [Plan skill theo weapon ID](plans/skill-system.md)
 
 ## Planned
 

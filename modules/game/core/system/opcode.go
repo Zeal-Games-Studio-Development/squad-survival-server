@@ -11,4 +11,5 @@ const (
 	OpMatchLifecycleState        int64 = 107
 	OpPlayerProgressionBatch     int64 = 108
 	OpExperiencePackageState     int64 = 109
+	OpSkillStateBatch            int64 = 110
 )

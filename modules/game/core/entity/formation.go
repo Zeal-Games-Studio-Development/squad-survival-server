@@ -144,12 +144,16 @@ func rangeClassPriority(rangeClass RangeClass) int {
 }
 
 func StepCharacters(player *Player) error {
+	return StepCharactersAtTick(player, -1)
+}
+
+func StepCharactersAtTick(player *Player, tick int64) error {
 	if err := AssignCharacterTargets(player); err != nil {
 		return err
 	}
 	deltaSeconds := 1.0 / float64(TickRate)
 	for _, character := range player.Characters {
-		if character == nil || !isFinite(character.MoveSpeed) || character.MoveSpeed <= 0 {
+		if character == nil || character.ActiveSkillID != "" && tick >= 0 && tick <= character.SkillCompleteTick || !isFinite(character.MoveSpeed) || character.MoveSpeed <= 0 {
 			continue
 		}
 		character.Position = moveTowards(

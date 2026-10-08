@@ -27,3 +27,23 @@ func TestCooldownModesScaleAndDedupeActions(t *testing.T) {
 		}
 	}
 }
+
+func TestCooldownResetStartsNextCycleWithoutCountingOldAction(t *testing.T) {
+	character := NewCharacter()
+	character.CooldownScale = 1.25
+	if err := character.StartCooldown("skill", CooldownDamageReceived, 1.25); err != nil {
+		t.Fatal(err)
+	}
+	character.AdvanceCooldowns(CooldownDamageReceived, "action:a")
+	if !character.ResetCooldown("skill") || character.Cooldowns["skill"].Progress != 0 {
+		t.Fatal("ready skill did not reset")
+	}
+	character.AdvanceCooldowns(CooldownDamageReceived, "action:a")
+	if character.Cooldowns["skill"].Progress != 0 {
+		t.Fatal("old action advanced a new cooldown cycle")
+	}
+	character.AdvanceCooldowns(CooldownDamageReceived, "action:b")
+	if !character.CooldownReady("skill") {
+		t.Fatal("new action did not recharge skill")
+	}
+}

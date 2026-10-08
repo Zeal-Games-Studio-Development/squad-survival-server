@@ -19,7 +19,23 @@ message CombatEvent {
     ProjectileSpawned projectile_spawned = 4;
     ProjectileHit projectile_hit = 5;
     ProjectileExpired projectile_expired = 6;
+    SkillStarted skill_started = 7;
   }
+}
+
+message SkillStarted {
+  string action_id = 1;
+  string skill_id = 2;
+  string attacker_user_id = 3;
+  string attacker_character_id = 4;
+  string target_user_id = 5;
+  string target_character_id = 6;
+  string weapon_id = 7;
+  Vector2 direction = 8;
+  int64 start_tick = 9;
+  int64 impact_tick = 10;
+  int64 complete_tick = 11;
+  repeated string tags = 12;
 }
 
 message AttackStarted {

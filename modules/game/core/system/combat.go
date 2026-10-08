@@ -26,6 +26,15 @@ func EncodeCombatEventBatch(tick int64, events []corecombat.Event) ([]byte, erro
 
 func combatEventSnapshot(event corecombat.Event) (*CombatEvent, error) {
 	switch event.Type {
+	case corecombat.EventSkillStarted:
+		return &CombatEvent{Event: &CombatEvent_SkillStarted{SkillStarted: &SkillStarted{
+			ActionId: event.AttackID, SkillId: event.SkillID,
+			AttackerUserId: event.AttackerUserID, AttackerCharacterId: event.AttackerCharacterID,
+			TargetUserId: event.TargetUserID, TargetCharacterId: event.TargetCharacterID,
+			WeaponId: event.WeaponID, Direction: vectorSnapshot(event.Direction),
+			StartTick: event.StartTick, ImpactTick: event.ImpactTick, CompleteTick: event.CompleteTick,
+			Tags: tagNames(event.Tags),
+		}}}, nil
 	case corecombat.EventAttackStarted:
 		return &CombatEvent{Event: &CombatEvent_AttackStarted{AttackStarted: &AttackStarted{
 			ActionId: event.AttackID, AttackerUserId: event.AttackerUserID, AttackerCharacterId: event.AttackerCharacterID,

@@ -1,0 +1,13 @@
+{
+  "skills": [
+    {
+      "skill_id": "sword_cone",
+      "weapon_id": "sword",
+      "priority": 0,
+      "cooldown": { "mode": "ticks", "required": 30 },
+      "timing": { "impact_ticks": 2, "complete_ticks": 5 },
+      "target": { "relation": "enemy", "shape": "cone", "angle_degrees": 90, "range_scale": 1 },
+      "effect": { "kind": "damage", "damage_multiplier": 1, "can_crit": true }
+    }
+  ]
+}

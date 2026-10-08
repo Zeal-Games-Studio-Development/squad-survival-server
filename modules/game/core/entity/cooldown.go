@@ -29,6 +29,7 @@ func (c *Character) StartCooldown(skillID string, mode CooldownMode, required fl
 		c.Cooldowns = make(map[string]*Cooldown)
 	}
 	c.Cooldowns[skillID] = &Cooldown{Mode: mode, Required: required}
+	c.SkillStateVersion++
 	return nil
 }
 
@@ -38,6 +39,19 @@ func (c *Character) CooldownReady(skillID string) bool {
 	}
 	state, exists := c.Cooldowns[skillID]
 	return exists && state.Progress >= state.Required
+}
+
+func (c *Character) ResetCooldown(skillID string) bool {
+	if c == nil {
+		return false
+	}
+	state, exists := c.Cooldowns[skillID]
+	if !exists || state == nil || state.Progress < state.Required {
+		return false
+	}
+	state.Progress = 0
+	c.SkillStateVersion++
+	return true
 }
 
 func (c *Character) AdvanceCooldowns(mode CooldownMode, actionID string) {
@@ -75,6 +89,7 @@ func (c *Character) AdvanceCooldowns(mode CooldownMode, actionID string) {
 			state.seenActions[actionID] = struct{}{}
 		}
 		state.Progress += scale
+		c.SkillStateVersion++
 		if state.Progress > state.Required {
 			state.Progress = state.Required
 		}

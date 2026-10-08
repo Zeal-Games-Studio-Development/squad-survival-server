@@ -58,6 +58,7 @@ type State struct {
 	Combat              *combat.Simulation
 	RosterVersions      map[string]map[string]uint64
 	ProgressionVersions map[string]map[string]uint64
+	SkillStateVersions  map[string]map[string]uint64
 	Experience          *experience.Manager
 	CharacterBoxes      map[string]*entity.CharacterBox
 	WeaponCatalog       []entity.Weapon
@@ -107,6 +108,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		Combat:              combat.NewSimulation(),
 		RosterVersions:      make(map[string]map[string]uint64),
 		ProgressionVersions: make(map[string]map[string]uint64),
+		SkillStateVersions:  make(map[string]map[string]uint64),
 		CharacterBoxes:      make(map[string]*entity.CharacterBox),
 		WeaponCatalog:       weaponCatalog,
 		NextBoxRefillTick:   characterBoxRefillTicks,
@@ -307,7 +309,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	state.stepAI(tick)
 	for _, player := range state.Players {
 		entity.StepMovement(player, tick)
-		if err := entity.StepCharacters(player); err != nil && logger != nil {
+		if err := entity.StepCharactersAtTick(player, tick); err != nil && logger != nil {
 			logger.Error("Could not update character strategy: session_id=%s error=%v", player.SessionID, err)
 		}
 		if err := state.SpatialGrid.Move(player); err != nil && logger != nil {
@@ -349,6 +351,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 		}
 	}
 	state.broadcastCombatEvents(logger, dispatcher, tick, combatEvents, nearbyPlayers)
+	state.broadcastSkillStates(logger, dispatcher, tick, nearbyPlayers)
 	state.broadcastPlayerMovementSnapshots(logger, dispatcher, tick, nearbyPlayers)
 	state.broadcastProjectileMovementSnapshots(logger, dispatcher, tick, nearbyPlayers, state.Combat.Projectiles())
 
@@ -364,6 +367,41 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	}
 
 	return state
+}
+
+func (s *State) broadcastSkillStates(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, nearbyPlayers map[string][]*entity.Player) {
+	if s.SkillStateVersions == nil {
+		s.SkillStateVersions = make(map[string]map[string]uint64)
+	}
+	for sessionID, player := range s.Players {
+		presence, ok := s.Presences[sessionID]
+		if !ok || player == nil {
+			continue
+		}
+		seen := s.SkillStateVersions[sessionID]
+		if seen == nil {
+			seen = make(map[string]uint64)
+			s.SkillStateVersions[sessionID] = seen
+		}
+		visible := append([]*entity.Player{player}, nearbyPlayers[sessionID]...)
+		states := system.ChangedSkillStates(visible, seen)
+		if len(states) == 0 {
+			continue
+		}
+		payload, err := system.EncodeSkillStateBatch(tick, states)
+		if err == nil {
+			err = dispatcher.BroadcastMessage(system.OpSkillStateBatch, payload, []runtime.Presence{presence}, nil, true)
+		}
+		if err != nil {
+			if logger != nil {
+				logger.Error("Could not send skill state: session_id=%s error=%v", sessionID, err)
+			}
+			continue
+		}
+		for _, state := range states {
+			seen[system.SkillStateKey(state)] = state.Version
+		}
+	}
 }
 
 func (s *State) ensureCharacterBoxState(tick int64) {
@@ -877,6 +915,7 @@ func (s *State) broadcastRosterUpdates(logger runtime.Logger, dispatcher runtime
 
 func (s *State) removeRosterTracking(sessionID string) {
 	delete(s.RosterVersions, sessionID)
+	delete(s.SkillStateVersions, sessionID)
 	for _, sent := range s.RosterVersions {
 		delete(sent, sessionID)
 	}

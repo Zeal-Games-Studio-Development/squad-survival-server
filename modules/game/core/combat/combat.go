@@ -23,12 +23,14 @@ const (
 	EventProjectileSpawned
 	EventProjectileHit
 	EventProjectileExpired
+	EventSkillStarted
 )
 
 type Event struct {
 	Type                                      EventType
 	AttackID, ProjectileID                    string
 	HitID                                     string
+	SkillID                                   string
 	HitIndex                                  int
 	Tags                                      []entity.ActionTag
 	AttackCount                               int
@@ -116,6 +118,24 @@ func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[s
 
 	for _, attacker := range characters {
 		character := attacker.character
+		if character.ActiveSkillID != "" {
+			if character.Health <= 0 {
+				character.ResetSkill()
+				continue
+			}
+			if !character.SkillImpacted && tick >= character.SkillImpactTick {
+				if skill, ok := skillByID(character.Weapon.ID, character.ActiveSkillID); ok {
+					result := resolveSkillImpact(skill, attacker, candidates[attacker.owner.SessionID], tick, random)
+					intents = append(intents, result.damageIntents...)
+					events = append(events, result.events...)
+				}
+				character.SkillImpacted = true
+			}
+			if tick >= character.SkillCompleteTick {
+				character.ResetSkill()
+			}
+			continue
+		}
 		if !canAttack(attacker, s.config.QueryBuffer) {
 			character.ResetAttack()
 			continue
@@ -171,7 +191,11 @@ func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[s
 				character.ResetAttack()
 			}
 		}
-		if !canAttack(attacker, s.config.QueryBuffer) || character.TargetCharacterID != "" {
+		if character.ActiveSkillID != "" || !canAttack(attacker, s.config.QueryBuffer) || character.TargetCharacterID != "" {
+			continue
+		}
+		if event, ok := tryStartSkill(attacker, candidates[attacker.owner.SessionID], tick); ok {
+			events = append(events, event)
 			continue
 		}
 		if target, ok := nearestTarget(attacker, candidates[attacker.owner.SessionID]); ok {
@@ -179,6 +203,153 @@ func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[s
 		}
 	}
 	return events
+}
+
+func skillByID(weaponID, skillID string) (entity.SkillDefinition, bool) {
+	for _, skill := range entity.SkillsForWeapon(weaponID) {
+		if skill.ID == skillID {
+			return skill, true
+		}
+	}
+	return entity.SkillDefinition{}, false
+}
+
+func skillTargets(skill entity.SkillDefinition, caster ownedCharacter, enemies []ownedCharacter) []ownedCharacter {
+	switch skill.Target.Relation {
+	case "self":
+		return []ownedCharacter{caster}
+	case "ally":
+		allies := make([]ownedCharacter, 0, len(caster.owner.Characters))
+		for _, character := range caster.owner.Characters {
+			if character != nil && character != caster.character && character.Health > 0 {
+				allies = append(allies, ownedCharacter{owner: caster.owner, character: character})
+			}
+		}
+		sort.Slice(allies, func(i, j int) bool { return targetLess(allies[i], allies[j]) })
+		return allies
+	default:
+		return enemies
+	}
+}
+
+func nearestSkillTarget(skill entity.SkillDefinition, caster ownedCharacter, enemies []ownedCharacter) (ownedCharacter, bool) {
+	var selected ownedCharacter
+	best, found := math.Inf(1), false
+	maximum := caster.character.AttackRange * skill.Target.RangeScale
+	for _, candidate := range skillTargets(skill, caster, enemies) {
+		if candidate.character == nil || candidate.character.ID == "" || candidate.character.Health <= 0 {
+			continue
+		}
+		distance := distanceSquared(caster.character.Position, candidate.character.Position)
+		if distance > maximum*maximum {
+			continue
+		}
+		if !found || distance < best || distance == best && targetLess(candidate, selected) {
+			selected, best, found = candidate, distance, true
+		}
+	}
+	return selected, found
+}
+
+func tryStartSkill(caster ownedCharacter, enemies []ownedCharacter, tick int64) (Event, bool) {
+	character := caster.character
+	for _, skill := range entity.SkillsForWeapon(character.Weapon.ID) {
+		if !character.CooldownReady(skill.ID) {
+			continue
+		}
+		target, ok := nearestSkillTarget(skill, caster, enemies)
+		if !ok || !character.ResetCooldown(skill.ID) {
+			continue
+		}
+		character.AttackSequence++
+		character.ActiveSkillID = skill.ID
+		character.SkillStateVersion++
+		character.SkillActionID = attackID(character)
+		character.SkillDirection = directionTo(character.Position, target.character.Position)
+		if character.SkillDirection == (entity.Vector2{}) {
+			character.SkillDirection = entity.NormalizeDirection(caster.owner.Facing)
+		}
+		if character.SkillDirection == (entity.Vector2{}) {
+			character.SkillDirection = entity.Vector2{X: 1}
+		}
+		character.SkillStartTick = tick
+		character.SkillImpactTick = tick + skill.Timing.ImpactTicks
+		character.SkillCompleteTick = tick + skill.Timing.CompleteTicks
+		character.SkillImpacted = false
+		tags := []entity.ActionTag{entity.TagSkill}
+		if skill.Target.Shape == "cone" {
+			tags = append(tags, entity.TagAOE)
+		}
+		return Event{Type: EventSkillStarted, AttackID: character.SkillActionID, SkillID: skill.ID,
+			Tags: tags, AttackerUserID: caster.owner.UserID, AttackerCharacterID: character.ID,
+			TargetUserID: target.owner.UserID, TargetCharacterID: target.character.ID,
+			WeaponType: character.Weapon.Type, WeaponID: character.Weapon.ID, Direction: character.SkillDirection,
+			StartTick: character.SkillStartTick, ImpactTick: character.SkillImpactTick,
+			CompleteTick: character.SkillCompleteTick, Tick: tick}, true
+	}
+	return Event{}, false
+}
+
+type skillEffectResult struct {
+	damageIntents []damageIntent
+	events        []Event
+}
+
+type skillEffectHandler func(entity.SkillDefinition, ownedCharacter, []ownedCharacter, int64, *rand.Rand) skillEffectResult
+
+var skillEffectHandlers = map[string]skillEffectHandler{"damage": skillDamageIntents}
+
+func resolveSkillImpact(skill entity.SkillDefinition, caster ownedCharacter, enemies []ownedCharacter, tick int64, random *rand.Rand) skillEffectResult {
+	handler := skillEffectHandlers[skill.Effect.Kind]
+	if handler == nil {
+		return skillEffectResult{}
+	}
+	return handler(skill, caster, skillTargets(skill, caster, enemies), tick, random)
+}
+
+func skillDamageIntents(skill entity.SkillDefinition, caster ownedCharacter, candidates []ownedCharacter, tick int64, random *rand.Rand) skillEffectResult {
+	character := caster.character
+	maximum := character.AttackRange * skill.Target.RangeScale
+	cosHalfAngle := math.Cos(skill.Target.AngleDegrees * math.Pi / 360)
+	targets := make([]ownedCharacter, 0)
+	for _, candidate := range candidates {
+		if candidate.character == nil || candidate.character.ID == "" || candidate.character.Health <= 0 {
+			continue
+		}
+		dx := candidate.character.Position.X - character.Position.X
+		dy := candidate.character.Position.Y - character.Position.Y
+		distance := math.Hypot(dx, dy)
+		if distance > maximum {
+			continue
+		}
+		if skill.Target.Shape == "cone" && distance > 0 && (dx*character.SkillDirection.X+dy*character.SkillDirection.Y)/distance < cosHalfAngle {
+			continue
+		}
+		targets = append(targets, candidate)
+	}
+	if skill.Target.Shape == "single" && len(targets) > 1 {
+		sort.Slice(targets, func(i, j int) bool {
+			left := distanceSquared(character.Position, targets[i].character.Position)
+			right := distanceSquared(character.Position, targets[j].character.Position)
+			return left < right || left == right && targetLess(targets[i], targets[j])
+		})
+		targets = targets[:1]
+	}
+	sort.Slice(targets, func(i, j int) bool { return targetLess(targets[i], targets[j]) })
+	tags := []entity.ActionTag{entity.TagSkill}
+	if skill.Target.Shape == "cone" {
+		tags = append(tags, entity.TagAOE)
+	}
+	intents := make([]damageIntent, 0, len(targets))
+	for index, target := range targets {
+		amount, critical := character.Damage, false
+		if skill.Effect.CanCrit {
+			amount, critical = damage.RollAttack(character, random)
+		}
+		amount *= skill.Effect.DamageMultiplier
+		intents = append(intents, newDamageIntent(caster, target, character.SkillActionID, index+1, "", tags, tick, amount, critical))
+	}
+	return skillEffectResult{damageIntents: intents}
 }
 
 func (s *Simulation) stepProjectiles(lookup map[string]ownedCharacter, tick int64) ([]damageIntent, []Event) {

@@ -6,6 +6,7 @@ import (
 
 	"squad-survival-be/modules/account"
 	"squad-survival-be/modules/economy"
+	"squad-survival-be/modules/game/core/entity"
 	"squad-survival-be/modules/game/inventory"
 	"squad-survival-be/modules/game/matchmaking"
 	"squad-survival-be/modules/game/matchregistry"
@@ -17,6 +18,7 @@ import (
 )
 
 func InitModule(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, initializer runtime.Initializer) error {
+	entity.DefaultSkillCatalog()
 	if err := account.Register(initializer); err != nil {
 		return err
 	}

@@ -40,7 +40,15 @@ type Character struct {
 	AttackActionCount  int
 	AttackHitsEmitted  int
 	AttackDirection    Vector2
+	ActiveSkillID      string
+	SkillActionID      string
+	SkillDirection     Vector2
+	SkillStartTick     int64
+	SkillImpactTick    int64
+	SkillCompleteTick  int64
+	SkillImpacted      bool
 	Cooldowns          map[string]*Cooldown
+	SkillStateVersion  uint64
 	LastCooldownTick   int64
 	CooldownTickSet    bool
 }
@@ -53,6 +61,12 @@ func CreateCharacter(random *rand.Rand, weapons []Weapon) *Character {
 
 func (c *Character) ApplyWeapon(weapon Weapon) {
 	c.Weapon = weapon
+	c.Cooldowns = nil
+	for _, skill := range SkillsForWeapon(weapon.ID) {
+		if err := c.StartCooldown(skill.ID, skill.Cooldown.Mode, skill.Cooldown.Required); err != nil {
+			panic("invalid skill cooldown: " + err.Error())
+		}
+	}
 	c.RangeClass = weapon.RangeClass
 	c.MaxHealth = weapon.Health
 	c.Health = c.MaxHealth
@@ -76,6 +90,19 @@ func (c *Character) ApplyWeapon(weapon Weapon) {
 		c.CritMultiplier = DefaultCritMultiplier
 	}
 	c.DamageReduction = weapon.DamageReduction
+}
+
+func (c *Character) ResetSkill() {
+	if c.ActiveSkillID != "" {
+		c.SkillStateVersion++
+	}
+	c.ActiveSkillID = ""
+	c.SkillActionID = ""
+	c.SkillDirection = Vector2{}
+	c.SkillStartTick = 0
+	c.SkillImpactTick = 0
+	c.SkillCompleteTick = 0
+	c.SkillImpacted = false
 }
 
 func (c *Character) ResetAttack() {

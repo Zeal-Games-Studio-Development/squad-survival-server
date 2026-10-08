@@ -34,4 +34,14 @@ message CharacterRoster {
   double damage_reduction = 14;
   int32 attack_count = 15;
   double cooldown_scale = 16;
+  repeated SkillCooldown skill_cooldowns = 17;
+}
+
+message SkillCooldown {
+  string skill_id = 1;
+  string mode = 2;
+  double progress = 3;
+  double required = 4;
+  string active_action_id = 5;
+  int64 complete_tick = 6;
 }

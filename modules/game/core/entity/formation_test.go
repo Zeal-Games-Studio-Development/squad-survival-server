@@ -78,6 +78,31 @@ func TestStepCharactersMovesSoftlyWithoutOvershoot(t *testing.T) {
 	}
 }
 
+func TestCastingCharacterHoldsPositionThenReturnsToFormation(t *testing.T) {
+	player := newTestPlayer(Vector2{})
+	character := player.Characters[0]
+	character.ActiveSkillID = "sword_cone"
+	character.SkillCompleteTick = 5
+	player.Position = Vector2{X: 10}
+	initial := character.Position
+	for tick := int64(2); tick <= 5; tick++ {
+		if err := StepCharactersAtTick(player, tick); err != nil {
+			t.Fatal(err)
+		}
+		if character.Position != initial {
+			t.Fatalf("casting character moved at tick %d: %+v", tick, character.Position)
+		}
+	}
+	character.ResetSkill()
+	if err := StepCharactersAtTick(player, 6); err != nil {
+		t.Fatal(err)
+	}
+	expected := character.MoveSpeed * CharacterFollowSpeedMultiplier / float64(TickRate)
+	if !almostEqual(character.Position.X-initial.X, expected) {
+		t.Fatalf("expected normal formation return step %f, got %+v", expected, character.Position)
+	}
+}
+
 func TestSetStrategyRejectsInsufficientCapacity(t *testing.T) {
 	player := newTestPlayer(Vector2{})
 	player.Level = 2

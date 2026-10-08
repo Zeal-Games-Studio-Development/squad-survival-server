@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package game.core.system;
+
+option go_package = "squad-survival-be/modules/game/core/system;system";
+
+import "modules/game/core/system/roster.proto";
+
+message SkillStateBatch {
+  int64 tick = 1;
+  repeated SkillState states = 2;
+}
+
+message SkillState {
+  string user_id = 1;
+  string character_id = 2;
+  uint64 version = 3;
+  repeated SkillCooldown cooldowns = 4;
+}

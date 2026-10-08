@@ -35,7 +35,8 @@ func playerRoster(player *entity.Player) *PlayerRoster {
 			DamageReduction: character.DamageReduction,
 			AttackCount:     int32(character.AttackCount), CooldownScale: character.CooldownScale,
 			WeaponType: string(character.Weapon.Type), RangeClass: string(character.RangeClass),
-			WeaponId: character.Weapon.ID,
+			WeaponId:       character.Weapon.ID,
+			SkillCooldowns: skillCooldownSnapshots(character),
 		})
 	}
 	return &PlayerRoster{

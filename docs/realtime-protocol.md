@@ -14,6 +14,7 @@
 | `107` | Server → Client | `MatchLifecycleState` | Reliable | Join và chuyển phase Battle Royale |
 | `108` | Server → Client | `PlayerProgressionBatch` | Reliable | Join/enter detection/progression changed |
 | `109` | Server → Client | `ExperiencePackageStateBatch` | Reliable | Experience package detect/lost/collected |
+| `110` | Server → Client | `SkillStateBatch` | Reliable | Cooldown hoặc trạng thái thi triển thay đổi |
 
 Contract nằm trong các source schema:
 
@@ -24,6 +25,7 @@ Contract nằm trong các source schema:
 - [`projectile_movement.proto`](../modules/game/core/system/projectile_movement.proto)
 - [`vector.proto`](../modules/game/core/system/vector.proto)
 - [`combat.proto`](../modules/game/core/system/combat.proto)
+- [`skill_state.proto`](../modules/game/core/system/skill_state.proto)
 - [`character_box.proto`](../modules/game/core/entity/character_box.proto)
 - [`character_box_state.proto`](../modules/game/core/system/character_box_state.proto)
 - [`player_progression.proto`](../modules/game/core/system/player_progression.proto)
@@ -34,7 +36,9 @@ Contract nằm trong các source schema:
 
 `CharacterRoster` gửi `crit_chance`, `crit_multiplier`, `damage_reduction`, `attack_count`, `cooldown_scale`; `damage_ratio` đã được bỏ khỏi schema và không còn `reserved`. `DamageApplied` gửi `critical` và lượng máu thực tế bị trừ trong `damage`.
 
-Combat event dùng `action_id` chung cho một lượt đánh và `hit_id` riêng cho từng hit/projectile. `AttackStarted` gửi `attack_count`; các event có `tags` (`basic_attack`, `aoe`, `projectile`; dành `skill` cho tương lai). Tên field cũ `attack_id` đã đổi trực tiếp thành `action_id` tại cùng field number; Unity phải regenerate `Combat.cs`.
+Combat event dùng `action_id` chung cho một lượt đánh hoặc skill và `hit_id` riêng cho từng hit/projectile. `AttackStarted` gửi `attack_count`; `SkillStarted` gửi `skill_id`, hướng và các mốc tick. Tags gồm `basic_attack`, `aoe`, `projectile`, `skill`. Hit của sword cone mang `skill`, `aoe`. Unity cần regenerate `Combat.cs`.
+
+Roster gửi `skill_cooldowns` ở field 17 của từng character khi join hoặc đi vào detection. Mỗi cooldown gồm `skill_id`, `mode`, `progress`, `required`, `active_action_id`, `complete_tick`; `active_action_id` chỉ có giá trị khi đang thi triển. Opcode `110` gửi `SkillStateBatch` khi state thay đổi, gồm `user_id`, `character_id`, `version` và danh sách cooldown. Client chỉ nhận state của character bản thân và các player trong spatial detection; khi player rời detection, dùng movement snapshot để loại state đã cache. Các số `progress` và `required` có thể là số lẻ do `cooldown_scale`.
 
 `CharacterRoster`, `AttackStarted` và `ProjectileSpawned` dùng `weapon_id` thay cho `weapon_name` tại cùng field number protobuf. `CharacterBoxValue` chỉ gửi `weapon_type` ở field 1; `weapon_id` được chọn theo loadout của người nhặt và xuất hiện trong roster của character mới. Client cần regenerate protobuf; client cũ có thể đọc ID thành `weapon_name`.
 
@@ -48,7 +52,7 @@ sequenceDiagram
     Unity->>NakamaSDK: MovementInput.ToByteArray()
     NakamaSDK->>Match: opcode 1 + bytes
     Match->>Match: proto.Unmarshal + simulation
-    Match->>NakamaSDK: opcode 101/102/103/104/105/106/107/108/109 + proto.Marshal bytes
+    Match->>NakamaSDK: opcode 101/102/103/104/105/106/107/108/109/110 + proto.Marshal bytes
     NakamaSDK->>Unity: ReceivedMatchState
     Unity->>Unity: Message.Parser.ParseFrom(state.State)
 ```
@@ -99,11 +103,14 @@ socket.ReceivedMatchState += state => {
         case 109:
             Handle(ExperiencePackageStateBatch.Parser.ParseFrom(state.State));
             break;
+        case 110:
+            Handle(SkillStateBatch.Parser.ParseFrom(state.State));
+            break;
     }
 };
 ```
 
-`CombatEvent` dùng protobuf `oneof`; Unity kiểm tra `EventCase` trước khi đọc `AttackStarted`, projectile event, damage hoặc death.
+`CombatEvent` dùng protobuf `oneof`; Unity kiểm tra `EventCase` trước khi đọc `AttackStarted`, `SkillStarted`, projectile event, damage hoặc death.
 
 `CharacterBoxStateBatch` dùng `PICKUP_STARTED` để gửi `box_id`, `claimant_session_id`, `started_at_tick` và `completes_at_tick`. Client suy ra countdown từ tick server, không chờ packet mỗi tick. `PICKUP_CANCELLED` mở khóa UI khi claimant rời vùng, chết hoặc leave; `DESPAWNED` xác nhận box đã được consume và character được grant. Các event này được broadcast reliable toàn match. Snapshot gửi lúc join gồm cả box và claim đang hoạt động.
 
@@ -127,7 +134,7 @@ Project dùng Buf remote plugins:
 buf generate
 ```
 
-Go `.pb.go` được giữ trong backend repo. C# được tạo local tại `clients/unity/Generated/Protobuf` và bị Git ignore vì Unity nằm ở repo riêng; copy `Input.cs`, `State.cs`, `PlayerMovement.cs`, `PlayerProgression.cs`, `ExperiencePackage.cs`, `ExperiencePackageState.cs`, `Roster.cs`, `ProjectileMovement.cs`, `Vector.cs`, `Combat.cs` sang Unity sau khi schema thay đổi.
+Go `.pb.go` được giữ trong backend repo. C# được tạo local tại `clients/unity/Generated/Protobuf` và bị Git ignore vì Unity nằm ở repo riêng; copy `Input.cs`, `State.cs`, `PlayerMovement.cs`, `PlayerProgression.cs`, `ExperiencePackage.cs`, `ExperiencePackageState.cs`, `Roster.cs`, `SkillState.cs`, `ProjectileMovement.cs`, `Vector.cs`, `Combat.cs` sang Unity sau khi schema thay đổi.
 
 Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf hoặc `protoc` nếu chỉ sử dụng generated `.cs`.
 
@@ -135,7 +142,7 @@ Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf ho�
 
 - RPC `find_or_create_match`, `get_character_inventory`, `set_squad_loadout` request/response. `set_squad_loadout` nhận `{ "squad_loadout": { "bow": "bow", ... }, "version": "..." }`; cả hai RPC inventory trả `weapon_ids`, `squad_loadout` và `version`.
 - Match label cho `MatchList` query.
-- Embedded `weapons.json`, `strategies.json` và `pickup_delays.json`.
+- Embedded `weapons.json`, `skills.json`, `strategies.json` và `pickup_delays.json`.
 - RPC `healthcheck` response.
 
-Realtime opcode `1`, `101`, `102`, `103`, `104`, `105`, `106`, `107`, `108`, `109` đều dùng Protobuf binary.
+Realtime opcode `1`, `101`, `102`, `103`, `104`, `105`, `106`, `107`, `108`, `109`, `110` đều dùng Protobuf binary.

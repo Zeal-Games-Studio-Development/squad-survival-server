@@ -167,6 +167,7 @@ type CharacterRoster struct {
 	DamageReduction float64                `protobuf:"fixed64,14,opt,name=damage_reduction,json=damageReduction,proto3" json:"damage_reduction,omitempty"`
 	AttackCount     int32                  `protobuf:"varint,15,opt,name=attack_count,json=attackCount,proto3" json:"attack_count,omitempty"`
 	CooldownScale   float64                `protobuf:"fixed64,16,opt,name=cooldown_scale,json=cooldownScale,proto3" json:"cooldown_scale,omitempty"`
+	SkillCooldowns  []*SkillCooldown       `protobuf:"bytes,17,rep,name=skill_cooldowns,json=skillCooldowns,proto3" json:"skill_cooldowns,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -313,6 +314,97 @@ func (x *CharacterRoster) GetCooldownScale() float64 {
 	return 0
 }
 
+func (x *CharacterRoster) GetSkillCooldowns() []*SkillCooldown {
+	if x != nil {
+		return x.SkillCooldowns
+	}
+	return nil
+}
+
+type SkillCooldown struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SkillId        string                 `protobuf:"bytes,1,opt,name=skill_id,json=skillId,proto3" json:"skill_id,omitempty"`
+	Mode           string                 `protobuf:"bytes,2,opt,name=mode,proto3" json:"mode,omitempty"`
+	Progress       float64                `protobuf:"fixed64,3,opt,name=progress,proto3" json:"progress,omitempty"`
+	Required       float64                `protobuf:"fixed64,4,opt,name=required,proto3" json:"required,omitempty"`
+	ActiveActionId string                 `protobuf:"bytes,5,opt,name=active_action_id,json=activeActionId,proto3" json:"active_action_id,omitempty"`
+	CompleteTick   int64                  `protobuf:"varint,6,opt,name=complete_tick,json=completeTick,proto3" json:"complete_tick,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SkillCooldown) Reset() {
+	*x = SkillCooldown{}
+	mi := &file_modules_game_core_system_roster_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SkillCooldown) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SkillCooldown) ProtoMessage() {}
+
+func (x *SkillCooldown) ProtoReflect() protoreflect.Message {
+	mi := &file_modules_game_core_system_roster_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SkillCooldown.ProtoReflect.Descriptor instead.
+func (*SkillCooldown) Descriptor() ([]byte, []int) {
+	return file_modules_game_core_system_roster_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *SkillCooldown) GetSkillId() string {
+	if x != nil {
+		return x.SkillId
+	}
+	return ""
+}
+
+func (x *SkillCooldown) GetMode() string {
+	if x != nil {
+		return x.Mode
+	}
+	return ""
+}
+
+func (x *SkillCooldown) GetProgress() float64 {
+	if x != nil {
+		return x.Progress
+	}
+	return 0
+}
+
+func (x *SkillCooldown) GetRequired() float64 {
+	if x != nil {
+		return x.Required
+	}
+	return 0
+}
+
+func (x *SkillCooldown) GetActiveActionId() string {
+	if x != nil {
+		return x.ActiveActionId
+	}
+	return ""
+}
+
+func (x *SkillCooldown) GetCompleteTick() int64 {
+	if x != nil {
+		return x.CompleteTick
+	}
+	return 0
+}
+
 var File_modules_game_core_system_roster_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_roster_proto_rawDesc = "" +
@@ -329,7 +421,7 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\x0eroster_version\x18\x04 \x01(\x04R\rrosterVersion\x12A\n" +
 	"\n" +
 	"characters\x18\x05 \x03(\v2!.game.core.system.CharacterRosterR\n" +
-	"characters\"\xa5\x04\n" +
+	"characters\"\xef\x04\n" +
 	"\x0fCharacterRoster\x12!\n" +
 	"\fcharacter_id\x18\x01 \x01(\tR\vcharacterId\x12\x16\n" +
 	"\x06health\x18\x02 \x01(\x01R\x06health\x12\x1d\n" +
@@ -353,7 +445,15 @@ const file_modules_game_core_system_roster_proto_rawDesc = "" +
 	"\x0fcrit_multiplier\x18\r \x01(\x01R\x0ecritMultiplier\x12)\n" +
 	"\x10damage_reduction\x18\x0e \x01(\x01R\x0fdamageReduction\x12!\n" +
 	"\fattack_count\x18\x0f \x01(\x05R\vattackCount\x12%\n" +
-	"\x0ecooldown_scale\x18\x10 \x01(\x01R\rcooldownScaleB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
+	"\x0ecooldown_scale\x18\x10 \x01(\x01R\rcooldownScale\x12H\n" +
+	"\x0fskill_cooldowns\x18\x11 \x03(\v2\x1f.game.core.system.SkillCooldownR\x0eskillCooldowns\"\xc5\x01\n" +
+	"\rSkillCooldown\x12\x19\n" +
+	"\bskill_id\x18\x01 \x01(\tR\askillId\x12\x12\n" +
+	"\x04mode\x18\x02 \x01(\tR\x04mode\x12\x1a\n" +
+	"\bprogress\x18\x03 \x01(\x01R\bprogress\x12\x1a\n" +
+	"\brequired\x18\x04 \x01(\x01R\brequired\x12(\n" +
+	"\x10active_action_id\x18\x05 \x01(\tR\x0eactiveActionId\x12#\n" +
+	"\rcomplete_tick\x18\x06 \x01(\x03R\fcompleteTickB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
 
 var (
 	file_modules_game_core_system_roster_proto_rawDescOnce sync.Once
@@ -367,20 +467,22 @@ func file_modules_game_core_system_roster_proto_rawDescGZIP() []byte {
 	return file_modules_game_core_system_roster_proto_rawDescData
 }
 
-var file_modules_game_core_system_roster_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_modules_game_core_system_roster_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_modules_game_core_system_roster_proto_goTypes = []any{
 	(*PlayerRosterBatch)(nil), // 0: game.core.system.PlayerRosterBatch
 	(*PlayerRoster)(nil),      // 1: game.core.system.PlayerRoster
 	(*CharacterRoster)(nil),   // 2: game.core.system.CharacterRoster
+	(*SkillCooldown)(nil),     // 3: game.core.system.SkillCooldown
 }
 var file_modules_game_core_system_roster_proto_depIdxs = []int32{
 	1, // 0: game.core.system.PlayerRosterBatch.players:type_name -> game.core.system.PlayerRoster
 	2, // 1: game.core.system.PlayerRoster.characters:type_name -> game.core.system.CharacterRoster
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 2: game.core.system.CharacterRoster.skill_cooldowns:type_name -> game.core.system.SkillCooldown
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_modules_game_core_system_roster_proto_init() }
@@ -394,7 +496,7 @@ func file_modules_game_core_system_roster_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_modules_game_core_system_roster_proto_rawDesc), len(file_modules_game_core_system_roster_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
