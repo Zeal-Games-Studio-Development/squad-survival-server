@@ -9,7 +9,7 @@ import (
 )
 
 func TestEncodeCharacterBoxStateBatch(t *testing.T) {
-	box := entity.NewCharacterBox("box:1", entity.Vector2{X: 3, Y: -4}, entity.WeaponWand)
+	box := entity.NewCharacterBox("box:1", entity.Vector2{X: 3, Y: -4}, entity.WeaponCrossbow)
 	data, err := EncodeCharacterBoxStateBatch(42, []CharacterBoxEvent{
 		SpawnedCharacterBox(box),
 		CharacterBoxPickupStarted(box.ID, "session-1", 42, 52),
@@ -27,7 +27,7 @@ func TestEncodeCharacterBoxStateBatch(t *testing.T) {
 		t.Fatalf("unexpected batch: %+v", &batch)
 	}
 	spawned := batch.Events[0]
-	if spawned.EventType != CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_SPAWNED || spawned.BoxId != box.ID || spawned.Position.X != 3 || spawned.Position.Y != -4 || spawned.Value.WeaponType != "wand" {
+	if spawned.EventType != CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_SPAWNED || spawned.BoxId != box.ID || spawned.Position.X != 3 || spawned.Position.Y != -4 || spawned.Value.WeaponType != "crossbow" {
 		t.Fatalf("unexpected spawn event: %+v", spawned)
 	}
 	started := batch.Events[1]

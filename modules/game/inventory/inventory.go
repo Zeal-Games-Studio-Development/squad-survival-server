@@ -27,7 +27,7 @@ var (
 
 var requiredTypes = []entity.WeaponType{
 	entity.WeaponBow, entity.WeaponStaff, entity.WeaponSpear, entity.WeaponSword,
-	entity.WeaponWand, entity.WeaponAxe, entity.WeaponBlunt, entity.WeaponCrossbow,
+	entity.WeaponAxe, entity.WeaponBlunt, entity.WeaponCrossbow,
 	entity.WeaponShield,
 }
 

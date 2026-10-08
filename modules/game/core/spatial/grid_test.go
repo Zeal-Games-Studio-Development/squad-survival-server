@@ -117,7 +117,7 @@ func TestQueryCharacterBoxesFiltersRadiusSortsAndRemoves(t *testing.T) {
 		entity.NewCharacterBox("box:b", entity.Vector2{X: 0.6, Y: 0.8}, entity.WeaponBow),
 		entity.NewCharacterBox("box:a", entity.Vector2{X: -0.6, Y: -0.8}, entity.WeaponSword),
 		entity.NewCharacterBox("box:outside", entity.Vector2{X: 1.01}, entity.WeaponAxe),
-		entity.NewCharacterBox("box:negative", entity.Vector2{X: -0.1}, entity.WeaponWand),
+		entity.NewCharacterBox("box:negative", entity.Vector2{X: -0.1}, entity.WeaponCrossbow),
 	}
 	for _, box := range boxes {
 		if err := grid.InsertCharacterBox(box); err != nil {

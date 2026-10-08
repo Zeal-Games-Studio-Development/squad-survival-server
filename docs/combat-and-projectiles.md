@@ -18,7 +18,6 @@ Mỗi đòn đánh thường có một `action_id` duy nhất và tag `basic_att
 | Bow | Damage projectile nhân từ `1×` đến `2×` theo khoảng cách giữa vị trí bắn và vị trí mục tiêu lúc chạm, chia cho `attack_range` đã ghi lúc bắn. |
 | Crossbow | Crit chance cộng từ 0 đến 35 điểm phần trăm theo phần máu đã mất của mục tiêu; đạt mức tối đa khi mục tiêu còn 50% HP trở xuống. Tính trước từng hit lúc projectile chạm, không cộng vào stat của attacker. |
 | Staff | `cooldown_scale = 1,25` cho chính character. |
-| Wand | Giữ đòn bắn một mục tiêu. |
 | Spear | Đánh AoE theo đường thẳng như trên; không sinh projectile. |
 
 Damage trước giảm chung bằng damage gốc nhân modifier theo type và crit multiplier nếu chí mạng. Giảm chung giới hạn ở 60%; riêng shield nhân thêm `0,6` sau bước này nếu hit mang tag `projectile`. `DamageApplied.damage` là lượng HP thực tế mất, không vượt quá HP còn lại. Các hit trong tick được sắp theo thứ tự ổn định trước khi áp dụng.

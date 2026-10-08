@@ -21,7 +21,7 @@ Chỉnh `modules/game/core/ai/config.json`:
 
 Count phải không âm; `0` tắt bot của mode đó. Nếu có bot, hai danh sách tên phải có phần tử và không chứa chuỗi trắng. Tên có dạng `Iron Wolf`; khi trùng trong match, thêm số như `Iron Wolf 2`. Config được nhúng bằng `go:embed`: cần build và deploy/restart server để dùng cấu hình mới. Không có hot reload hoặc spawn bù bot chết.
 
-`disengage_difference_by_max_characters` đặt ngưỡng bỏ đuổi `n` theo sức chứa tối đa của AI ở level hiện tại. Key hợp lệ từ 1 đến 9, giá trị từ 1 đến key. Mức không cấu hình dùng `max(1, floor(MaxCharacters / 3))`: sức chứa 1–5 dùng 1, 6–8 dùng 2, mức 9 dùng 3. `NewController(player)` dùng config mặc định; `NewControllerWithConfig(player, config)` dùng config truyền vào. Hai mode truyền config đã đọc khi spawn cho controller.
+`disengage_difference_by_max_characters` đặt ngưỡng bỏ đuổi `n` theo sức chứa tối đa của AI ở level hiện tại. Key hợp lệ từ 1 đến 9, giá trị từ 1 đến key. Mức không cấu hình dùng `max(1, floor(MaxCharacters / 3))`: sức chứa 1–5 dùng 1, 6–8 dùng 2 và 9 dùng 3. `NewController(player)` dùng config mặc định; `NewControllerWithConfig(player, config)` dùng config truyền vào. Hai mode truyền config đã đọc khi spawn cho controller.
 
 ## Identity và network
 

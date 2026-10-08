@@ -73,24 +73,6 @@
       "damage_reduction": 0
     },
     {
-      "type": "wand",
-      "weapon_id": "wand",
-      "range_class": "ranged",
-      "health": 80,
-      "damage": 15,
-      "move_speed": 5.1,
-      "attack_speed": 1,
-      "attack_count": 1,
-      "cooldown_scale": 1,
-      "attack_range": 7,
-      "impact_ratio": 0.45,
-      "projectile_speed": 11,
-      "regen_rate": 1.2,
-      "crit_chance": 0.06,
-      "crit_multiplier": 1.5,
-      "damage_reduction": 0
-    },
-    {
       "type": "axe",
       "weapon_id": "axe",
       "range_class": "melee",

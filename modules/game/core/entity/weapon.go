@@ -17,7 +17,6 @@ const (
 	WeaponStaff    WeaponType = "staff"
 	WeaponSpear    WeaponType = "spear"
 	WeaponSword    WeaponType = "sword"
-	WeaponWand     WeaponType = "wand"
 	WeaponAxe      WeaponType = "axe"
 	WeaponBlunt    WeaponType = "blunt"
 	WeaponCrossbow WeaponType = "crossbow"
@@ -81,6 +80,9 @@ func ParseWeaponCatalog(data []byte) ([]Weapon, error) {
 		if weapon.Type == "" {
 			return nil, errors.New("weapon type is required")
 		}
+		if !weapon.Type.Valid() {
+			return nil, fmt.Errorf("unsupported weapon type %q", weapon.Type)
+		}
 		if weapon.ID == "" {
 			return nil, errors.New("weapon id is required")
 		}
@@ -130,6 +132,15 @@ func ParseWeaponCatalog(data []byte) ([]Weapon, error) {
 
 func (r RangeClass) Valid() bool {
 	return r == RangeMelee || r == RangeRanged
+}
+
+func (t WeaponType) Valid() bool {
+	switch t {
+	case WeaponBow, WeaponStaff, WeaponSpear, WeaponSword, WeaponAxe, WeaponBlunt, WeaponCrossbow, WeaponShield:
+		return true
+	default:
+		return false
+	}
 }
 
 func DefaultWeaponCatalog() []Weapon {

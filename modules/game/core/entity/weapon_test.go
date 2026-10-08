@@ -9,15 +9,15 @@ import (
 
 func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	weapons := DefaultWeaponCatalog()
-	if len(weapons) != 9 {
-		t.Fatalf("expected 9 weapons, got %d", len(weapons))
+	if len(weapons) != 8 {
+		t.Fatalf("expected 8 weapons, got %d", len(weapons))
 	}
 
 	found := make(map[WeaponType]bool, len(weapons))
 	for _, weapon := range weapons {
 		found[weapon.Type] = true
-		if weapon.ID == "" {
-			t.Fatalf("weapon %q has no id", weapon.Type)
+		if weapon.ID == "" || weapon.ID == "wand" {
+			t.Fatalf("weapon %q has missing or removed id %q", weapon.Type, weapon.ID)
 		}
 		if !weapon.RangeClass.Valid() {
 			t.Fatalf("weapon %q has invalid range class %q", weapon.Type, weapon.RangeClass)
@@ -28,11 +28,26 @@ func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	}
 	for _, weaponType := range []WeaponType{
 		WeaponBow, WeaponStaff, WeaponSpear,
-		WeaponSword, WeaponWand, WeaponAxe, WeaponBlunt, WeaponCrossbow, WeaponShield,
+		WeaponSword, WeaponAxe, WeaponBlunt, WeaponCrossbow, WeaponShield,
 	} {
 		if !found[weaponType] {
 			t.Fatalf("missing weapon type %q", weaponType)
 		}
+	}
+}
+
+func TestParseWeaponCatalogRejectsRemovedWandType(t *testing.T) {
+	data := []byte(`{"weapons":[{"type":"wand","weapon_id":"wand","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)
+	if _, err := ParseWeaponCatalog(data); err == nil || !strings.Contains(err.Error(), "unsupported weapon type") {
+		t.Fatalf("removed wand type was accepted: %v", err)
+	}
+}
+
+func TestParseWeaponCatalogAllowsVariantOfSupportedType(t *testing.T) {
+	data := []byte(`{"weapons":[{"type":"bow","weapon_id":"bow","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10},{"type":"bow","weapon_id":"bow_rare","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)
+	weapons, err := ParseWeaponCatalog(data)
+	if err != nil || len(weapons) != 2 {
+		t.Fatalf("supported type variant was rejected: weapons=%+v err=%v", weapons, err)
 	}
 }
 
@@ -132,7 +147,7 @@ func TestCreateCharacterSelectsWeaponFromCatalog(t *testing.T) {
 func TestDefaultWeaponDamageStats(t *testing.T) {
 	want := map[WeaponType]float64{
 		WeaponBow: 0.12, WeaponStaff: 0.12, WeaponSpear: 0.12,
-		WeaponSword: 0.10, WeaponWand: 0.06, WeaponAxe: 0.14, WeaponBlunt: 0.18, WeaponCrossbow: 0.12, WeaponShield: 0.08,
+		WeaponSword: 0.10, WeaponAxe: 0.14, WeaponBlunt: 0.18, WeaponCrossbow: 0.12, WeaponShield: 0.08,
 	}
 	for _, weapon := range DefaultWeaponCatalog() {
 		reduction := 0.0

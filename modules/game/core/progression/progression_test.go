@@ -38,7 +38,7 @@ func TestParseCatalogRejectsInvalidDefinitions(t *testing.T) {
 }
 
 func TestMaxCharactersForLevelClampsLevel(t *testing.T) {
-	tests := map[int]int{-1: 1, 1: 1, 2: 2, 9: 9, 10: 9, 99: 9}
+	tests := map[int]int{-1: 1, 1: 1, 2: 2, 8: 8, 9: 9, 10: 9, 99: 9}
 	for level, expected := range tests {
 		if actual := MaxCharactersForLevel(level); actual != expected {
 			t.Fatalf("level %d: expected %d characters, got %d", level, expected, actual)

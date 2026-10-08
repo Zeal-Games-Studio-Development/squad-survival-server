@@ -31,6 +31,9 @@ func TestDefaultStrategies(t *testing.T) {
 			t.Fatalf("unexpected %q grid: %v", strategyName, definition.Grid)
 		}
 		slots := definition.Slots()
+		if len(slots) != MaxCharacters {
+			t.Fatalf("expected %q to expose %d usable slots, got %d", strategyName, MaxCharacters, len(slots))
+		}
 		if slots[0].Row != GridCenter || slots[0].Column != GridCenter || slots[0].Offset.X != 0 || slots[0].Offset.Y != 0 {
 			t.Fatalf("expected %q center slot first, got %+v", strategyName, slots[0])
 		}

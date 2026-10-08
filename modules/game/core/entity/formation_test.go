@@ -125,6 +125,26 @@ func TestAddCharacterEnforcesMaximum(t *testing.T) {
 	}
 }
 
+func TestNinthCharacterRequiresLevelNine(t *testing.T) {
+	player := newTestPlayer(Vector2{})
+	player.Level = 8
+	for player.CharacterCount() < 8 {
+		if err := player.AddCharacter(NewCharacter()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := player.AddCharacter(NewCharacter()); !errors.Is(err, ErrCharacterLimit) {
+		t.Fatalf("expected level 8 to reject ninth character, got %v", err)
+	}
+	player.Level = 9
+	if err := player.AddCharacter(NewCharacter()); err != nil {
+		t.Fatalf("expected level 9 to allow ninth character: %v", err)
+	}
+	if player.CharacterCount() != 9 {
+		t.Fatalf("expected nine characters, got %d", player.CharacterCount())
+	}
+}
+
 func TestRemoveDeadCharactersCompactsFormation(t *testing.T) {
 	player := newTestPlayer(Vector2{})
 	initialVersion := player.RosterVersion

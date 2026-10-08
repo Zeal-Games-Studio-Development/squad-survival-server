@@ -56,8 +56,11 @@ func TestInitialInventoryAndLoadout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(snapshot.WeaponIDs) != 9 || len(snapshot.SquadLoadout) != 9 {
+	if len(snapshot.WeaponIDs) != 8 || len(snapshot.SquadLoadout) != 8 {
 		t.Fatalf("unexpected initial inventory: %+v", snapshot)
+	}
+	if _, exists := snapshot.SquadLoadout["wand"]; exists {
+		t.Fatal("new account received removed wand slot")
 	}
 	for _, weapon := range entity.DefaultWeaponCatalog() {
 		if snapshot.SquadLoadout[string(weapon.Type)] != weapon.ID {
@@ -67,17 +70,29 @@ func TestInitialInventoryAndLoadout(t *testing.T) {
 	if _, err := service.Load(context.Background(), store, "old-user"); !errors.Is(err, ErrNotInitialized) {
 		t.Fatalf("unexpected old account fallback: %v", err)
 	}
+	legacy := snapshot.Data
+	legacy.WeaponIDs = append(append([]string(nil), snapshot.WeaponIDs...), "wand")
+	legacy.SquadLoadout = copyLoadout(snapshot.SquadLoadout)
+	legacy.SquadLoadout["wand"] = "wand"
+	value, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.objects["legacy-user"] = &api.StorageObject{Value: string(value), Version: "legacy"}
+	if _, err := service.Load(context.Background(), store, "legacy-user"); !errors.Is(err, ErrInvalidLoadout) {
+		t.Fatalf("legacy wand inventory was not rejected: %v", err)
+	}
 }
 
 func TestSetLoadoutValidatesOwnershipTypeCompletenessAndVersion(t *testing.T) {
 	weapons := entity.DefaultWeaponCatalog()
 	variant := weapons[0]
 	variant.ID = "bow_rare"
-	service, err := NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "wand", "axe", "blunt", "crossbow", "shield", "bow_rare"})
+	service, err := NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "axe", "blunt", "crossbow", "shield", "bow_rare"})
 	if err == nil {
 		t.Fatal("initial config must not contain duplicate type")
 	}
-	service, err = NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "wand", "axe", "blunt", "crossbow", "shield"})
+	service, err = NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "axe", "blunt", "crossbow", "shield"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,6 +103,13 @@ func TestSetLoadoutValidatesOwnershipTypeCompletenessAndVersion(t *testing.T) {
 	current, err := service.Load(context.Background(), store, "user")
 	if err != nil {
 		t.Fatal(err)
+	}
+	withWand := current.Data
+	withWand.WeaponIDs = append(append([]string(nil), current.WeaponIDs...), "wand")
+	withWand.SquadLoadout = copyLoadout(current.SquadLoadout)
+	withWand.SquadLoadout["wand"] = "wand"
+	if err := service.Validate(withWand); !errors.Is(err, ErrInvalidLoadout) {
+		t.Fatalf("removed wand loadout was accepted: %v", err)
 	}
 	wrongType := copyLoadout(current.SquadLoadout)
 	wrongType["bow"] = "staff"
@@ -148,7 +170,7 @@ func TestRPCRejectsInvalidPayload(t *testing.T) {
 	if err := json.Unmarshal([]byte(response), &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Version == "" || len(snapshot.WeaponIDs) != 9 {
+	if snapshot.Version == "" || len(snapshot.WeaponIDs) != 8 {
 		t.Fatalf("invalid RPC response: %+v", snapshot)
 	}
 }
