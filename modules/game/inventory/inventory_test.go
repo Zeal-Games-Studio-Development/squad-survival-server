@@ -63,6 +63,9 @@ func TestInitialInventoryAndLoadout(t *testing.T) {
 		t.Fatal("new account received removed wand slot")
 	}
 	for _, weapon := range entity.DefaultWeaponCatalog() {
+		if weapon.ID != string(weapon.Type) {
+			continue
+		}
 		if snapshot.SquadLoadout[string(weapon.Type)] != weapon.ID {
 			t.Fatalf("missing loadout slot for %s", weapon.Type)
 		}

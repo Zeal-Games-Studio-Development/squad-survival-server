@@ -2,7 +2,7 @@
   "skills": [
     {
       "skill_id": "sword_cone",
-      "weapon_id": "sword",
+      "weapon_ids": ["sword", "sword_swift", "sword_heavy", "sword_sturdy"],
       "priority": 0,
       "cooldown": { "mode": "ticks", "required": 30 },
       "timing": { "impact_ticks": 2, "complete_ticks": 5 },

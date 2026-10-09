@@ -9,13 +9,13 @@ import (
 
 func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	weapons := DefaultWeaponCatalog()
-	if len(weapons) != 8 {
-		t.Fatalf("expected 8 weapons, got %d", len(weapons))
+	if len(weapons) != 32 {
+		t.Fatalf("expected 32 weapons, got %d", len(weapons))
 	}
 
-	found := make(map[WeaponType]bool, len(weapons))
+	counts := make(map[WeaponType]int, 8)
 	for _, weapon := range weapons {
-		found[weapon.Type] = true
+		counts[weapon.Type]++
 		if weapon.ID == "" || weapon.ID == "wand" {
 			t.Fatalf("weapon %q has missing or removed id %q", weapon.Type, weapon.ID)
 		}
@@ -30,8 +30,8 @@ func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 		WeaponBow, WeaponStaff, WeaponSpear,
 		WeaponSword, WeaponAxe, WeaponBlunt, WeaponCrossbow, WeaponShield,
 	} {
-		if !found[weaponType] {
-			t.Fatalf("missing weapon type %q", weaponType)
+		if counts[weaponType] != 4 {
+			t.Fatalf("weapon type %q has %d ids, want 4", weaponType, counts[weaponType])
 		}
 	}
 }

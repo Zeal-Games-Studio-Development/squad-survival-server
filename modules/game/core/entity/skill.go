@@ -33,13 +33,14 @@ type SkillEffect struct {
 }
 
 type SkillDefinition struct {
-	ID       string            `json:"skill_id"`
-	WeaponID string            `json:"weapon_id"`
-	Priority int               `json:"priority"`
-	Cooldown SkillCooldownSpec `json:"cooldown"`
-	Timing   SkillTiming       `json:"timing"`
-	Target   SkillTarget       `json:"target"`
-	Effect   SkillEffect       `json:"effect"`
+	ID        string            `json:"skill_id"`
+	WeaponID  string            `json:"weapon_id"`
+	WeaponIDs []string          `json:"weapon_ids"`
+	Priority  int               `json:"priority"`
+	Cooldown  SkillCooldownSpec `json:"cooldown"`
+	Timing    SkillTiming       `json:"timing"`
+	Target    SkillTarget       `json:"target"`
+	Effect    SkillEffect       `json:"effect"`
 }
 
 //go:embed skills.json
@@ -65,8 +66,22 @@ func ParseSkillCatalog(data []byte, weapons []Weapon) ([]SkillDefinition, error)
 			return nil, fmt.Errorf("missing or duplicate skill id %q", skill.ID)
 		}
 		seen[skill.ID] = true
-		if !weaponIDs[skill.WeaponID] {
-			return nil, fmt.Errorf("skill %q references unknown weapon id %q", skill.ID, skill.WeaponID)
+		ids := skill.WeaponIDs
+		if skill.WeaponID != "" {
+			ids = append([]string{skill.WeaponID}, ids...)
+		}
+		if len(ids) == 0 {
+			return nil, fmt.Errorf("skill %q has no weapon ids", skill.ID)
+		}
+		boundIDs := make(map[string]bool, len(ids))
+		for _, id := range ids {
+			if !weaponIDs[id] {
+				return nil, fmt.Errorf("skill %q references unknown weapon id %q", skill.ID, id)
+			}
+			if boundIDs[id] {
+				return nil, fmt.Errorf("skill %q repeats weapon id %q", skill.ID, id)
+			}
+			boundIDs[id] = true
 		}
 		if !validCooldownMode(skill.Cooldown.Mode) || !finitePositive(skill.Cooldown.Required) {
 			return nil, fmt.Errorf("skill %q has invalid cooldown", skill.ID)
@@ -120,6 +135,13 @@ func SkillsForWeapon(weaponID string) []SkillDefinition {
 	for _, skill := range DefaultSkillCatalog() {
 		if skill.WeaponID == weaponID {
 			result = append(result, skill)
+			continue
+		}
+		for _, id := range skill.WeaponIDs {
+			if id == weaponID {
+				result = append(result, skill)
+				break
+			}
 		}
 	}
 	return result

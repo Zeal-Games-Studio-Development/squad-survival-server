@@ -60,6 +60,37 @@ func TestSwordSkillUsesLockedConeAndCurrentTargetPositions(t *testing.T) {
 	}
 }
 
+func TestSwordWeaponVariantsStartAndHitWithSwordCone(t *testing.T) {
+	for _, weapon := range entity.DefaultWeaponCatalog() {
+		if weapon.Type != entity.WeaponSword || weapon.ID == "sword" {
+			continue
+		}
+		t.Run(weapon.ID, func(t *testing.T) {
+			caster := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
+			character := caster.Characters[0]
+			character.ApplyWeapon(weapon)
+			cooldown := character.Cooldowns["sword_cone"]
+			if cooldown == nil {
+				t.Fatal("sword variant has no sword_cone cooldown")
+			}
+			cooldown.Progress = cooldown.Required
+			target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
+			target.Characters[0].AttackSpeed = 0
+			players := playerMap(caster, target)
+			nearby := allNearby(players)
+			simulation := NewSimulation()
+			random := rand.New(rand.NewSource(1))
+			if event := findEvent(simulation.Step(players, nearby, 1, random), EventSkillStarted, character.ID); event == nil || event.SkillID != "sword_cone" {
+				t.Fatalf("sword variant did not start sword_cone: %+v", event)
+			}
+			simulation.Step(players, nearby, 2, random)
+			if event := findEvent(simulation.Step(players, nearby, 3, random), EventDamageApplied, character.ID); event == nil || !entity.HasActionTag(event.Tags, entity.TagSkill) {
+				t.Fatalf("sword variant did not deal skill damage: %+v", event)
+			}
+		})
+	}
+}
+
 func TestReadySkillWaitsForTargetAndCurrentAttack(t *testing.T) {
 	caster := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
 	character := caster.Characters[0]

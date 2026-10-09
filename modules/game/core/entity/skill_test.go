@@ -7,14 +7,18 @@ import (
 
 func TestDefaultSkillCatalogAndWeaponBinding(t *testing.T) {
 	skills := DefaultSkillCatalog()
-	if len(skills) != 1 || skills[0].ID != "sword_cone" || skills[0].WeaponID != "sword" {
+	if len(skills) != 1 || skills[0].ID != "sword_cone" || len(skills[0].WeaponIDs) != 4 {
 		t.Fatalf("unexpected default skills: %+v", skills)
 	}
 	for _, weapon := range DefaultWeaponCatalog() {
 		character := NewCharacter()
 		character.ApplyWeapon(weapon)
-		if got := len(character.Cooldowns); got != len(SkillsForWeapon(weapon.ID)) {
-			t.Fatalf("weapon %s has %d cooldowns", weapon.ID, got)
+		want := 0
+		if weapon.Type == WeaponSword {
+			want = 1
+		}
+		if got := len(character.Cooldowns); got != want || len(SkillsForWeapon(weapon.ID)) != want {
+			t.Fatalf("weapon %s has %d cooldowns, want %d", weapon.ID, got, want)
 		}
 	}
 	variant := DefaultWeaponCatalog()[0]
@@ -24,6 +28,19 @@ func TestDefaultSkillCatalogAndWeaponBinding(t *testing.T) {
 	character.ApplyWeapon(variant)
 	if len(character.Cooldowns) != 0 {
 		t.Fatal("skill leaked from weapon type to another weapon ID")
+	}
+}
+
+func TestParseSkillCatalogRejectsInvalidWeaponBindings(t *testing.T) {
+	for _, change := range []struct{ old, replacement string }{
+		{`"sword_sturdy"`, `"missing"`},
+		{`"sword_sturdy"`, `"sword"`},
+		{`"sword_sturdy"`, `""`},
+	} {
+		data := strings.Replace(string(defaultSkillJSON), change.old, change.replacement, 1)
+		if _, err := ParseSkillCatalog([]byte(data), DefaultWeaponCatalog()); err == nil {
+			t.Fatalf("accepted invalid weapon binding: %s", data)
+		}
 	}
 }
 
