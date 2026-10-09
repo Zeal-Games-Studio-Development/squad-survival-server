@@ -39,6 +39,63 @@ func BenchmarkCombatCandidateAcquisition32Players416Characters(b *testing.B) {
 	}
 }
 
+// Each operation starts 416 sword skills and advances the simulation through their impact tick.
+func BenchmarkCombatSwordSkillStartAndImpact32Players416Characters(b *testing.B) {
+	players := benchmarkPlayers(32, 13)
+	candidates := allNearby(players)
+	for _, player := range players {
+		for _, character := range player.Characters {
+			if err := character.StartCooldown("sword_cone", entity.CooldownTicks, 30); err != nil {
+				b.Fatal(err)
+			}
+		}
+	}
+
+	reset := func() {
+		for _, player := range players {
+			for _, character := range player.Characters {
+				character.ResetAttack()
+				character.ResetSkill()
+				character.Health = 1_000_000
+				character.Cooldowns["sword_cone"].Progress = 30
+			}
+		}
+	}
+
+	// Confirm this setup exercises both skill phases before timing it.
+	reset()
+	check := NewSimulation()
+	random := rand.New(rand.NewSource(1))
+	starts := check.Step(players, candidates, 1, random)
+	started := 0
+	for _, event := range starts {
+		if event.Type == EventSkillStarted {
+			started++
+		}
+	}
+	check.Step(players, candidates, 2, random)
+	impacts := check.Step(players, candidates, 3, random)
+	hits := 0
+	for _, event := range impacts {
+		if event.Type == EventDamageApplied && entity.HasActionTag(event.Tags, entity.TagSkill) {
+			hits++
+		}
+	}
+	if started != 416 || hits == 0 {
+		b.Fatalf("benchmark setup did not exercise skills: started=%d hits=%d", started, hits)
+	}
+
+	simulation := NewSimulation()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for index := 0; index < b.N; index++ {
+		reset()
+		simulation.Step(players, candidates, 1, random)
+		simulation.Step(players, candidates, 2, random)
+		simulation.Step(players, candidates, 3, random)
+	}
+}
+
 func benchmarkPlayers(playerCount, characterCount int) map[string]*entity.Player {
 	players := make(map[string]*entity.Player, playerCount)
 	for playerIndex := 0; playerIndex < playerCount; playerIndex++ {
