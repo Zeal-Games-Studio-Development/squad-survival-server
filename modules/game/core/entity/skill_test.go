@@ -34,7 +34,7 @@ func TestDefaultSkillCatalogAndWeaponBinding(t *testing.T) {
 func TestParseSkillCatalogRejectsInvalidWeaponBindings(t *testing.T) {
 	for _, change := range []struct{ old, replacement string }{
 		{`"sword_sturdy"`, `"missing"`},
-		{`"sword_sturdy"`, `"sword"`},
+		{`"sword_sturdy"`, `"swordman"`},
 		{`"sword_sturdy"`, `""`},
 	} {
 		data := strings.Replace(string(defaultSkillJSON), change.old, change.replacement, 1)
@@ -45,9 +45,9 @@ func TestParseSkillCatalogRejectsInvalidWeaponBindings(t *testing.T) {
 }
 
 func TestParseSkillCatalogRejectsInvalidDefinitions(t *testing.T) {
-	valid := `{"skills":[{"skill_id":"one","weapon_id":"sword","cooldown":{"mode":"ticks","required":30},"timing":{"impact_ticks":2,"complete_ticks":5},"target":{"relation":"enemy","shape":"cone","angle_degrees":90,"range_scale":1},"effect":{"kind":"damage","damage_multiplier":1,"can_crit":true}}]}`
+	valid := `{"skills":[{"skill_id":"one","weapon_id":"swordman","cooldown":{"mode":"ticks","required":30},"timing":{"impact_ticks":2,"complete_ticks":5},"target":{"relation":"enemy","shape":"cone","angle_degrees":90,"range_scale":1},"effect":{"kind":"damage","damage_multiplier":1,"can_crit":true}}]}`
 	for _, mutation := range []struct{ old, replacement string }{
-		{`"weapon_id":"sword"`, `"weapon_id":"missing"`},
+		{`"weapon_id":"swordman"`, `"weapon_id":"missing"`},
 		{`"mode":"ticks"`, `"mode":"invalid"`},
 		{`"required":30`, `"required":0`},
 		{`"impact_ticks":2`, `"impact_ticks":6`},

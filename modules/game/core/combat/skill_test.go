@@ -62,7 +62,7 @@ func TestSwordSkillUsesLockedConeAndCurrentTargetPositions(t *testing.T) {
 
 func TestSwordWeaponVariantsStartAndHitWithSwordCone(t *testing.T) {
 	for _, weapon := range entity.DefaultWeaponCatalog() {
-		if weapon.Type != entity.WeaponSword || weapon.ID == "sword" {
+		if weapon.Type != entity.WeaponSword || weapon.ID == "swordman" {
 			continue
 		}
 		t.Run(weapon.ID, func(t *testing.T) {

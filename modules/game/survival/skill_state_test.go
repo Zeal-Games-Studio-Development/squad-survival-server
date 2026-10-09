@@ -17,7 +17,7 @@ func TestSkillStateBroadcastUsesDetection(t *testing.T) {
 	for _, id := range []string{"a", "b", "c"} {
 		player := entity.NewPlayer(id, id, "", entity.Vector2{}, rand.New(rand.NewSource(1)))
 		for _, weapon := range entity.DefaultWeaponCatalog() {
-			if weapon.ID == "sword" {
+			if weapon.ID == "swordman" {
 				player.Characters[0].ApplyWeapon(weapon)
 			}
 		}

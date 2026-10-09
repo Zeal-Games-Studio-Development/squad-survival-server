@@ -13,7 +13,7 @@ import (
 func TestSkillCombatAndStateProtocol(t *testing.T) {
 	player := entity.NewPlayer("a", "session-a", "", entity.Vector2{}, rand.New(rand.NewSource(1)))
 	for _, weapon := range entity.DefaultWeaponCatalog() {
-		if weapon.ID == "sword" {
+		if weapon.ID == "swordman" {
 			player.Characters[0].ApplyWeapon(weapon)
 		}
 	}
@@ -58,7 +58,7 @@ func TestSkillCombatAndStateProtocol(t *testing.T) {
 	started, err := EncodeCombatEventBatch(3, []combat.Event{{
 		Type: combat.EventSkillStarted, AttackID: "a:1:1", SkillID: "sword_cone",
 		AttackerUserID: player.UserID, AttackerCharacterID: character.ID,
-		WeaponID: "sword", Direction: entity.Vector2{X: 1},
+		WeaponID: "swordman", Direction: entity.Vector2{X: 1},
 		StartTick: 3, ImpactTick: 5, CompleteTick: 8,
 		Tags: []entity.ActionTag{entity.TagSkill, entity.TagAOE},
 	}})

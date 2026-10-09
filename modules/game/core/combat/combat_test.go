@@ -314,7 +314,7 @@ func combatPlayer(userID, characterID string, rangeClass entity.RangeClass, posi
 		Characters: []*entity.Character{{
 			ID: characterID, RangeClass: rangeClass, Position: position,
 			Health: 100, AttackSpeed: 2, AttackRange: attackRange, ImpactRatio: impactRatio,
-			Damage: 10, CritMultiplier: 1.5, Weapon: entity.Weapon{Type: entity.WeaponSword, ID: "sword"},
+			Damage: 10, CritMultiplier: 1.5, Weapon: entity.Weapon{Type: entity.WeaponSword, ID: "swordman"},
 		}},
 	}
 }

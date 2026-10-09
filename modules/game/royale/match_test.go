@@ -63,7 +63,7 @@ func TestCharacterBoxUsesCollectorLoadout(t *testing.T) {
 	second.SquadLoadout[entity.WeaponBow] = variant.ID
 	firstWeapon, firstOK := state.weaponForBox(first, box)
 	secondWeapon, secondOK := state.weaponForBox(second, box)
-	if !firstOK || !secondOK || firstWeapon.ID != "bow" || secondWeapon.ID != variant.ID || secondWeapon.Damage != 99 {
+	if !firstOK || !secondOK || firstWeapon.ID != "acher" || secondWeapon.ID != variant.ID || secondWeapon.Damage != 99 {
 		t.Fatalf("box ignored player loadouts: first=%+v second=%+v", firstWeapon, secondWeapon)
 	}
 }

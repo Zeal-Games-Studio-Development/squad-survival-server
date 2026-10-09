@@ -2,7 +2,7 @@
   "weapons": [
     {
       "type": "bow",
-      "weapon_id": "bow",
+      "weapon_id": "acher",
       "range_class": "ranged",
       "health": 85,
       "damage": 11,
@@ -20,7 +20,7 @@
     },
     {
       "type": "staff",
-      "weapon_id": "staff",
+      "weapon_id": "novice_mage",
       "range_class": "ranged",
       "health": 105,
       "damage": 13,
@@ -38,7 +38,7 @@
     },
     {
       "type": "spear",
-      "weapon_id": "spear",
+      "weapon_id": "farmer",
       "range_class": "melee",
       "health": 110,
       "damage": 12,
@@ -56,7 +56,7 @@
     },
     {
       "type": "sword",
-      "weapon_id": "sword",
+      "weapon_id": "swordman",
       "range_class": "melee",
       "health": 115,
       "damage": 11,
@@ -74,7 +74,7 @@
     },
     {
       "type": "axe",
-      "weapon_id": "axe",
+      "weapon_id": "axeman",
       "range_class": "melee",
       "health": 125,
       "damage": 16,
@@ -92,7 +92,7 @@
     },
     {
       "type": "blunt",
-      "weapon_id": "blunt",
+      "weapon_id": "bruiser",
       "range_class": "melee",
       "health": 135,
       "damage": 14,
@@ -110,7 +110,7 @@
     },
     {
       "type": "crossbow",
-      "weapon_id": "crossbow",
+      "weapon_id": "hunter",
       "range_class": "ranged",
       "health": 85,
       "damage": 11,
@@ -128,7 +128,7 @@
     },
     {
       "type": "shield",
-      "weapon_id": "shield",
+      "weapon_id": "shieldbearer",
       "range_class": "melee",
       "health": 140,
       "damage": 9,

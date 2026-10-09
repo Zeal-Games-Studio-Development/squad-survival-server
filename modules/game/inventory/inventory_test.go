@@ -62,12 +62,12 @@ func TestInitialInventoryAndLoadout(t *testing.T) {
 	if _, exists := snapshot.SquadLoadout["wand"]; exists {
 		t.Fatal("new account received removed wand slot")
 	}
-	for _, weapon := range entity.DefaultWeaponCatalog() {
-		if weapon.ID != string(weapon.Type) {
-			continue
-		}
-		if snapshot.SquadLoadout[string(weapon.Type)] != weapon.ID {
-			t.Fatalf("missing loadout slot for %s", weapon.Type)
+	for weaponType, id := range map[string]string{
+		"bow": "acher", "staff": "novice_mage", "spear": "farmer", "sword": "swordman",
+		"axe": "axeman", "blunt": "bruiser", "crossbow": "hunter", "shield": "shieldbearer",
+	} {
+		if snapshot.SquadLoadout[weaponType] != id {
+			t.Fatalf("missing loadout slot for %s: %+v", weaponType, snapshot.SquadLoadout)
 		}
 	}
 	if _, err := service.Load(context.Background(), store, "old-user"); !errors.Is(err, ErrNotInitialized) {
@@ -91,11 +91,11 @@ func TestSetLoadoutValidatesOwnershipTypeCompletenessAndVersion(t *testing.T) {
 	weapons := entity.DefaultWeaponCatalog()
 	variant := weapons[0]
 	variant.ID = "bow_rare"
-	service, err := NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "axe", "blunt", "crossbow", "shield", "bow_rare"})
+	service, err := NewService(append(weapons, variant), []string{"acher", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer", "bow_rare"})
 	if err == nil {
 		t.Fatal("initial config must not contain duplicate type")
 	}
-	service, err = NewService(append(weapons, variant), []string{"bow", "staff", "spear", "sword", "axe", "blunt", "crossbow", "shield"})
+	service, err = NewService(append(weapons, variant), []string{"acher", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestSetLoadoutValidatesOwnershipTypeCompletenessAndVersion(t *testing.T) {
 		t.Fatalf("removed wand loadout was accepted: %v", err)
 	}
 	wrongType := copyLoadout(current.SquadLoadout)
-	wrongType["bow"] = "staff"
+	wrongType["bow"] = "novice_mage"
 	if _, err := service.SetLoadout(context.Background(), store, "user", current.Version, wrongType); !errors.Is(err, ErrInvalidLoadout) {
 		t.Fatalf("wrong type: %v", err)
 	}
@@ -152,6 +152,52 @@ func TestSetLoadoutValidatesOwnershipTypeCompletenessAndVersion(t *testing.T) {
 	store.rejectVersion = true
 	if _, err := service.SetLoadout(context.Background(), store, "user", updated.Version, updated.SquadLoadout); !errors.Is(err, ErrVersionConflict) {
 		t.Fatalf("storage CAS conflict not reported: %v", err)
+	}
+}
+
+func TestLoadRenamedStarterIDs(t *testing.T) {
+	service := DefaultService()
+	legacy := Data{
+		WeaponIDs: []string{"bow", "staff", "spear", "sword", "axe", "blunt", "crossbow", "shield"},
+		SquadLoadout: map[string]string{
+			"bow": "bow", "staff": "staff", "spear": "spear", "sword": "sword",
+			"axe": "axe", "blunt": "blunt", "crossbow": "crossbow", "shield": "shield",
+		},
+	}
+	value, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &memoryStore{objects: map[string]*api.StorageObject{
+		"user": {Value: string(value), Version: "legacy"},
+	}}
+	snapshot, err := service.Load(context.Background(), store, "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.SquadLoadout["bow"] != "acher" || snapshot.SquadLoadout["shield"] != "shieldbearer" || snapshot.Version != "legacy" {
+		t.Fatalf("legacy IDs were not mapped: %+v", snapshot)
+	}
+	if !reflect.DeepEqual(snapshot.WeaponIDs, service.initialIDs) {
+		t.Fatalf("legacy owned IDs were not mapped: %+v", snapshot.WeaponIDs)
+	}
+	updated, err := service.SetLoadout(context.Background(), store, "user", snapshot.Version, snapshot.SquadLoadout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(updated.WeaponIDs, service.initialIDs) {
+		t.Fatalf("renamed IDs were not persisted: %+v", updated)
+	}
+	legacy.WeaponIDs[6] = "crossbowman"
+	legacy.SquadLoadout["crossbow"] = "crossbowman"
+	value, err = json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store.objects["previous-name"] = &api.StorageObject{Value: string(value), Version: "legacy"}
+	snapshot, err = service.Load(context.Background(), store, "previous-name")
+	if err != nil || snapshot.SquadLoadout["crossbow"] != "hunter" {
+		t.Fatalf("previous crossbow ID was not mapped: %+v, %v", snapshot, err)
 	}
 }
 

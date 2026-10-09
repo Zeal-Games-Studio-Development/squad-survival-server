@@ -31,6 +31,18 @@ var requiredTypes = []entity.WeaponType{
 	entity.WeaponShield,
 }
 
+var renamedStarterIDs = map[string]string{
+	"bow":         "acher",
+	"staff":       "novice_mage",
+	"spear":       "farmer",
+	"sword":       "swordman",
+	"axe":         "axeman",
+	"blunt":       "bruiser",
+	"crossbow":    "hunter",
+	"crossbowman": "hunter",
+	"shield":      "shieldbearer",
+}
+
 //go:embed initial_character_inventory.json
 var initialInventoryJSON []byte
 
@@ -165,10 +177,28 @@ func (s *Service) Load(ctx context.Context, store Store, userID string) (Snapsho
 	if err := json.Unmarshal([]byte(objects[0].Value), &data); err != nil {
 		return Snapshot{}, fmt.Errorf("decode character inventory: %w", err)
 	}
+	for index, id := range data.WeaponIDs {
+		data.WeaponIDs[index] = s.currentID(id)
+	}
+	for weaponType, id := range data.SquadLoadout {
+		data.SquadLoadout[weaponType] = s.currentID(id)
+	}
 	if err := s.Validate(data); err != nil {
 		return Snapshot{}, err
 	}
 	return Snapshot{Data: data, Version: objects[0].Version}, nil
+}
+
+func (s *Service) currentID(id string) string {
+	if _, exists := s.byID[id]; exists {
+		return id
+	}
+	if replacement, renamed := renamedStarterIDs[id]; renamed {
+		if _, exists := s.byID[replacement]; exists {
+			return replacement
+		}
+	}
+	return id
 }
 
 func (s *Service) InitializeNewAccount(ctx context.Context, store Store, userID string) error {
