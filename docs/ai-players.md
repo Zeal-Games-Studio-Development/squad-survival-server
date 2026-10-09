@@ -2,6 +2,12 @@
 
 Survival và battle royale tạo bot ngay trong `MatchInit`. Bot dùng cùng `entity.Player`, random spawn, character/weapon mặc định, spatial grid, progression và combat của người chơi. Logic quyết định di chuyển nằm riêng trong `modules/game/core/ai.Controller`; `Player` không chứa AI behaviour.
 
+## Chọn vũ khí cho bot
+
+Nhân vật đầu tiên của mỗi bot chọn ngẫu nhiên đều một `weapon_id` từ toàn bộ catalog trong [`weapons.json`](../modules/game/core/entity/weapons.json), gồm cả các biến thể. Lựa chọn này độc lập với `squad_loadout` của bot.
+
+Bot không có inventory tài khoản. `squad_loadout` mặc định lấy `weapon_id` đầu tiên của mỗi `type` theo thứ tự trong catalog; nó không được random. Khi bot nhặt Character Box, `weapon_type` của box xác định slot, rồi server lấy `weapon_id` trong slot đó để tạo nhân vật mới. Vì vậy nhân vật đầu tiên có thể dùng biến thể, còn nhân vật nhận từ box dùng ID đã chọn sẵn trong loadout mặc định.
+
 ## Cấu hình
 
 Chỉnh `modules/game/core/ai/config.json`:

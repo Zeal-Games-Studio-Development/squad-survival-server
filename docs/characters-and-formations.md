@@ -8,7 +8,7 @@ Giới hạn character hiện tại được tính bằng `min(level, 9)`: level
 
 ## Character Lifecycle
 
-Player mới vào trận với một character được chọn đều từ tám slot `squad_loadout` đã lưu của tài khoản. Character ID có dạng `<user_id>:<sequence>` và ổn định khi array được compact.
+Người chơi thật mới vào trận với một character: server chọn ngẫu nhiên đều một trong tám `weapon_type`, rồi lấy `weapon_id` ở slot `squad_loadout` đã lưu của tài khoản cho type đó. Nhân vật đầu tiên không được random trực tiếp từ toàn bộ catalog. Character ID có dạng `<user_id>:<sequence>` và ổn định khi array được compact.
 
 Character có position, target position, health/max health, damage, movement/attack stats, weapon và combat state. Khi `Health <= 0`, character bị remove trong combat tick; formation được gán lại trước snapshot tiếp theo.
 
