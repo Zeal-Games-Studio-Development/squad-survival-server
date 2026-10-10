@@ -78,6 +78,9 @@ func TestAILeavesAllHumanSlotsAvailable(t *testing.T) {
 			t.Fatalf("human %d rejected: %s", i, reason)
 		}
 		match.MatchJoin(nil, nil, nil, nil, dispatcher, 1, state, []runtime.Presence{presence})
+		if i == WaitingPlayerLimit-1 {
+			match.MatchLoop(nil, aiTestLogger{}, nil, nil, dispatcher, 1, state, nil)
+		}
 	}
 	if state.humanPlayerCount() != MaxPlayers || len(state.Players) != MaxPlayers+len(state.AIControllers) {
 		t.Fatal("bots consumed human capacity")
@@ -162,25 +165,23 @@ func TestAIVisibleToHumansWithoutNetworkObservers(t *testing.T) {
 	}
 }
 
-func TestAIOnlyMatchExpiresAndBotMoves(t *testing.T) {
+func TestAIOnlyWaitingMatchExpiresWithoutMovingBots(t *testing.T) {
 	match, state := newAITestMatch(t)
 	state.EmptyTicks = emptyMatchTTLSeconds*tickRate - 1
 	if next := match.MatchLoop(nil, aiTestLogger{}, nil, nil, &testDispatcher{}, 1, state, nil); next != nil {
 		t.Fatal("AI kept an empty match alive")
 	}
-	moved := false
 	for _, controller := range state.AIControllers {
 		if controller.Player.Direction != (entity.Vector2{}) {
-			moved = true
+			t.Fatal("bot moved during waiting")
 		}
-	}
-	if !moved {
-		t.Fatal("survival did not tick AI")
 	}
 }
 
 func TestAIUsesNormalPickupProgressionAndCombat(t *testing.T) {
 	match, state := newAITestMatch(t)
+	state.Phase = PhasePlaying
+	state.PlayingEndsAtTick = playingDurationTicks
 
 	var bot *entity.Player
 	for _, controller := range state.AIControllers {

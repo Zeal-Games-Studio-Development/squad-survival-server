@@ -30,7 +30,11 @@ const (
 	ModuleName                  = "survival"
 	DefaultMode                 = "survival"
 	MaxPlayers                  = 32
+	WaitingPlayerLimit          = 3
 	tickRate                    = entity.TickRate
+	waitingDurationTicks        = 30 * tickRate
+	playingDurationTicks        = 15 * 60 * tickRate
+	endedDurationTicks          = 60 * tickRate
 	reservationTTLSeconds       = 10
 	emptyMatchTTLSeconds        = 60
 	spatialCellSize             = 20.0
@@ -46,10 +50,21 @@ type Match struct {
 	inventory *inventory.Service
 }
 
+type Phase string
+
+const (
+	PhaseWaiting Phase = "waiting"
+	PhasePlaying Phase = "playing"
+	PhaseEnded   Phase = "ended"
+)
+
 type State struct {
 	MatchID             string
 	Mode                string
-	AllowJoinInProgress bool
+	Phase               Phase
+	WaitingEndsAtTick   int64
+	PlayingEndsAtTick   int64
+	EndedAtTick         int64
 	Players             map[string]*entity.Player
 	AIControllers       map[string]*ai.Controller
 	Presences           map[string]runtime.Presence
@@ -73,11 +88,12 @@ type State struct {
 }
 
 type Label struct {
-	Mode        string `json:"mode"`
-	Status      string `json:"status"`
-	PlayerCount int    `json:"player_count"`
-	MaxPlayers  int    `json:"max_players"`
-	Joinable    bool   `json:"joinable"`
+	Mode           string `json:"mode"`
+	Status         string `json:"status"`
+	PlayerCount    int    `json:"player_count"`
+	MaxPlayers     int    `json:"max_players"`
+	AvailableSlots int    `json:"available_slots"`
+	Joinable       bool   `json:"joinable"`
 }
 
 func NewMatchHandler(registry *matchregistry.Registry, inventoryService ...*inventory.Service) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule) (runtime.Match, error) {
@@ -99,7 +115,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 	state := &State{
 		MatchID:             matchIDFromContext(ctx),
 		Mode:                stringParam(params, "mode", DefaultMode),
-		AllowJoinInProgress: true,
+		Phase:               PhaseWaiting,
 		Players:             make(map[string]*entity.Player),
 		AIControllers:       make(map[string]*ai.Controller),
 		Presences:           make(map[string]runtime.Presence),
@@ -142,10 +158,16 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 	if state.MatchID != "" && !m.registry.CanJoin(presence.GetUserId(), state.MatchID) {
 		return state, false, "already in another match"
 	}
-	if !state.AllowJoinInProgress && state.humanPlayerCount() > 0 {
-		return state, false, "match already started"
+	if state.Phase == PhaseEnded {
+		return state, false, "match already ended"
 	}
-	if state.occupiedSlots() >= MaxPlayers {
+	limit := MaxPlayers
+	if state.Phase == PhaseWaiting {
+		limit = WaitingPlayerLimit
+	} else if state.Phase != PhasePlaying {
+		return state, false, "invalid match phase"
+	}
+	if state.occupiedSlots() >= limit {
 		return state, false, "match is full"
 	}
 	if m.inventory != nil {
@@ -160,7 +182,23 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 
 func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, dispatcher runtime.MatchDispatcher, tick int64, rawState interface{}, presences []runtime.Presence) interface{} {
 	state := rawState.(*State)
+	if state.Phase == PhaseEnded {
+		newPresences := make([]runtime.Presence, 0, len(presences))
+		for _, presence := range presences {
+			delete(state.Reservations, presence.GetSessionId())
+			if _, exists := state.Players[presence.GetSessionId()]; !exists {
+				newPresences = append(newPresences, presence)
+			}
+		}
+		if len(newPresences) > 0 {
+			if err := dispatcher.MatchKick(newPresences); err != nil && logger != nil {
+				logger.Error("Could not kick presence from ended survival match: %v", err)
+			}
+		}
+		return state
+	}
 	playerCount := state.humanPlayerCount()
+	joined := make([]runtime.Presence, 0, len(presences))
 	displayNames, err := resolveDisplayNames(ctx, nk, presences)
 	if err != nil && logger != nil {
 		logger.Error("Could not load player display names: %v", err)
@@ -214,13 +252,24 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		}
 		state.Players[presence.GetSessionId()] = player
 		state.Presences[presence.GetSessionId()] = presence
+		if state.Phase == PhaseWaiting && state.WaitingEndsAtTick == 0 {
+			state.WaitingEndsAtTick = tick + waitingDurationTicks
+		}
 		state.sendInitialRoster(logger, dispatcher, tick, presence, player)
 		state.sendInitialProgression(logger, dispatcher, tick, presence, player)
 		state.sendCurrentCharacterBoxes(logger, dispatcher, tick, presence)
+		joined = append(joined, presence)
 	}
 	state.broadcastExperiencePackageEvents(logger, dispatcher, tick, nil)
 	state.EmptyTicks = 0
-	state.updateLabel(dispatcher)
+	if state.Phase == PhaseWaiting && state.humanPlayerCount() >= WaitingPlayerLimit {
+		state.startPlaying(logger, dispatcher, tick)
+	} else {
+		state.updateLabel(dispatcher)
+		if len(joined) > 0 {
+			state.broadcastLifecycle(logger, dispatcher, tick, joined)
+		}
+	}
 	if state.humanPlayerCount() != playerCount {
 		state.broadcastSnapshot(logger, dispatcher, tick)
 	}
@@ -286,6 +335,53 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	state.ensureCharacterBoxState(tick)
 	if state.expireReservations(tick) {
 		state.updateLabel(dispatcher)
+	}
+	switch state.Phase {
+	case PhaseWaiting:
+		if state.WaitingEndsAtTick > 0 && state.humanPlayerCount() == 0 && len(state.Reservations) == 0 {
+			if logger != nil {
+				logger.Info("Stopping empty survival lobby")
+			}
+			m.registry.RemoveMatch(state.MatchID)
+			return nil
+		}
+		if state.humanPlayerCount() >= WaitingPlayerLimit || state.WaitingEndsAtTick > 0 && tick >= state.WaitingEndsAtTick {
+			state.startPlaying(logger, dispatcher, tick)
+		} else {
+			if state.WaitingEndsAtTick == 0 && len(state.Reservations) == 0 {
+				state.EmptyTicks++
+				if state.EmptyTicks >= emptyMatchTTLSeconds*tickRate {
+					if logger != nil {
+						logger.Info("Stopping unused survival lobby")
+					}
+					m.registry.RemoveMatch(state.MatchID)
+					return nil
+				}
+			} else {
+				state.EmptyTicks = 0
+			}
+			return state
+		}
+	case PhasePlaying:
+		if tick >= state.PlayingEndsAtTick {
+			state.finishPlaying(logger, dispatcher, tick)
+			return state
+		}
+	case PhaseEnded:
+		if tick >= state.EndedAtTick {
+			if logger != nil {
+				logger.Info("Stopping ended survival match")
+			}
+			m.registry.RemoveMatch(state.MatchID)
+			return nil
+		}
+		return state
+	default:
+		if logger != nil {
+			logger.Error("Stopping survival match with invalid phase: phase=%s", state.Phase)
+		}
+		m.registry.RemoveMatch(state.MatchID)
+		return nil
 	}
 
 	for _, message := range messages {
@@ -358,7 +454,9 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 	if state.humanPlayerCount() == 0 && len(state.Reservations) == 0 {
 		state.EmptyTicks++
 		if state.EmptyTicks >= emptyMatchTTLSeconds*tickRate {
-			logger.Info("Stopping empty survival match")
+			if logger != nil {
+				logger.Info("Stopping empty survival match")
+			}
 			m.registry.RemoveMatch(state.MatchID)
 			return nil
 		}
@@ -459,6 +557,62 @@ func (s *State) expireReservations(tick int64) bool {
 
 func (s *State) updateLabel(dispatcher runtime.MatchDispatcher) {
 	_ = dispatcher.MatchLabelUpdate(s.label())
+}
+
+func (s *State) startPlaying(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64) {
+	s.Phase = PhasePlaying
+	s.PlayingEndsAtTick = tick + playingDurationTicks
+	s.NextBoxRefillTick = tick + characterBoxRefillTicks
+	if s.Experience != nil {
+		s.Experience.ResetRefill(tick, tickRate)
+	}
+	s.EmptyTicks = 0
+	s.updateLabel(dispatcher)
+	s.broadcastLifecycle(logger, dispatcher, tick, nil)
+}
+
+func (s *State) finishPlaying(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64) {
+	s.broadcastCharacterBoxEvents(logger, dispatcher, tick, s.cancelAllBoxClaims(), nil)
+	s.Phase = PhaseEnded
+	s.EndedAtTick = tick + endedDurationTicks
+	s.updateLabel(dispatcher)
+	s.broadcastLifecycle(logger, dispatcher, tick, nil)
+}
+
+func (s *State) broadcastLifecycle(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, presences []runtime.Presence) {
+	payload, err := system.EncodeMatchLifecycleState(s.protocolPhase(), tick, s.phaseEndsAtTick(), tickRate)
+	if err == nil {
+		err = dispatcher.BroadcastMessage(system.OpMatchLifecycleState, payload, presences, nil, true)
+	}
+	if err != nil && logger != nil {
+		logger.Error("Could not send survival lifecycle state: %v", err)
+	}
+}
+
+func (s *State) phaseEndsAtTick() int64 {
+	switch s.Phase {
+	case PhaseWaiting:
+		return s.WaitingEndsAtTick
+	case PhasePlaying:
+		return s.PlayingEndsAtTick
+	case PhaseEnded:
+		return s.EndedAtTick
+	default:
+		return 0
+	}
+}
+
+func (s *State) protocolPhase() system.MatchPhase {
+	switch s.Phase {
+	case PhaseWaiting:
+		return system.MatchPhase_MATCH_PHASE_WAITING
+	case PhasePlaying:
+		return system.MatchPhase_MATCH_PHASE_PLAYING
+	case PhaseEnded:
+		return system.MatchPhase_MATCH_PHASE_ENDED
+	default:
+		return system.MatchPhase_MATCH_PHASE_UNSPECIFIED
+	}
 }
 
 func (s *State) broadcastSnapshot(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64) {
@@ -664,6 +818,19 @@ func (s *State) cancelBoxClaimForSession(sessionID string) []system.CharacterBox
 		return nil
 	}
 	return s.cancelBoxClaim(boxID)
+}
+
+func (s *State) cancelAllBoxClaims() []system.CharacterBoxEvent {
+	boxIDs := make([]string, 0, len(s.BoxClaims))
+	for boxID := range s.BoxClaims {
+		boxIDs = append(boxIDs, boxID)
+	}
+	sort.Strings(boxIDs)
+	events := make([]system.CharacterBoxEvent, 0, len(boxIDs))
+	for _, boxID := range boxIDs {
+		events = append(events, s.cancelBoxClaim(boxID)...)
+	}
+	return events
 }
 
 func (s *State) weaponByID(weaponID string) (entity.Weapon, bool) {
@@ -998,12 +1165,21 @@ func (s *State) removeProgressionTracking(sessionID string) {
 }
 
 func (s *State) label() string {
+	limit := 0
+	switch s.Phase {
+	case PhaseWaiting:
+		limit = WaitingPlayerLimit
+	case PhasePlaying:
+		limit = MaxPlayers
+	}
+	available := max(0, limit-s.occupiedSlots())
 	label, _ := json.Marshal(Label{
-		Mode:        s.Mode,
-		Status:      "playing",
-		PlayerCount: s.humanPlayerCount(),
-		MaxPlayers:  MaxPlayers,
-		Joinable:    s.AllowJoinInProgress && s.occupiedSlots() < MaxPlayers,
+		Mode:           s.Mode,
+		Status:         string(s.Phase),
+		PlayerCount:    s.humanPlayerCount(),
+		MaxPlayers:     MaxPlayers,
+		AvailableSlots: available,
+		Joinable:       available > 0,
 	})
 	return string(label)
 }

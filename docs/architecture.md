@@ -6,7 +6,7 @@
 | --- | --- |
 | `modules/game/matchregistry` | Active user/session membership theo match |
 | `modules/game/matchmaking` | RPC find-or-create và matchmaker callback |
-| `modules/game/survival` | Authoritative Survival match, cho phép join-in-progress |
+| `modules/game/survival` | Authoritative Survival match với lifecycle `waiting → playing → ended`, cho phép join trong `playing` |
 | `modules/game/royale` | Authoritative Battle Royale match với lifecycle `waiting → playing → ended` |
 | `modules/game/core/entity` | Player, character, weapon và movement |
 | `modules/game/core/strategy` | Strategy mask và slot formation |
@@ -25,13 +25,13 @@ matchmaking cùng các Survival và Battle Royale match handler trong cùng proc
 
 ## Authoritative State
 
-Mỗi authoritative match sở hữu state độc lập, gồm player, presence, reservation, spatial grid, combat simulation và random source. Movement, health, formation và projectile đều do server quyết định. Combat của cả hai mode dùng player trong spatial detection làm candidate set, sau đó kiểm tra attack range chính xác giữa các character. Battle Royale bổ sung phase và deadline tick cho phòng chờ, gameplay và thời gian giữ match sau khi kết thúc.
+Mỗi authoritative match sở hữu state độc lập, gồm player, presence, reservation, spatial grid, combat simulation, random source, phase và deadline tick. Movement, health, formation và projectile đều do server quyết định. Combat của cả hai mode dùng player trong spatial detection làm candidate set, sau đó kiểm tra attack range chính xác giữa các character.
 
 State gameplay chỉ tồn tại trong memory. Nakama Storage/PostgreSQL hiện chưa lưu position, character health, formation hoặc projectile.
 
 ## Match Loop
 
-Match chạy ở `10 Hz`, tương đương `100 ms/tick`. Survival chạy simulation ngay; Battle Royale chỉ chạy flow gameplay dưới đây trong phase `playing`.
+Match chạy ở `10 Hz`, tương đương `100 ms/tick`. Cả Survival và Battle Royale chỉ chạy flow gameplay dưới đây trong phase `playing`.
 
 ```mermaid
 flowchart TD
@@ -61,7 +61,23 @@ Invalid opcode hoặc malformed movement payload bị bỏ qua và không dừng
 | `MatchTerminate` | Kết thúc mà không persist match state |
 | `MatchSignal` | Trả state label; chưa có gameplay command qua signal |
 
-Survival và Battle Royale lobby chưa từng có player tự dừng sau `60 giây` (`600 ticks`) khi không có player hoặc reservation. Battle Royale lobby đã bắt đầu countdown sẽ dừng ngay khi trở thành trống.
+Survival và Battle Royale lobby chưa từng có player tự dừng sau `60 giây` (`600 ticks`) khi không có player hoặc reservation. Lobby đã bắt đầu countdown sẽ dừng ngay khi trở thành trống.
+
+### Survival Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> waiting
+    waiting --> playing: 30 giây từ player đầu tiên hoặc đủ 3 player
+    waiting --> [*]: lobby đã khởi động nhưng trở thành trống
+    playing --> ended: đủ 15 phút gameplay
+    ended --> [*]: giữ 1 phút
+```
+
+- `waiting`: nhận tối đa 3 người tính cả reservation; tạm dừng input và simulation.
+- `playing`: cho join tiếp đến 32 người; trận trống dừng sau 60 giây.
+- `ended`: khóa join, hủy claim nhặt hộp, dừng simulation và giữ match 1 phút.
+- Opcode reliable `107` (`MatchLifecycleState`) gửi phase, deadline và tick rate khi join hoặc chuyển phase.
 
 ### Battle Royale Lifecycle
 
@@ -84,7 +100,7 @@ Coordinator chọn module và capacity theo `mode`: `survival.MaxPlayers` cho Su
 
 ## Dữ Liệu Và Serialization
 
-- Realtime opcode dùng binary Protobuf; opcode `107` hiện chỉ được Battle Royale phát ra.
+- Realtime opcode dùng binary Protobuf; cả Survival và Battle Royale đều phát opcode `107`.
 - Matchmaking RPC request/response và match label dùng JSON.
 - Weapon/strategy catalog, combat query buffer, Character Box pickup delay và Experience Package config mặc định dùng embedded JSON.
 - Generated Go code được compile vào `backend.so`; `.proto`, Buf và generated C# không cần có trong runtime image.

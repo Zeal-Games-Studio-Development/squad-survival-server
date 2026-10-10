@@ -49,7 +49,7 @@ Khi không có đối thủ phù hợp, bot chọn box gần nhất nếu đội
 
 Bot đứng lại khi vào bán kính nhặt box để hoàn tất thời gian nhặt. Hướng cuối cùng được giảm độ dài để tránh đi quá mục tiêu. Controller chỉ đặt `Direction`/`Facing`; tốc độ, formation, nhặt đồ, damage và XP được tính bằng hệ thống gameplay chung. Bot bị loại dừng di chuyển và giữ entity theo cơ chế player hiện tại.
 
-Survival chạy AI từ tick đầu tiên. Battle royale giữ bot bất động trong `waiting`; người thật đầu tiên kích hoạt countdown, đủ 32 người thật hoặc hết countdown mới vào `playing`. AI dừng khi match kết thúc. Match không có người thật vẫn đóng theo vòng đời hiện có dù còn bot.
+Cả Survival và Battle Royale giữ bot bất động trong `waiting` và chỉ chạy AI khi `playing`. Người thật đầu tiên kích hoạt countdown; Survival chuyển sang `playing` khi đủ 3 người hoặc hết 30 giây, Battle Royale khi đủ 32 người hoặc hết 15 giây. AI dừng khi match vào `ended`. Match không có người thật vẫn đóng theo vòng đời của mode dù còn bot.
 
 ## Kiểm thử
 

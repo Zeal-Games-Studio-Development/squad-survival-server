@@ -126,6 +126,9 @@ func findOrCreate(ctx context.Context, logger runtime.Logger, nk runtime.NakamaM
 		logger.Info("Backfilling %s match: match_id=%s players=%d", request.Mode, matches[0].GetMatchId(), requiredSlots)
 		return matches[0].GetMatchId(), false, nil
 	}
+	if moduleNameForMode(request.Mode) == survival.ModuleName && requiredSlots > survival.WaitingPlayerLimit {
+		return "", false, errors.New("matched party exceeds survival waiting capacity and no playing match has enough slots")
+	}
 
 	moduleName := moduleNameForMode(request.Mode)
 	matchID, err := nk.MatchCreate(ctx, moduleName, map[string]interface{}{
@@ -149,6 +152,19 @@ func findJoinable(ctx context.Context, nk runtime.NakamaModule, request Request,
 	matches, err := nk.MatchList(ctx, 20, true, "", nil, &maxCurrentSize, query)
 	if err != nil {
 		return nil, err
+	}
+	if moduleNameForMode(request.Mode) == survival.ModuleName {
+		eligible := matches[:0]
+		for _, match := range matches {
+			var label survival.Label
+			if match.GetLabel() == nil || json.Unmarshal([]byte(match.GetLabel().GetValue()), &label) != nil {
+				continue
+			}
+			if (label.Status == string(survival.PhaseWaiting) || label.Status == string(survival.PhasePlaying)) && label.AvailableSlots >= requiredSlots {
+				eligible = append(eligible, match)
+			}
+		}
+		matches = eligible
 	}
 
 	sort.SliceStable(matches, func(i, j int) bool {

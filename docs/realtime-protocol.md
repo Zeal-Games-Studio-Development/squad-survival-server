@@ -11,10 +11,12 @@
 | `104` | Server → Client | `PlayerRosterBatch` | Reliable | Join/enter detection/roster changed |
 | `105` | Server → Client | `ProjectileMovementSnapshot` | Unreliable | Mỗi tick |
 | `106` | Server → Client | `CharacterBoxStateBatch` | Reliable | Box spawn/despawn và pickup countdown |
-| `107` | Server → Client | `MatchLifecycleState` | Reliable | Join và chuyển phase Battle Royale |
+| `107` | Server → Client | `MatchLifecycleState` | Reliable | Join và chuyển phase Survival/Battle Royale |
 | `108` | Server → Client | `PlayerProgressionBatch` | Reliable | Join/enter detection/progression changed |
 | `109` | Server → Client | `ExperiencePackageStateBatch` | Reliable | Experience package detect/lost/collected |
 | `110` | Server → Client | `SkillStateBatch` | Reliable | Cooldown hoặc trạng thái thi triển thay đổi |
+
+Ở cả Survival và Battle Royale, `MatchLifecycleState` gửi `phase`, `server_tick`, `phase_ends_at_tick` và `tick_rate` khi người chơi join hoặc phase thay đổi. Survival dùng `waiting → playing → ended`: waiting tối đa 30 giây hoặc đến khi đủ 3 người, playing 15 phút và ended giữ match thêm 1 phút. Client dùng `phase_ends_at_tick - server_tick` cùng `tick_rate` để hiển thị thời gian còn lại; khi waiting chưa có người, deadline bằng `0`. Survival vẫn nhận người chơi mới trong playing nếu chưa đủ 32 người.
 
 Contract nằm trong các source schema:
 

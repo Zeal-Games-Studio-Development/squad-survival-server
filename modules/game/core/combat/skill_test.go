@@ -22,6 +22,7 @@ func TestSwordSkillUsesLockedConeAndCurrentTargetPositions(t *testing.T) {
 		t.Fatal(err)
 	}
 	character.Cooldowns["sword_cone"].Progress = 30
+	wantDamage := character.Damage * entity.DefaultSkillCatalog()[0].Effect.DamageMultiplier
 	players := playerMap(caster, primary, inside, outside)
 	nearby := spatialCandidates(t, players)
 	simulation := NewSimulation()
@@ -45,7 +46,7 @@ func TestSwordSkillUsesLockedConeAndCurrentTargetPositions(t *testing.T) {
 			continue
 		}
 		hits++
-		if event.TargetCharacterID != inside.Characters[0].ID || event.AttackID != start.AttackID || event.Damage != 10 || !entity.HasActionTag(event.Tags, entity.TagAOE) || !entity.HasActionTag(event.Tags, entity.TagSkill) {
+		if event.TargetCharacterID != inside.Characters[0].ID || event.AttackID != start.AttackID || event.Damage != wantDamage || !entity.HasActionTag(event.Tags, entity.TagAOE) || !entity.HasActionTag(event.Tags, entity.TagSkill) {
 			t.Fatalf("wrong skill hit: %+v", event)
 		}
 	}
@@ -152,7 +153,7 @@ func TestSkillAOEHitsHaveIndependentCritsAndIDs(t *testing.T) {
 	}
 	skill.Effect.CanCrit = false
 	for _, intent := range skillDamageIntents(skill, ownedCharacter{owner: caster, character: character}, candidates, 5, rand.New(rand.NewSource(1))).damageIntents {
-		if intent.event.Critical || intent.event.Damage != character.Damage {
+		if intent.event.Critical || intent.event.Damage != character.Damage*skill.Effect.DamageMultiplier {
 			t.Fatalf("noncritical skill still rolled crit: %+v", intent.event)
 		}
 	}

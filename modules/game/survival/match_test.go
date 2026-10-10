@@ -44,7 +44,7 @@ func TestInventoryGatesJoinAndProvidesStarter(t *testing.T) {
 	service := inventory.DefaultService()
 	match := &Match{inventory: service}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
-	state := &State{AllowJoinInProgress: true, Players: make(map[string]*entity.Player), Presences: make(map[string]runtime.Presence), Reservations: make(map[string]int64), SpatialGrid: spatial.NewGrid(spatialCellSize), random: rand.New(rand.NewSource(1))}
+	state := &State{Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks, Players: make(map[string]*entity.Player), Presences: make(map[string]runtime.Presence), Reservations: make(map[string]int64), SpatialGrid: spatial.NewGrid(spatialCellSize), random: rand.New(rand.NewSource(1))}
 	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, inventoryTestModule{}, nil, 0, state, presence, nil); allowed || reason != "invalid squad loadout" {
 		t.Fatalf("missing inventory accepted: %v %s", allowed, reason)
 	}
@@ -86,10 +86,10 @@ func TestCharacterBoxResolvesWeaponVariantByID(t *testing.T) {
 func TestJoinAttemptReservesAndExpiresSlot(t *testing.T) {
 	match := &Match{}
 	state := &State{
-		Mode:                DefaultMode,
-		AllowJoinInProgress: true,
-		Players:             make(map[string]*entity.Player),
-		Reservations:        make(map[string]int64),
+		Mode:  DefaultMode,
+		Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
+		Players:      make(map[string]*entity.Player),
+		Reservations: make(map[string]int64),
 	}
 	for i := 0; i < MaxPlayers; i++ {
 		presence := testPresence{userID: fmt.Sprintf("user-%d", i), sessionID: fmt.Sprintf("session-%d", i)}
@@ -116,20 +116,20 @@ func TestJoinAndLeaveUpdateCapacityLabel(t *testing.T) {
 	dispatcher := &testDispatcher{}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
 	state := &State{
-		Mode:                DefaultMode,
-		AllowJoinInProgress: true,
-		Players:             make(map[string]*entity.Player),
-		Presences:           make(map[string]runtime.Presence),
-		Reservations:        map[string]int64{presence.sessionID: 100},
-		SpatialGrid:         spatial.NewGrid(spatialCellSize),
-		random:              rand.New(rand.NewSource(1)),
+		Mode:  DefaultMode,
+		Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
+		Players:      make(map[string]*entity.Player),
+		Presences:    make(map[string]runtime.Presence),
+		Reservations: map[string]int64{presence.sessionID: 100},
+		SpatialGrid:  spatial.NewGrid(spatialCellSize),
+		random:       rand.New(rand.NewSource(1)),
 	}
 
 	match.MatchJoin(nil, nil, nil, nil, dispatcher, 0, state, []runtime.Presence{presence})
 	if state.Players[presence.sessionID].DisplayName != presence.userID {
 		t.Fatalf("expected username fallback, got %q", state.Players[presence.sessionID].DisplayName)
 	}
-	if dispatcher.label != `{"mode":"survival","status":"playing","player_count":1,"max_players":32,"joinable":true}` {
+	if dispatcher.label != `{"mode":"survival","status":"playing","player_count":1,"max_players":32,"available_slots":31,"joinable":true}` {
 		t.Fatalf("unexpected full label: %s", dispatcher.label)
 	}
 	assertStateSnapshot(t, dispatcher, 0, 1)
@@ -141,7 +141,7 @@ func TestJoinAndLeaveUpdateCapacityLabel(t *testing.T) {
 	}
 
 	match.MatchLeave(nil, nil, nil, nil, dispatcher, 2, state, []runtime.Presence{presence})
-	if dispatcher.label != `{"mode":"survival","status":"playing","player_count":0,"max_players":32,"joinable":true}` {
+	if dispatcher.label != `{"mode":"survival","status":"playing","player_count":0,"max_players":32,"available_slots":32,"joinable":true}` {
 		t.Fatalf("unexpected empty label: %s", dispatcher.label)
 	}
 	assertStateSnapshot(t, dispatcher, 2, 0)
@@ -171,14 +171,14 @@ func TestJoinAndLeaveUpdateActiveMatchRegistry(t *testing.T) {
 	dispatcher := &testDispatcher{}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
 	state := &State{
-		MatchID:             "match-1",
-		Mode:                DefaultMode,
-		AllowJoinInProgress: true,
-		Players:             make(map[string]*entity.Player),
-		Presences:           make(map[string]runtime.Presence),
-		Reservations:        make(map[string]int64),
-		SpatialGrid:         spatial.NewGrid(spatialCellSize),
-		random:              rand.New(rand.NewSource(1)),
+		MatchID: "match-1",
+		Mode:    DefaultMode,
+		Phase:   PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
+		Players:      make(map[string]*entity.Player),
+		Presences:    make(map[string]runtime.Presence),
+		Reservations: make(map[string]int64),
+		SpatialGrid:  spatial.NewGrid(spatialCellSize),
+		random:       rand.New(rand.NewSource(1)),
 	}
 
 	match.MatchJoin(nil, nil, nil, nil, dispatcher, 0, state, []runtime.Presence{presence})
@@ -197,10 +197,10 @@ func TestJoinAttemptRejectsUserActiveInAnotherMatch(t *testing.T) {
 	registry.Add("user-1", "session-1", "match-1")
 	match := &Match{registry: registry}
 	state := &State{
-		MatchID:             "match-2",
-		AllowJoinInProgress: true,
-		Players:             make(map[string]*entity.Player),
-		Reservations:        make(map[string]int64),
+		MatchID: "match-2",
+		Phase:   PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
+		Players:      make(map[string]*entity.Player),
+		Reservations: make(map[string]int64),
 	}
 	presence := testPresence{userID: "user-1", sessionID: "session-2"}
 
@@ -237,11 +237,11 @@ func TestMatchLoopIgnoresInvalidMessagesWithoutBroadcastingSnapshot(t *testing.T
 	dispatcher := &testDispatcher{}
 	player := entity.NewPlayer("user-1", "session-1", "Player One", entity.Vector2{}, rand.New(rand.NewSource(1)))
 	state := &State{
-		Mode:                DefaultMode,
-		AllowJoinInProgress: true,
-		Players:             map[string]*entity.Player{player.SessionID: player},
-		Reservations:        make(map[string]int64),
-		SpatialGrid:         spatial.NewGrid(spatialCellSize),
+		Mode:  DefaultMode,
+		Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
+		Players:      map[string]*entity.Player{player.SessionID: player},
+		Reservations: make(map[string]int64),
+		SpatialGrid:  spatial.NewGrid(spatialCellSize),
 	}
 	if err := state.SpatialGrid.Insert(player); err != nil {
 		t.Fatal(err)
@@ -268,11 +268,11 @@ func TestMatchLoopAppliesMovementWithoutBroadcastingSnapshot(t *testing.T) {
 	dispatcher := &testDispatcher{}
 	player := entity.NewPlayer("user-1", "session-1", "Player One", entity.Vector2{}, rand.New(rand.NewSource(1)))
 	state := &State{
-		Mode:                DefaultMode,
-		AllowJoinInProgress: true,
-		Players:             map[string]*entity.Player{player.SessionID: player},
-		Reservations:        make(map[string]int64),
-		SpatialGrid:         spatial.NewGrid(spatialCellSize),
+		Mode:  DefaultMode,
+		Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
+		Players:      map[string]*entity.Player{player.SessionID: player},
+		Reservations: make(map[string]int64),
+		SpatialGrid:  spatial.NewGrid(spatialCellSize),
 	}
 	if err := state.SpatialGrid.Insert(player); err != nil {
 		t.Fatal(err)
@@ -304,11 +304,11 @@ func TestMatchLoopRemovesDeadCharacterBeforeMovement(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := &State{
-		Mode:                DefaultMode,
-		AllowJoinInProgress: true,
-		Players:             map[string]*entity.Player{player.SessionID: player},
-		Reservations:        make(map[string]int64),
-		SpatialGrid:         grid,
+		Mode:  DefaultMode,
+		Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
+		Players:      map[string]*entity.Player{player.SessionID: player},
+		Reservations: make(map[string]int64),
+		SpatialGrid:  grid,
 	}
 	message := testMatchData{
 		testPresence: testPresence{userID: player.UserID, sessionID: player.SessionID},
@@ -340,8 +340,8 @@ func TestMatchLoopMovesPlayerBetweenSpatialCells(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := &State{
-		Mode:                DefaultMode,
-		AllowJoinInProgress: true,
+		Mode:  DefaultMode,
+		Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
 		Players: map[string]*entity.Player{
 			moving.SessionID:   moving,
 			detector.SessionID: detector,
@@ -380,8 +380,8 @@ func TestMatchLoopSendsPersonalizedPlayerMovementSnapshots(t *testing.T) {
 		}
 	}
 	state := &State{
-		Mode:                DefaultMode,
-		AllowJoinInProgress: true,
+		Mode:  DefaultMode,
+		Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
 		Players: map[string]*entity.Player{
 			playerA.SessionID: playerA,
 			playerB.SessionID: playerB,
@@ -684,8 +684,8 @@ func TestMatchLoopSendsReliableCombatEventsToRelevantViewers(t *testing.T) {
 		}
 	}
 	state := &State{
-		Mode:                DefaultMode,
-		AllowJoinInProgress: true,
+		Mode:  DefaultMode,
+		Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks,
 		Players: map[string]*entity.Player{
 			playerA.SessionID: playerA,
 			playerB.SessionID: playerB,
@@ -1015,6 +1015,8 @@ func TestCharacterBoxRefillAndJoinSnapshot(t *testing.T) {
 
 func characterBoxTestState(seed int64) *State {
 	return &State{
+		Phase:             PhasePlaying,
+		PlayingEndsAtTick: playingDurationTicks,
 		Players:           make(map[string]*entity.Player),
 		Presences:         make(map[string]runtime.Presence),
 		Reservations:      make(map[string]int64),

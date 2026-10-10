@@ -10,9 +10,19 @@ import (
 
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 type inventoryModule struct{ runtime.NakamaModule }
+
+type matchListModule struct {
+	runtime.NakamaModule
+	matches []*api.Match
+}
+
+func (m matchListModule) MatchList(context.Context, int, bool, string, *int, *int, string) ([]*api.Match, error) {
+	return m.matches, nil
+}
 
 func (inventoryModule) StorageRead(_ context.Context, _ []*runtime.StorageRead) ([]*api.StorageObject, error) {
 	return nil, nil
@@ -57,6 +67,22 @@ func TestBattleRoyaleMatchQueryOnlyFindsWaitingLobbies(t *testing.T) {
 	want := "+label.mode:battle-royale +label.joinable:T +label.max_players:32 +label.status:waiting"
 	if query != want {
 		t.Fatalf("unexpected query: got %q want %q", query, want)
+	}
+}
+
+func TestSurvivalMatchmakingRespectsPhaseCapacity(t *testing.T) {
+	matches := []*api.Match{
+		{MatchId: "waiting-one-slot", Size: 2, Label: wrapperspb.String(`{"status":"waiting","available_slots":1}`)},
+		{MatchId: "playing-two-slots", Size: 30, Label: wrapperspb.String(`{"status":"playing","available_slots":2}`)},
+		{MatchId: "ended", Size: 1, Label: wrapperspb.String(`{"status":"ended","available_slots":31}`)},
+	}
+	module := matchListModule{matches: matches}
+	found, err := findJoinable(context.Background(), module, Request{Mode: "survival"}, 2)
+	if err != nil || len(found) != 1 || found[0].GetMatchId() != "playing-two-slots" {
+		t.Fatalf("wrong matches for two-player party: %+v, %v", found, err)
+	}
+	if _, _, err := findOrCreate(context.Background(), nil, matchListModule{}, Request{Mode: "survival"}, 4); err == nil {
+		t.Fatal("party larger than waiting capacity created an unusable lobby")
 	}
 }
 

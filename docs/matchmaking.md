@@ -34,7 +34,7 @@ Server chỉ tìm/tạo match khi tài khoản có `squad_loadout` hợp lệ v�
 
 ## Find Or Create
 
-Khi cho phép join in progress, coordinator tìm tối đa 20 authoritative match có label phù hợp, còn đủ slot và `joinable=true`. Danh sách được sắp theo size giảm dần để backfill match đông nhất trước.
+Coordinator tìm tối đa 20 authoritative match có label phù hợp, còn đủ slot và `joinable=true`. Survival có thể backfill trong `waiting` và `playing`; coordinator kiểm tra `available_slots` để nhóm ghép trận không vượt sức chứa của phase. Nhóm trên 3 người chỉ có thể vào trận Survival đang `playing`; nếu không có trận đủ chỗ, yêu cầu bị từ chối. Battle Royale chỉ backfill trong `waiting`. Danh sách được sắp theo size giảm dần để backfill match đông nhất trước.
 
 Nếu không tìm thấy, server gọi `MatchCreate`. Mutex process-local bảo vệ đoạn find-or-create khỏi tạo trùng trong cùng Nakama process.
 
@@ -43,11 +43,22 @@ Nếu không tìm thấy, server gọi `MatchCreate`. Mutex process-local bảo 
 | Giá trị | Hiện tại |
 | --- | --- |
 | Max players | `32` |
+| Survival waiting limit | `3` người, tính cả reservation |
 | Reservation TTL | `10 giây` |
 | Empty match TTL | `60 giây` |
 | Match list limit | `20` |
 
-Capacity được tính bằng player đã join cộng reservation chưa hết hạn. Party lớn hơn capacity bị từ chối.
+Capacity được tính bằng player đã join cộng reservation chưa hết hạn. Party lớn hơn capacity của phase hiện tại bị từ chối.
+
+## Survival lifecycle
+
+| Phase | Thời lượng | Join | Gameplay |
+| --- | --- | --- | --- |
+| `waiting` | Tối đa 30 giây từ người đầu tiên | Tối đa 3 người | Tạm dừng |
+| `playing` | 15 phút | Tiếp tục nhận đến 32 người | Hoạt động |
+| `ended` | 1 phút trước khi đóng match | Không | Tạm dừng |
+
+Đủ 3 người đã join thì chuyển sang `playing` ngay; nếu chưa đủ, chuyển khi hết 30 giây. Khi `playing` hết 15 phút, server hủy các lượt nhặt hộp đang chờ và chuyển sang `ended`. Tổng kết điểm và xếp hạng chưa được triển khai. Lobby chưa từng có người đóng sau 60 giây trống; lobby đã bắt đầu countdown đóng ngay khi không còn người hoặc reservation. Trận `playing` trống đóng sau 60 giây; `ended` giữ đủ 1 phút dù không còn người.
 
 ## Active Match Registry
 
@@ -66,18 +77,19 @@ Label JSON gồm:
 ```json
 {
   "mode": "survival",
-  "status": "playing",
+  "status": "waiting",
   "player_count": 1,
   "max_players": 32,
+  "available_slots": 2,
   "joinable": true
 }
 ```
 
-Label được cập nhật khi reservation hết hạn, player join hoặc leave. Opcode `101` gửi lại player count khi join/leave.
+`status` đổi theo phase. Với Survival, `available_slots` tính từ giới hạn của phase trừ số người đã join và reservation còn hạn; `joinable` đúng khi còn chỗ trong `waiting` hoặc `playing`. Label được cập nhật khi phase đổi, reservation hết hạn, player join hoặc leave. Opcode `101` gửi lại player count khi join/leave; opcode `107` gửi phase và deadline cho người mới join và khi phase đổi.
 
 ## Giới Hạn Hiện Tại
 
 - `MatchLeave` xóa player state ngay; chưa có reconnect grace period.
 - Mutex không điều phối find-or-create giữa nhiều Nakama node.
 - Match đang chạy không được migrate hoặc restore sau restart/deploy.
-- Chưa có end-of-match phase hoặc reward settlement.
+- Chưa có tổng kết điểm, xếp hạng hoặc reward settlement.
