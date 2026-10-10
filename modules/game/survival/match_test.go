@@ -782,7 +782,7 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 	state.Players[far.SessionID] = far
 	state.Players[near.SessionID] = near
 	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
-	if farWeapon, ok := state.weaponForBox(far, box); !ok || farWeapon.ID != "acher" {
+	if farWeapon, ok := state.weaponForBox(far, box); !ok || farWeapon.ID != "archer" {
 		t.Fatalf("far player's bow loadout was not used: %+v", farWeapon)
 	}
 	state.CharacterBoxes[box.ID] = box

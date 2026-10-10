@@ -2,7 +2,7 @@
   "weapons": [
     {
       "type": "bow",
-      "weapon_id": "acher",
+      "weapon_id": "archer",
       "range_class": "ranged",
       "health": 85,
       "damage": 11,

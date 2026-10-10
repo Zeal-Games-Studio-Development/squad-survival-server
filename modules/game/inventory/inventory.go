@@ -32,7 +32,8 @@ var requiredTypes = []entity.WeaponType{
 }
 
 var renamedStarterIDs = map[string]string{
-	"bow":         "acher",
+	"bow":         "archer",
+	"acher":       "archer",
 	"staff":       "novice_mage",
 	"spear":       "farmer",
 	"sword":       "swordman",

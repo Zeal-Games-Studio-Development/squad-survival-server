@@ -142,7 +142,7 @@ Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf ho�
 
 ## JSON Còn Được Dùng Ở Đâu
 
-- RPC `find_or_create_match`, `get_character_inventory`, `set_squad_loadout` request/response. `set_squad_loadout` nhận `{ "squad_loadout": { "bow": "acher", ... }, "version": "..." }`; cả hai RPC inventory trả `weapon_ids`, `squad_loadout` và `version`.
+- RPC `find_or_create_match`, `get_character_inventory`, `set_squad_loadout` request/response. `set_squad_loadout` nhận `{ "squad_loadout": { "bow": "archer", ... }, "version": "..." }`; cả hai RPC inventory trả `weapon_ids`, `squad_loadout` và `version`.
 - Match label cho `MatchList` query.
 - Embedded `weapons.json`, `skills.json`, `strategies.json` và `pickup_delays.json`.
 - RPC `healthcheck` response.
