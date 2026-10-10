@@ -36,7 +36,8 @@ const (
 	playingDurationTicks        = 15 * 60 * tickRate
 	endedDurationTicks          = 60 * tickRate
 	reservationTTLSeconds       = 10
-	emptyMatchTTLSeconds        = 60
+	waitingEmptyTTLSeconds      = 60
+	playingEmptyTTLSeconds      = 15
 	spatialCellSize             = 20.0
 	characterBoxMinCount        = 60
 	characterBoxMaxCount        = 80
@@ -350,7 +351,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 		} else {
 			if state.WaitingEndsAtTick == 0 && len(state.Reservations) == 0 {
 				state.EmptyTicks++
-				if state.EmptyTicks >= emptyMatchTTLSeconds*tickRate {
+				if state.EmptyTicks >= waitingEmptyTTLSeconds*tickRate {
 					if logger != nil {
 						logger.Info("Stopping unused survival lobby")
 					}
@@ -453,7 +454,7 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 
 	if state.humanPlayerCount() == 0 && len(state.Reservations) == 0 {
 		state.EmptyTicks++
-		if state.EmptyTicks >= emptyMatchTTLSeconds*tickRate {
+		if state.EmptyTicks >= playingEmptyTTLSeconds*tickRate {
 			if logger != nil {
 				logger.Info("Stopping empty survival match")
 			}

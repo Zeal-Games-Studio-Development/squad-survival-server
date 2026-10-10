@@ -117,7 +117,7 @@ func TestSurvivalEndedStopsGameplayAndTerminatesAfterGracePeriod(t *testing.T) {
 
 func TestSurvivalWaitingAndPlayingEmptyMatchPolicy(t *testing.T) {
 	match, state := newAITestMatch(t)
-	state.EmptyTicks = emptyMatchTTLSeconds*tickRate - 1
+	state.EmptyTicks = waitingEmptyTTLSeconds*tickRate - 1
 	if result := match.MatchLoop(nil, aiTestLogger{}, nil, nil, &testDispatcher{}, 1, state, nil); result != nil {
 		t.Fatal("unused waiting match survived empty TTL")
 	}
@@ -129,9 +129,35 @@ func TestSurvivalWaitingAndPlayingEmptyMatchPolicy(t *testing.T) {
 	match, state = newAITestMatch(t)
 	state.Phase = PhasePlaying
 	state.PlayingEndsAtTick = playingDurationTicks
-	state.EmptyTicks = emptyMatchTTLSeconds*tickRate - 1
-	if result := match.MatchLoop(nil, aiTestLogger{}, nil, nil, &testDispatcher{}, 1, state, nil); result != nil {
-		t.Fatal("empty playing match survived empty TTL")
+	state.EmptyTicks = playingEmptyTTLSeconds*tickRate - 2
+	if result := match.MatchLoop(nil, aiTestLogger{}, nil, nil, &testDispatcher{}, 1, state, nil); result == nil || state.EmptyTicks != playingEmptyTTLSeconds*tickRate-1 {
+		t.Fatal("empty playing match stopped before 15 seconds")
+	}
+	if result := match.MatchLoop(nil, aiTestLogger{}, nil, nil, &testDispatcher{}, 2, state, nil); result != nil {
+		t.Fatal("empty playing match survived 15 seconds")
+	}
+
+	match, state = newAITestMatch(t)
+	state.Phase = PhasePlaying
+	state.PlayingEndsAtTick = playingDurationTicks
+	state.EmptyTicks = playingEmptyTTLSeconds*tickRate - 1
+	state.Reservations["pending"] = 100
+	if result := match.MatchLoop(nil, aiTestLogger{}, nil, nil, &testDispatcher{}, 1, state, nil); result == nil || state.EmptyTicks != 0 {
+		t.Fatal("reservation did not reset empty playing TTL")
+	}
+	delete(state.Reservations, "pending")
+	if result := match.MatchLoop(nil, aiTestLogger{}, nil, nil, &testDispatcher{}, 2, state, nil); result == nil || state.EmptyTicks != 1 {
+		t.Fatal("empty playing TTL did not restart after reservation disappeared")
+	}
+
+	state.EmptyTicks = playingEmptyTTLSeconds*tickRate - 1
+	presence := testPresence{userID: "user-1", sessionID: "session-1"}
+	match.MatchJoin(nil, nil, nil, nil, &testDispatcher{}, 3, state, []runtime.Presence{presence})
+	if state.EmptyTicks != 0 {
+		t.Fatal("joining player did not reset empty playing TTL")
+	}
+	if result := match.MatchLoop(nil, aiTestLogger{}, nil, nil, &testDispatcher{}, 3, state, nil); result == nil || state.EmptyTicks != 0 {
+		t.Fatal("playing match with a player stopped as empty")
 	}
 }
 

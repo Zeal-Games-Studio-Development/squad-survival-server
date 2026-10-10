@@ -167,7 +167,7 @@ func TestAIVisibleToHumansWithoutNetworkObservers(t *testing.T) {
 
 func TestAIOnlyWaitingMatchExpiresWithoutMovingBots(t *testing.T) {
 	match, state := newAITestMatch(t)
-	state.EmptyTicks = emptyMatchTTLSeconds*tickRate - 1
+	state.EmptyTicks = waitingEmptyTTLSeconds*tickRate - 1
 	if next := match.MatchLoop(nil, aiTestLogger{}, nil, nil, &testDispatcher{}, 1, state, nil); next != nil {
 		t.Fatal("AI kept an empty match alive")
 	}

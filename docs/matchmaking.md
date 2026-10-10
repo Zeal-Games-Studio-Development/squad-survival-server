@@ -45,7 +45,7 @@ Nếu không tìm thấy, server gọi `MatchCreate`. Mutex process-local bảo 
 | Max players | `32` |
 | Survival waiting limit | `3` người, tính cả reservation |
 | Reservation TTL | `10 giây` |
-| Empty match TTL | `60 giây` |
+| Empty match TTL | `60 giây` khi `waiting` chưa từng có người; `15 giây` khi `playing` trống |
 | Match list limit | `20` |
 
 Capacity được tính bằng player đã join cộng reservation chưa hết hạn. Party lớn hơn capacity của phase hiện tại bị từ chối.
@@ -58,7 +58,7 @@ Capacity được tính bằng player đã join cộng reservation chưa hết h
 | `playing` | 15 phút | Tiếp tục nhận đến 32 người | Hoạt động |
 | `ended` | 1 phút trước khi đóng match | Không | Tạm dừng |
 
-Đủ 3 người đã join thì chuyển sang `playing` ngay; nếu chưa đủ, chuyển khi hết 30 giây. Khi `playing` hết 15 phút, server hủy các lượt nhặt hộp đang chờ và chuyển sang `ended`. Tổng kết điểm và xếp hạng chưa được triển khai. Lobby chưa từng có người đóng sau 60 giây trống; lobby đã bắt đầu countdown đóng ngay khi không còn người hoặc reservation. Trận `playing` trống đóng sau 60 giây; `ended` giữ đủ 1 phút dù không còn người.
+Đủ 3 người đã join thì chuyển sang `playing` ngay; nếu chưa đủ, chuyển khi hết 30 giây. Khi `playing` hết 15 phút, server hủy các lượt nhặt hộp đang chờ và chuyển sang `ended`. Tổng kết điểm và xếp hạng chưa được triển khai. Lobby chưa từng có người đóng sau 60 giây trống; lobby đã bắt đầu countdown đóng ngay khi không còn người hoặc reservation. Trận `playing` trống đóng sau 15 giây; `ended` giữ đủ 1 phút dù không còn người.
 
 ## Active Match Registry
 

@@ -75,7 +75,7 @@ stateDiagram-v2
 ```
 
 - `waiting`: nhận tối đa 3 người tính cả reservation; tạm dừng input và simulation.
-- `playing`: cho join tiếp đến 32 người; trận trống dừng sau 60 giây.
+- `playing`: cho join tiếp đến 32 người; trận trống dừng sau 15 giây.
 - `ended`: khóa join, hủy claim nhặt hộp, dừng simulation và giữ match 1 phút.
 - Opcode reliable `107` (`MatchLifecycleState`) gửi phase, deadline và tick rate khi join hoặc chuyển phase.
 
