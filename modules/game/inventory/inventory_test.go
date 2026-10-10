@@ -155,51 +155,35 @@ func TestSetLoadoutValidatesOwnershipTypeCompletenessAndVersion(t *testing.T) {
 	}
 }
 
-func TestLoadRenamedStarterIDs(t *testing.T) {
+func TestLoadRejectsObsoleteWeaponIDs(t *testing.T) {
 	service := DefaultService()
-	legacy := Data{
-		WeaponIDs: []string{"bow", "staff", "spear", "sword", "axe", "blunt", "crossbow", "shield"},
-		SquadLoadout: map[string]string{
-			"bow": "bow", "staff": "staff", "spear": "spear", "sword": "sword",
-			"axe": "axe", "blunt": "blunt", "crossbow": "crossbow", "shield": "shield",
-		},
-	}
-	value, err := json.Marshal(legacy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	store := &memoryStore{objects: map[string]*api.StorageObject{
-		"user": {Value: string(value), Version: "legacy"},
-	}}
-	snapshot, err := service.Load(context.Background(), store, "user")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if snapshot.SquadLoadout["bow"] != "archer" || snapshot.SquadLoadout["shield"] != "shieldbearer" || snapshot.Version != "legacy" {
-		t.Fatalf("legacy IDs were not mapped: %+v", snapshot)
-	}
-	if !reflect.DeepEqual(snapshot.WeaponIDs, service.initialIDs) {
-		t.Fatalf("legacy owned IDs were not mapped: %+v", snapshot.WeaponIDs)
-	}
-	updated, err := service.SetLoadout(context.Background(), store, "user", snapshot.Version, snapshot.SquadLoadout)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(updated.WeaponIDs, service.initialIDs) {
-		t.Fatalf("renamed IDs were not persisted: %+v", updated)
-	}
-	legacy.WeaponIDs[0] = "acher"
-	legacy.SquadLoadout["bow"] = "acher"
-	legacy.WeaponIDs[6] = "crossbowman"
-	legacy.SquadLoadout["crossbow"] = "crossbowman"
-	value, err = json.Marshal(legacy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	store.objects["previous-name"] = &api.StorageObject{Value: string(value), Version: "legacy"}
-	snapshot, err = service.Load(context.Background(), store, "previous-name")
-	if err != nil || snapshot.SquadLoadout["bow"] != "archer" || snapshot.SquadLoadout["crossbow"] != "hunter" {
-		t.Fatalf("previous bow or crossbow ID was not mapped: %+v, %v", snapshot, err)
+	for _, old := range []struct {
+		id         string
+		weaponType string
+		index      int
+	}{
+		{id: "bow", weaponType: "bow", index: 0},
+		{id: "acher", weaponType: "bow", index: 0},
+		{id: "crossbowman", weaponType: "crossbow", index: 6},
+	} {
+		t.Run(old.id, func(t *testing.T) {
+			data, err := service.InitialData()
+			if err != nil {
+				t.Fatal(err)
+			}
+			data.WeaponIDs[old.index] = old.id
+			data.SquadLoadout[old.weaponType] = old.id
+			value, err := json.Marshal(data)
+			if err != nil {
+				t.Fatal(err)
+			}
+			store := &memoryStore{objects: map[string]*api.StorageObject{
+				"user": {Value: string(value), Version: "legacy"},
+			}}
+			if _, err := service.Load(context.Background(), store, "user"); !errors.Is(err, ErrInvalidLoadout) {
+				t.Fatalf("obsolete ID %q was accepted: %v", old.id, err)
+			}
+		})
 	}
 }
 
