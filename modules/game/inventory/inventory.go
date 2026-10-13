@@ -20,9 +20,8 @@ const (
 )
 
 var (
-	ErrNotInitialized  = errors.New("character inventory is not initialized")
-	ErrInvalidLoadout  = errors.New("squad loadout must contain one owned weapon id for each weapon type")
-	ErrVersionConflict = errors.New("character inventory version conflict")
+	ErrNotInitialized   = errors.New("character inventory is not initialized")
+	ErrInvalidInventory = errors.New("character inventory must contain unique, known weapon ids")
 )
 
 var requiredTypes = []entity.WeaponType{
@@ -35,13 +34,7 @@ var requiredTypes = []entity.WeaponType{
 var initialInventoryJSON []byte
 
 type Data struct {
-	WeaponIDs    []string          `json:"weapon_ids"`
-	SquadLoadout map[string]string `json:"squad_loadout"`
-}
-
-type Snapshot struct {
-	Data
-	Version string `json:"version"`
+	WeaponIDs []string `json:"weapon_ids"`
 }
 
 type Store interface {
@@ -50,15 +43,16 @@ type Store interface {
 }
 
 type Service struct {
-	byID       map[string]entity.Weapon
-	initialIDs []string
+	byID          map[string]entity.Weapon
+	initialIDs    []string
+	initialByType map[entity.WeaponType]entity.Weapon
 }
 
 func NewService(weapons []entity.Weapon, initialIDs []string) (*Service, error) {
 	if len(weapons) == 0 {
 		return nil, errors.New("weapon catalog is empty")
 	}
-	service := &Service{byID: make(map[string]entity.Weapon, len(weapons)), initialIDs: append([]string(nil), initialIDs...)}
+	service := &Service{byID: make(map[string]entity.Weapon, len(weapons)), initialIDs: append([]string(nil), initialIDs...), initialByType: make(map[entity.WeaponType]entity.Weapon, len(requiredTypes))}
 	types := make(map[entity.WeaponType]bool)
 	for _, weapon := range weapons {
 		if weapon.ID == "" || weapon.Type == "" {
@@ -78,7 +72,20 @@ func NewService(weapons []entity.Weapon, initialIDs []string) (*Service, error) 
 			return nil, fmt.Errorf("missing weapon type %q", weaponType)
 		}
 	}
-	if _, err := service.InitialData(); err != nil {
+	if len(initialIDs) != len(requiredTypes) {
+		return nil, fmt.Errorf("initial inventory must contain exactly %d weapon ids", len(requiredTypes))
+	}
+	for _, id := range initialIDs {
+		weapon, ok := service.byID[id]
+		if !ok {
+			return nil, fmt.Errorf("initial inventory has unknown weapon id %q", id)
+		}
+		if _, exists := service.initialByType[weapon.Type]; exists {
+			return nil, fmt.Errorf("initial inventory has duplicate weapon type %q", weapon.Type)
+		}
+		service.initialByType[weapon.Type] = weapon
+	}
+	if err := service.Validate(Data{WeaponIDs: initialIDs}); err != nil {
 		return nil, err
 	}
 	return service, nil
@@ -99,76 +106,57 @@ func DefaultService() *Service {
 }
 
 func (s *Service) InitialData() (Data, error) {
-	data := Data{WeaponIDs: append([]string(nil), s.initialIDs...), SquadLoadout: make(map[string]string, len(requiredTypes))}
-	for _, id := range data.WeaponIDs {
-		weapon, ok := s.byID[id]
-		if !ok {
-			return Data{}, fmt.Errorf("initial inventory has unknown weapon id %q", id)
-		}
-		if _, exists := data.SquadLoadout[string(weapon.Type)]; exists {
-			return Data{}, fmt.Errorf("initial inventory has duplicate weapon type %q", weapon.Type)
-		}
-		data.SquadLoadout[string(weapon.Type)] = id
-	}
-	if err := s.Validate(data); err != nil {
-		return Data{}, fmt.Errorf("invalid initial inventory: %w", err)
-	}
-	return data, nil
+	return Data{WeaponIDs: append([]string(nil), s.initialIDs...)}, nil
 }
 
 func (s *Service) Validate(data Data) error {
+	if len(data.WeaponIDs) == 0 {
+		return ErrInvalidInventory
+	}
 	owned := make(map[string]bool, len(data.WeaponIDs))
 	for _, id := range data.WeaponIDs {
 		if _, ok := s.byID[id]; !ok || owned[id] {
-			return ErrInvalidLoadout
+			return ErrInvalidInventory
 		}
 		owned[id] = true
-	}
-	if len(data.SquadLoadout) != len(requiredTypes) {
-		return ErrInvalidLoadout
-	}
-	for _, weaponType := range requiredTypes {
-		id, ok := data.SquadLoadout[string(weaponType)]
-		if !ok || !owned[id] || s.byID[id].Type != weaponType {
-			return ErrInvalidLoadout
-		}
 	}
 	return nil
 }
 
-func (s *Service) Starter(snapshot Snapshot, random *rand.Rand) (entity.Weapon, error) {
-	if err := s.Validate(snapshot.Data); err != nil {
-		return entity.Weapon{}, err
-	}
+func (s *Service) Starter(random *rand.Rand) (entity.Weapon, error) {
 	if random == nil {
 		return entity.Weapon{}, errors.New("starter random source is required")
 	}
-	typeName := requiredTypes[random.Intn(len(requiredTypes))]
-	return s.byID[snapshot.SquadLoadout[string(typeName)]], nil
+	return s.byID[s.initialIDs[random.Intn(len(s.initialIDs))]], nil
 }
 
-func (s *Service) Load(ctx context.Context, store Store, userID string) (Snapshot, error) {
+func (s *Service) InitialWeapon(weaponType entity.WeaponType) (entity.Weapon, bool) {
+	weapon, ok := s.initialByType[weaponType]
+	return weapon, ok
+}
+
+func (s *Service) Load(ctx context.Context, store Store, userID string) (Data, error) {
 	if store == nil || userID == "" {
-		return Snapshot{}, errors.New("inventory store and user id are required")
+		return Data{}, errors.New("inventory store and user id are required")
 	}
 	objects, err := store.StorageRead(ctx, []*runtime.StorageRead{{Collection: Collection, Key: Key, UserID: userID}})
 	if err != nil {
-		return Snapshot{}, err
+		return Data{}, err
 	}
 	if len(objects) == 0 {
-		return Snapshot{}, ErrNotInitialized
+		return Data{}, ErrNotInitialized
 	}
 	if len(objects) != 1 || objects[0] == nil {
-		return Snapshot{}, errors.New("invalid character inventory storage response")
+		return Data{}, errors.New("invalid character inventory storage response")
 	}
 	var data Data
 	if err := json.Unmarshal([]byte(objects[0].Value), &data); err != nil {
-		return Snapshot{}, fmt.Errorf("decode character inventory: %w", err)
+		return Data{}, fmt.Errorf("decode character inventory: %w", err)
 	}
 	if err := s.Validate(data); err != nil {
-		return Snapshot{}, err
+		return Data{}, err
 	}
-	return Snapshot{Data: data, Version: objects[0].Version}, nil
+	return data, nil
 }
 
 func (s *Service) InitializeNewAccount(ctx context.Context, store Store, userID string) error {
@@ -185,37 +173,4 @@ func (s *Service) InitializeNewAccount(ctx context.Context, store Store, userID 
 	}
 	_, err = store.StorageWrite(ctx, []*runtime.StorageWrite{{Collection: Collection, Key: Key, UserID: userID, Value: string(value), PermissionRead: 1, PermissionWrite: 0}})
 	return err
-}
-
-func (s *Service) SetLoadout(ctx context.Context, store Store, userID, version string, loadout map[string]string) (Snapshot, error) {
-	if version == "" {
-		return Snapshot{}, ErrVersionConflict
-	}
-	current, err := s.Load(ctx, store, userID)
-	if err != nil {
-		return Snapshot{}, err
-	}
-	if current.Version != version {
-		return Snapshot{}, ErrVersionConflict
-	}
-	current.SquadLoadout = loadout
-	if err := s.Validate(current.Data); err != nil {
-		return Snapshot{}, err
-	}
-	value, err := json.Marshal(current.Data)
-	if err != nil {
-		return Snapshot{}, err
-	}
-	acks, err := store.StorageWrite(ctx, []*runtime.StorageWrite{{Collection: Collection, Key: Key, UserID: userID, Value: string(value), Version: version, PermissionRead: 1, PermissionWrite: 0}})
-	if err != nil {
-		if errors.Is(err, runtime.ErrStorageRejectedVersion) {
-			return Snapshot{}, ErrVersionConflict
-		}
-		return Snapshot{}, err
-	}
-	if len(acks) != 1 || acks[0] == nil {
-		return Snapshot{}, errors.New("invalid character inventory write response")
-	}
-	current.Version = acks[0].Version
-	return current, nil
 }

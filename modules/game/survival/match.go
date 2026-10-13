@@ -84,6 +84,7 @@ type State struct {
 	BoxClaims           map[string]characterbox.Claim
 	ClaimedBoxBySession map[string]string
 	BoxPickupDelays     map[int]int64
+	initialInventory    *inventory.Service
 	random              *rand.Rand // Gameplay RNG: spawn, weapon, combat, and damage.
 	aiRandom            *rand.Rand
 }
@@ -132,6 +133,7 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		BoxClaims:           make(map[string]characterbox.Claim),
 		ClaimedBoxBySession: make(map[string]string),
 		BoxPickupDelays:     characterbox.DefaultDelays(),
+		initialInventory:    m.inventory,
 		random:              rand.New(rand.NewSource(randomSeed)),
 		aiRandom:            rand.New(rand.NewSource(randomSeed + 2)),
 	}
@@ -173,7 +175,7 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 	}
 	if m.inventory != nil {
 		if _, err := m.inventory.Load(ctx, nk, presence.GetUserId()); err != nil {
-			return state, false, "invalid squad loadout"
+			return state, false, "invalid character inventory"
 		}
 	}
 
@@ -209,23 +211,27 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		if _, exists := state.Players[presence.GetSessionId()]; exists {
 			continue
 		}
-		var starter entity.Weapon
-		var loadout map[string]string
 		if m.inventory != nil {
-			snapshot, loadErr := m.inventory.Load(ctx, nk, presence.GetUserId())
-			if loadErr == nil {
-				starter, loadErr = m.inventory.Starter(snapshot, state.random)
-				loadout = snapshot.SquadLoadout
-			}
+			_, loadErr := m.inventory.Load(ctx, nk, presence.GetUserId())
 			if loadErr != nil {
 				if logger != nil {
-					logger.Error("Could not load squad loadout: user_id=%s error=%v", presence.GetUserId(), loadErr)
+					logger.Error("Could not load character inventory: user_id=%s error=%v", presence.GetUserId(), loadErr)
 				}
 				if kickErr := dispatcher.MatchKick([]runtime.Presence{presence}); kickErr != nil && logger != nil {
-					logger.Error("Could not kick presence with invalid loadout: %v", kickErr)
+					logger.Error("Could not kick presence with invalid inventory: %v", kickErr)
 				}
 				continue
 			}
+		}
+		starter, starterErr := state.initialWeaponService().Starter(state.random)
+		if starterErr != nil {
+			if logger != nil {
+				logger.Error("Could not choose initial character: user_id=%s error=%v", presence.GetUserId(), starterErr)
+			}
+			if kickErr := dispatcher.MatchKick([]runtime.Presence{presence}); kickErr != nil && logger != nil {
+				logger.Error("Could not kick presence without initial character: %v", kickErr)
+			}
+			continue
 		}
 		if state.MatchID != "" && !m.registry.Add(presence.GetUserId(), presence.GetSessionId(), state.MatchID) {
 			if logger != nil {
@@ -237,13 +243,7 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 			continue
 		}
 		position := state.randomPlayerSpawn()
-		var player *entity.Player
-		if m.inventory != nil {
-			player = entity.NewPlayerWithWeapon(presence.GetUserId(), presence.GetSessionId(), displayNames[presence.GetUserId()], position, starter)
-			player.SetSquadLoadout(loadout)
-		} else {
-			player = entity.NewPlayer(presence.GetUserId(), presence.GetSessionId(), displayNames[presence.GetUserId()], position, state.random)
-		}
+		player := entity.NewPlayerWithWeapon(presence.GetUserId(), presence.GetSessionId(), displayNames[presence.GetUserId()], position, starter)
 		if err = state.SpatialGrid.Insert(player); err != nil {
 			m.registry.RemoveSession(presence.GetSessionId())
 			if logger != nil {
@@ -738,10 +738,10 @@ func (s *State) collectCharacterBoxes(tick int64, logger runtime.Logger) []syste
 		if tick < claim.CompletesAtTick {
 			continue
 		}
-		weapon, ok := s.weaponForBox(player, box)
+		weapon, ok := s.weaponForBox(box)
 		if !ok {
 			if logger != nil {
-				logger.Error("Character box has no loadout weapon: box_id=%s user_id=%s weapon_type=%s", box.ID, player.UserID, box.WeaponType())
+				logger.Error("Character box has no initial weapon: box_id=%s user_id=%s weapon_type=%s", box.ID, player.UserID, box.WeaponType())
 			}
 			events = append(events, s.cancelBoxClaim(boxID)...)
 			continue
@@ -834,21 +834,18 @@ func (s *State) cancelAllBoxClaims() []system.CharacterBoxEvent {
 	return events
 }
 
-func (s *State) weaponByID(weaponID string) (entity.Weapon, bool) {
-	for _, weapon := range s.WeaponCatalog {
-		if weapon.ID == weaponID {
-			return weapon, true
-		}
+func (s *State) initialWeaponService() *inventory.Service {
+	if s.initialInventory == nil {
+		s.initialInventory = inventory.DefaultService()
 	}
-	return entity.Weapon{}, false
+	return s.initialInventory
 }
 
-func (s *State) weaponForBox(player *entity.Player, box *entity.CharacterBox) (entity.Weapon, bool) {
-	if player == nil || box == nil {
+func (s *State) weaponForBox(box *entity.CharacterBox) (entity.Weapon, bool) {
+	if box == nil {
 		return entity.Weapon{}, false
 	}
-	weapon, ok := s.weaponByID(player.SquadLoadout[box.WeaponType()])
-	return weapon, ok && weapon.Type == box.WeaponType()
+	return s.initialWeaponService().InitialWeapon(box.WeaponType())
 }
 
 func (s *State) sendCurrentCharacterBoxes(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, presence runtime.Presence) {

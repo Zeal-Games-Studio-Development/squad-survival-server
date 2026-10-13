@@ -20,7 +20,11 @@ func (s *State) spawnAI() {
 	usedNames := make(map[string]struct{}, count)
 	for index := 1; index <= count; index++ {
 		userID, sessionID := ai.IDs(namespace, index)
-		player := entity.NewPlayer(userID, sessionID, config.Name(s.aiRandom, usedNames), s.randomPlayerSpawn(), s.random)
+		weapon, err := s.initialWeaponService().Starter(s.random)
+		if err != nil {
+			panic("could not choose AI initial character: " + err.Error())
+		}
+		player := entity.NewPlayerWithWeapon(userID, sessionID, config.Name(s.aiRandom, usedNames), s.randomPlayerSpawn(), weapon)
 		if err := s.SpatialGrid.Insert(player); err != nil {
 			panic("could not initialize AI player: " + err.Error())
 		}

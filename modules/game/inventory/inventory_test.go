@@ -2,8 +2,8 @@ package inventory
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"math/rand"
 	"reflect"
 	"testing"
 
@@ -14,9 +14,7 @@ import (
 )
 
 type memoryStore struct {
-	objects       map[string]*api.StorageObject
-	writes        int
-	rejectVersion bool
+	objects map[string]*api.StorageObject
 }
 
 func (m *memoryStore) StorageRead(_ context.Context, reads []*runtime.StorageRead) ([]*api.StorageObject, error) {
@@ -28,205 +26,88 @@ func (m *memoryStore) StorageRead(_ context.Context, reads []*runtime.StorageRea
 
 func (m *memoryStore) StorageWrite(_ context.Context, writes []*runtime.StorageWrite) ([]*api.StorageObjectAck, error) {
 	write := writes[0]
-	if m.rejectVersion {
-		return nil, runtime.ErrStorageRejectedVersion
-	}
 	if m.objects == nil {
 		m.objects = make(map[string]*api.StorageObject)
-	}
-	if existing := m.objects[write.UserID]; existing != nil && write.Version != existing.Version {
-		return nil, ErrVersionConflict
 	}
 	if write.PermissionRead != 1 || write.PermissionWrite != 0 {
 		return nil, errors.New("storage object must be owner-readable and server-writable only")
 	}
-	m.writes++
-	version := string(rune('0' + m.writes))
-	m.objects[write.UserID] = &api.StorageObject{Value: write.Value, Version: version}
-	return []*api.StorageObjectAck{{Version: version}}, nil
+	m.objects[write.UserID] = &api.StorageObject{Value: write.Value, Version: "v1"}
+	return []*api.StorageObjectAck{{Version: "v1"}}, nil
 }
 
-func TestInitialInventoryAndLoadout(t *testing.T) {
+func TestInitialInventoryStoresOnlyWeaponIDs(t *testing.T) {
 	service := DefaultService()
 	store := &memoryStore{}
 	if err := service.InitializeNewAccount(context.Background(), store, "new-user"); err != nil {
 		t.Fatal(err)
 	}
-	snapshot, err := service.Load(context.Background(), store, "new-user")
+	data, err := service.Load(context.Background(), store, "new-user")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(snapshot.WeaponIDs) != 8 || len(snapshot.SquadLoadout) != 8 {
-		t.Fatalf("unexpected initial inventory: %+v", snapshot)
+	want := []string{"archer", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"}
+	if !reflect.DeepEqual(data.WeaponIDs, want) {
+		t.Fatalf("unexpected initial inventory: %+v", data)
 	}
-	if _, exists := snapshot.SquadLoadout["wand"]; exists {
-		t.Fatal("new account received removed wand slot")
+	if store.objects["new-user"].Value != `{"weapon_ids":["archer","novice_mage","farmer","swordman","axeman","bruiser","hunter","shieldbearer"]}` {
+		t.Fatalf("unexpected storage shape: %s", store.objects["new-user"].Value)
 	}
-	for weaponType, id := range map[string]string{
-		"bow": "archer", "staff": "novice_mage", "spear": "farmer", "sword": "swordman",
-		"axe": "axeman", "blunt": "bruiser", "crossbow": "hunter", "shield": "shieldbearer",
-	} {
-		if snapshot.SquadLoadout[weaponType] != id {
-			t.Fatalf("missing loadout slot for %s: %+v", weaponType, snapshot.SquadLoadout)
+	if _, err := service.Load(context.Background(), store, "missing-user"); !errors.Is(err, ErrNotInitialized) {
+		t.Fatalf("missing inventory: %v", err)
+	}
+}
+
+func TestInventoryValidationAllowsPartialOwnership(t *testing.T) {
+	service := DefaultService()
+	if err := service.Validate(Data{WeaponIDs: []string{"archer"}}); err != nil {
+		t.Fatalf("single owned weapon rejected: %v", err)
+	}
+	for _, ids := range [][]string{nil, {}, {"archer", "archer"}, {"archer", "wand"}} {
+		if err := service.Validate(Data{WeaponIDs: ids}); !errors.Is(err, ErrInvalidInventory) {
+			t.Fatalf("invalid ids %v accepted: %v", ids, err)
 		}
 	}
-	if _, err := service.Load(context.Background(), store, "old-user"); !errors.Is(err, ErrNotInitialized) {
-		t.Fatalf("unexpected old account fallback: %v", err)
-	}
-	legacy := snapshot.Data
-	legacy.WeaponIDs = append(append([]string(nil), snapshot.WeaponIDs...), "wand")
-	legacy.SquadLoadout = copyLoadout(snapshot.SquadLoadout)
-	legacy.SquadLoadout["wand"] = "wand"
-	value, err := json.Marshal(legacy)
-	if err != nil {
-		t.Fatal(err)
-	}
-	store.objects["legacy-user"] = &api.StorageObject{Value: string(value), Version: "legacy"}
-	if _, err := service.Load(context.Background(), store, "legacy-user"); !errors.Is(err, ErrInvalidLoadout) {
-		t.Fatalf("legacy wand inventory was not rejected: %v", err)
-	}
 }
 
-func TestSetLoadoutValidatesOwnershipTypeCompletenessAndVersion(t *testing.T) {
+func TestInitialCharactersRequireOneWeaponPerType(t *testing.T) {
 	weapons := entity.DefaultWeaponCatalog()
-	variant := weapons[0]
-	variant.ID = "bow_rare"
-	service, err := NewService(append(weapons, variant), []string{"archer", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer", "bow_rare"})
-	if err == nil {
-		t.Fatal("initial config must not contain duplicate type")
+	initial := []string{"archer", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"}
+	for _, ids := range [][]string{initial[:7], append(append([]string(nil), initial[:7]...), "bow_swift"), append(append([]string(nil), initial[:7]...), "wand")} {
+		if _, err := NewService(weapons, ids); err == nil {
+			t.Fatalf("invalid initial list accepted: %v", ids)
+		}
 	}
-	service, err = NewService(append(weapons, variant), []string{"archer", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"})
+	service, err := NewService(weapons, initial)
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := &memoryStore{}
-	if err := service.InitializeNewAccount(context.Background(), store, "user"); err != nil {
-		t.Fatal(err)
-	}
-	current, err := service.Load(context.Background(), store, "user")
-	if err != nil {
-		t.Fatal(err)
-	}
-	withWand := current.Data
-	withWand.WeaponIDs = append(append([]string(nil), current.WeaponIDs...), "wand")
-	withWand.SquadLoadout = copyLoadout(current.SquadLoadout)
-	withWand.SquadLoadout["wand"] = "wand"
-	if err := service.Validate(withWand); !errors.Is(err, ErrInvalidLoadout) {
-		t.Fatalf("removed wand loadout was accepted: %v", err)
-	}
-	wrongType := copyLoadout(current.SquadLoadout)
-	wrongType["bow"] = "novice_mage"
-	if _, err := service.SetLoadout(context.Background(), store, "user", current.Version, wrongType); !errors.Is(err, ErrInvalidLoadout) {
-		t.Fatalf("wrong type: %v", err)
-	}
-	missing := copyLoadout(current.SquadLoadout)
-	delete(missing, "bow")
-	if _, err := service.SetLoadout(context.Background(), store, "user", current.Version, missing); !errors.Is(err, ErrInvalidLoadout) {
-		t.Fatalf("missing slot: %v", err)
-	}
-	unowned := copyLoadout(current.SquadLoadout)
-	unowned["bow"] = "bow_rare"
-	if _, err := service.SetLoadout(context.Background(), store, "user", current.Version, unowned); !errors.Is(err, ErrInvalidLoadout) {
-		t.Fatalf("unowned id: %v", err)
-	}
-	withVariant := current.Data
-	withVariant.WeaponIDs = append(append([]string(nil), current.WeaponIDs...), "bow_rare")
-	withVariant.SquadLoadout = copyLoadout(current.SquadLoadout)
-	withVariant.SquadLoadout["bow"] = "bow_rare"
-	if err := service.Validate(withVariant); err != nil {
-		t.Fatalf("owned variant of the same type was rejected: %v", err)
-	}
-	if _, err := service.SetLoadout(context.Background(), store, "user", "old", current.SquadLoadout); !errors.Is(err, ErrVersionConflict) {
-		t.Fatalf("stale version: %v", err)
-	}
-	updated, err := service.SetLoadout(context.Background(), store, "user", current.Version, current.SquadLoadout)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if updated.Version == current.Version || !reflect.DeepEqual(updated.SquadLoadout, current.SquadLoadout) {
-		t.Fatalf("unexpected update: %+v", updated)
-	}
-	if store.writes != 2 {
-		t.Fatalf("invalid writes occurred: %d", store.writes)
-	}
-	store.rejectVersion = true
-	if _, err := service.SetLoadout(context.Background(), store, "user", updated.Version, updated.SquadLoadout); !errors.Is(err, ErrVersionConflict) {
-		t.Fatalf("storage CAS conflict not reported: %v", err)
-	}
-}
-
-func TestLoadRejectsObsoleteWeaponIDs(t *testing.T) {
-	service := DefaultService()
-	for _, old := range []struct {
-		id         string
-		weaponType string
-		index      int
-	}{
-		{id: "bow", weaponType: "bow", index: 0},
-		{id: "acher", weaponType: "bow", index: 0},
-		{id: "crossbowman", weaponType: "crossbow", index: 6},
-	} {
-		t.Run(old.id, func(t *testing.T) {
-			data, err := service.InitialData()
-			if err != nil {
-				t.Fatal(err)
+	for _, id := range initial {
+		var found bool
+		for _, weaponType := range requiredTypes {
+			weapon, ok := service.InitialWeapon(weaponType)
+			if ok && weapon.ID == id {
+				found = true
 			}
-			data.WeaponIDs[old.index] = old.id
-			data.SquadLoadout[old.weaponType] = old.id
-			value, err := json.Marshal(data)
-			if err != nil {
-				t.Fatal(err)
-			}
-			store := &memoryStore{objects: map[string]*api.StorageObject{
-				"user": {Value: string(value), Version: "legacy"},
-			}}
-			if _, err := service.Load(context.Background(), store, "user"); !errors.Is(err, ErrInvalidLoadout) {
-				t.Fatalf("obsolete ID %q was accepted: %v", old.id, err)
-			}
-		})
+		}
+		if !found {
+			t.Fatalf("initial weapon %s not found by type", id)
+		}
+	}
+	random := rand.New(rand.NewSource(3))
+	for i := 0; i < 100; i++ {
+		weapon, err := service.Starter(random)
+		if err != nil || !containsID(initial, weapon.ID) {
+			t.Fatalf("starter outside initial list: %+v %v", weapon, err)
+		}
 	}
 }
 
-func TestRPCRejectsInvalidPayload(t *testing.T) {
-	service := DefaultService()
-	store := &rpcStore{memoryStore: memoryStore{}}
-	ctx := context.WithValue(context.Background(), runtime.RUNTIME_CTX_USER_ID, "user")
-	if err := service.InitializeNewAccount(ctx, store, "user"); err != nil {
-		t.Fatal(err)
+func containsID(ids []string, id string) bool {
+	for _, candidate := range ids {
+		if candidate == id {
+			return true
+		}
 	}
-	if _, err := service.SetLoadoutRPC(ctx, nil, nil, store, `{`); err == nil {
-		t.Fatal("malformed payload accepted")
-	}
-	response, err := service.GetRPC(ctx, nil, nil, store, "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var snapshot Snapshot
-	if err := json.Unmarshal([]byte(response), &snapshot); err != nil {
-		t.Fatal(err)
-	}
-	if snapshot.Version == "" || len(snapshot.WeaponIDs) != 8 {
-		t.Fatalf("invalid RPC response: %+v", snapshot)
-	}
-}
-
-type rpcStore struct {
-	runtime.NakamaModule
-	memoryStore
-}
-
-func (r *rpcStore) StorageRead(ctx context.Context, reads []*runtime.StorageRead) ([]*api.StorageObject, error) {
-	return r.memoryStore.StorageRead(ctx, reads)
-}
-
-func (r *rpcStore) StorageWrite(ctx context.Context, writes []*runtime.StorageWrite) ([]*api.StorageObjectAck, error) {
-	return r.memoryStore.StorageWrite(ctx, writes)
-}
-
-func copyLoadout(source map[string]string) map[string]string {
-	copy := make(map[string]string, len(source))
-	for key, value := range source {
-		copy[key] = value
-	}
-	return copy
+	return false
 }

@@ -51,6 +51,11 @@ func TestAIInitUsesConfiguredPopulation(t *testing.T) {
 		if player.Characters[0].ID != player.UserID+":1" {
 			t.Fatal("character identity does not belong to bot")
 		}
+		weapon := player.Characters[0].Weapon
+		initial, ok := state.initialWeaponService().InitialWeapon(weapon.Type)
+		if !ok || initial.ID != weapon.ID {
+			t.Fatalf("AI starter is outside initial list: %+v", weapon)
+		}
 		found := false
 		for _, visible := range state.SpatialGrid.QueryPlayers(&entity.Player{SessionID: "probe", Position: player.Position, DetectionRadius: 0.001}) {
 			if visible == player {
@@ -257,6 +262,15 @@ func TestAIUsesNormalPickupProgressionAndCombat(t *testing.T) {
 	}
 	if state.CharacterBoxes[box.ID] != nil || bot.CharacterCount() != 2 {
 		t.Fatal("AI failed to finish timed character pickup")
+	}
+	var boxCharacter *entity.Character
+	for _, character := range bot.Characters {
+		if character.ID == bot.UserID+":2" {
+			boxCharacter = character
+		}
+	}
+	if boxCharacter == nil || boxCharacter.Weapon.ID != "archer" {
+		t.Fatalf("AI received wrong box character: %+v", boxCharacter)
 	}
 	if state.Experience.Packages[item.ID] != nil || bot.Experience != 1 {
 		t.Fatal("AI failed to collect normal experience")

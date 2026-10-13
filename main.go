@@ -37,13 +37,6 @@ func InitModule(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.N
 	}); err != nil {
 		return err
 	}
-	if err := initializer.RegisterRpc("get_character_inventory", inventoryService.GetRPC); err != nil {
-		return err
-	}
-	if err := initializer.RegisterRpc("set_squad_loadout", inventoryService.SetLoadoutRPC); err != nil {
-		return err
-	}
-
 	registry := matchregistry.New()
 	if err := initializer.RegisterMatch(survival.ModuleName, survival.NewMatchHandler(registry, inventoryService)); err != nil {
 		return err

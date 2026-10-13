@@ -29,7 +29,6 @@ type Player struct {
 	HasSequence           bool
 	LastInputTick         int64
 	Characters            []*Character
-	SquadLoadout          map[WeaponType]string
 	DetectionRadius       float64
 	Strategy              strategy.Definition
 	RosterVersion         uint64
@@ -57,7 +56,6 @@ func NewPlayerWithWeapon(userID, sessionID, displayName string, position Vector2
 		Position:           world.ClampToPlayArea(position),
 		Facing:             Vector2{X: 1},
 		Characters:         []*Character{character},
-		SquadLoadout:       defaultSquadLoadout(),
 		DetectionRadius:    DefaultDetectionRadius,
 		Strategy:           definition,
 		RosterVersion:      1,
@@ -76,23 +74,6 @@ func NewPlayerWithWeapon(userID, sessionID, displayName string, position Vector2
 		}
 	}
 	return player
-}
-
-func defaultSquadLoadout() map[WeaponType]string {
-	loadout := make(map[WeaponType]string)
-	for _, weapon := range DefaultWeaponCatalog() {
-		if _, exists := loadout[weapon.Type]; !exists {
-			loadout[weapon.Type] = weapon.ID
-		}
-	}
-	return loadout
-}
-
-func (p *Player) SetSquadLoadout(loadout map[string]string) {
-	p.SquadLoadout = make(map[WeaponType]string, len(loadout))
-	for weaponType, weaponID := range loadout {
-		p.SquadLoadout[WeaponType(weaponType)] = weaponID
-	}
 }
 
 func (p *Player) MaxCharacters() int {

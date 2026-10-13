@@ -8,7 +8,7 @@ Giới hạn character hiện tại được tính bằng `min(level, 9)`: level
 
 ## Character Lifecycle
 
-Người chơi thật mới vào trận với một character: server chọn ngẫu nhiên đều một trong tám `weapon_type`, rồi lấy `weapon_id` ở slot `squad_loadout` đã lưu của tài khoản cho type đó. Nhân vật đầu tiên không được random trực tiếp từ toàn bộ catalog. Character ID có dạng `<user_id>:<sequence>` và ổn định khi array được compact.
+Người chơi thật và AI mới vào trận với một character: server chọn ngẫu nhiên đều một trong tám `weapon_id` ở `initial_character_inventory.json`, độc lập với inventory sở hữu của người chơi. Character ID có dạng `<user_id>:<sequence>` và ổn định khi array được compact.
 
 Character có position, target position, health/max health, damage, movement/attack stats, weapon và combat state. Khi `Health <= 0`, character bị remove trong combat tick; formation được gán lại trước snapshot tiếp theo.
 
@@ -21,7 +21,7 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 | Field | Ý nghĩa |
 | --- | --- |
 | `type` | Loại weapon gameplay |
-| `weapon_id` | ID duy nhất, ổn định để inventory, loadout và Unity đối chiếu asset/reference |
+| `weapon_id` | ID duy nhất, ổn định để inventory và Unity đối chiếu asset/reference |
 | `range_class` | `melee` hoặc `ranged` |
 | `health` | Max health sau khi equip |
 | `damage` | Sát thương gốc cố định của mỗi đòn |
@@ -38,11 +38,11 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 
 `spear`, `sword`, `axe`, `blunt`, `shield` là melee. `bow`, `staff`, `crossbow` là ranged.
 
-## Character Inventory Và Squad Loadout
+## Character Inventory Và Character Khởi Đầu
 
-Nakama Storage lưu object `character_inventory/inventory` cho mỗi tài khoản mới, gồm `weapon_ids` và `squad_loadout`. Object có `permission_read=1` (chủ tài khoản được đọc) và `permission_write=0` (chỉ server được ghi). Config khởi tạo là [`initial_character_inventory.json`](../modules/game/inventory/initial_character_inventory.json); chỉ số của từng weapon lấy từ `weapons.json`. Tài khoản có sẵn trước tính năng này không được tự cấp inventory.
+Nakama Storage lưu object `character_inventory/inventory` cho mỗi tài khoản mới, chỉ gồm `weapon_ids`. Object có `permission_read=1` (chủ tài khoản được đọc) và `permission_write=0` (chỉ server được ghi). Config khởi tạo là [`initial_character_inventory.json`](../modules/game/inventory/initial_character_inventory.json); chỉ số của từng weapon lấy từ `weapons.json`. Tài khoản có sẵn trước tính năng này không được tự cấp inventory.
 
-`squad_loadout` là mapping từ tám `weapon_type` sang `weapon_id` mà tài khoản sở hữu. Mỗi ID phải đúng type của slot. Client đọc qua RPC `get_character_inventory`; RPC `set_squad_loadout` nhận toàn bộ mapping cùng storage `version` và trả snapshot/version mới. Có thể sửa trong trận, nhưng thay đổi chỉ áp dụng cho lần vào trận sau. Loadout thiếu hoặc không hợp lệ sẽ bị chặn khi tìm trận và khi join trực tiếp.
+Sau khi đăng nhập, client đọc Nakama Storage object với collection `character_inventory`, key `inventory` và `user_id` của session, rồi lấy `weapon_ids` từ JSON value để hiển thị. Inventory phải tồn tại, có ít nhất một ID đã biết và không có ID trùng; không cần đủ tám type. Inventory không hợp lệ bị chặn khi tìm trận và khi join trực tiếp. Danh sách initial gồm đúng tám ID, mỗi type một ID, và được kiểm tra khi server khởi động.
 
 ## Strategy 5x5
 
@@ -73,7 +73,7 @@ Match duy trì Character Box tĩnh và mỗi phút refill đến target của mo
 
 Opcode reliable `106` broadcast `PICKUP_STARTED` và `PICKUP_CANCELLED`; client tự tính countdown từ deadline tick. Khi hoàn tất, server grant character và gửi `DESPAWNED`. Box đang được claim vẫn tồn tại trong world và được tính khi refill.
 
-Khi hoàn tất nhặt box, server lấy `weapon_id` ở slot `squad_loadout` của chính player tương ứng với `weapon_type` của box. Loadout này được chốt lúc player vào trận, nên hai player có thể nhận hai weapon ID khác nhau từ cùng một loại box. Character nhận từ box chỉ tồn tại trong trận, không mở khóa `weapon_id` trong inventory tài khoản.
+Khi hoàn tất nhặt box, server lấy `weapon_id` trong danh sách initial tương ứng với `weapon_type` của box. Người chơi và AI nhận cùng character từ cùng một loại box, không phụ thuộc inventory sở hữu. Character nhận từ box chỉ tồn tại trong trận, không mở khóa `weapon_id` trong inventory tài khoản.
 
 ## Giới Hạn Hiện Tại
 

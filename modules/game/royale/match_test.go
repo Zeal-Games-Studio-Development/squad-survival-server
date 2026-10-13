@@ -30,41 +30,53 @@ func (m inventoryTestModule) StorageRead(_ context.Context, _ []*runtime.Storage
 	return []*api.StorageObject{{Value: m.value, Version: "v1"}}, nil
 }
 
+func (m inventoryTestModule) UsersGetId(_ context.Context, _ []string, _ []string) ([]*api.User, error) {
+	return nil, nil
+}
+
 func TestInventoryGatesBattleRoyaleJoin(t *testing.T) {
 	service := inventory.DefaultService()
 	match, state := newTestMatchState(t)
 	match.inventory = service
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
-	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, inventoryTestModule{}, nil, 0, state, presence, nil); allowed || reason != "invalid squad loadout" {
+	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, inventoryTestModule{}, nil, 0, state, presence, nil); allowed || reason != "invalid character inventory" {
 		t.Fatalf("missing inventory accepted: %v %s", allowed, reason)
 	}
 	data, err := service.InitialData()
 	if err != nil {
 		t.Fatal(err)
 	}
+	data.WeaponIDs = []string{"archer"}
 	value, err := json.Marshal(data)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, inventoryTestModule{value: string(value)}, nil, 0, state, presence, nil); !allowed || reason != "" {
+	module := inventoryTestModule{value: string(value)}
+	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, module, nil, 0, state, presence, nil); !allowed || reason != "" {
 		t.Fatalf("valid inventory rejected: %v %s", allowed, reason)
+	}
+	match.MatchJoin(context.Background(), nil, nil, module, &testDispatcher{}, 0, state, []runtime.Presence{presence})
+	player := state.Players[presence.sessionID]
+	if player == nil || len(player.Characters) != 1 {
+		t.Fatalf("player did not join with one character: %+v", player)
+	}
+	weapon := player.Characters[0].Weapon
+	initial, ok := service.InitialWeapon(weapon.Type)
+	if !ok || initial.ID != weapon.ID {
+		t.Fatalf("starter not selected from initial list: %+v", weapon)
 	}
 }
 
-func TestCharacterBoxUsesCollectorLoadout(t *testing.T) {
-	weapons := entity.DefaultWeaponCatalog()
-	variant := weapons[0]
-	variant.ID = "bow_rare"
-	variant.Damage = 99
-	state := &State{WeaponCatalog: append(weapons, variant)}
-	box := entity.NewCharacterBox("box", entity.Vector2{}, entity.WeaponBow)
-	first := entity.NewPlayer("first", "first", "", entity.Vector2{}, rand.New(rand.NewSource(1)))
-	second := entity.NewPlayer("second", "second", "", entity.Vector2{}, rand.New(rand.NewSource(2)))
-	second.SquadLoadout[entity.WeaponBow] = variant.ID
-	firstWeapon, firstOK := state.weaponForBox(first, box)
-	secondWeapon, secondOK := state.weaponForBox(second, box)
-	if !firstOK || !secondOK || firstWeapon.ID != "archer" || secondWeapon.ID != variant.ID || secondWeapon.Damage != 99 {
-		t.Fatalf("box ignored player loadouts: first=%+v second=%+v", firstWeapon, secondWeapon)
+func TestCharacterBoxUsesInitialWeaponByType(t *testing.T) {
+	state := &State{}
+	service := inventory.DefaultService()
+	for _, weaponType := range []entity.WeaponType{entity.WeaponBow, entity.WeaponStaff, entity.WeaponSpear, entity.WeaponSword, entity.WeaponAxe, entity.WeaponBlunt, entity.WeaponCrossbow, entity.WeaponShield} {
+		box := entity.NewCharacterBox("box", entity.Vector2{}, weaponType)
+		selected, ok := state.weaponForBox(box)
+		initial, initialOK := service.InitialWeapon(weaponType)
+		if !ok || !initialOK || selected.ID != initial.ID {
+			t.Fatalf("wrong initial weapon for %s: %+v", weaponType, selected)
+		}
 	}
 }
 

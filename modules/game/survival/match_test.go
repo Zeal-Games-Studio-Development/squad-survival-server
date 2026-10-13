@@ -40,18 +40,19 @@ func (m inventoryTestModule) UsersGetId(_ context.Context, _ []string, _ []strin
 	return nil, nil
 }
 
-func TestInventoryGatesJoinAndProvidesStarter(t *testing.T) {
+func TestInventoryGatesJoinAndProvidesInitialStarter(t *testing.T) {
 	service := inventory.DefaultService()
 	match := &Match{inventory: service}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
 	state := &State{Phase: PhasePlaying, PlayingEndsAtTick: playingDurationTicks, Players: make(map[string]*entity.Player), Presences: make(map[string]runtime.Presence), Reservations: make(map[string]int64), SpatialGrid: spatial.NewGrid(spatialCellSize), random: rand.New(rand.NewSource(1))}
-	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, inventoryTestModule{}, nil, 0, state, presence, nil); allowed || reason != "invalid squad loadout" {
+	if _, allowed, reason := match.MatchJoinAttempt(context.Background(), nil, nil, inventoryTestModule{}, nil, 0, state, presence, nil); allowed || reason != "invalid character inventory" {
 		t.Fatalf("missing inventory accepted: %v %s", allowed, reason)
 	}
 	data, err := service.InitialData()
 	if err != nil {
 		t.Fatal(err)
 	}
+	data.WeaponIDs = []string{"archer"}
 	value, err := json.Marshal(data)
 	if err != nil {
 		t.Fatal(err)
@@ -66,20 +67,21 @@ func TestInventoryGatesJoinAndProvidesStarter(t *testing.T) {
 		t.Fatalf("player did not join with one character: %+v", player)
 	}
 	weapon := player.Characters[0].Weapon
-	if data.SquadLoadout[string(weapon.Type)] != weapon.ID {
-		t.Fatalf("starter not selected from loadout: %+v", weapon)
+	initial, ok := service.InitialWeapon(weapon.Type)
+	if !ok || initial.ID != weapon.ID {
+		t.Fatalf("starter not selected from initial list: %+v", weapon)
 	}
 }
 
-func TestCharacterBoxResolvesWeaponVariantByID(t *testing.T) {
-	weapons := entity.DefaultWeaponCatalog()
-	variant := weapons[0]
-	variant.ID = "bow_rare"
-	variant.Damage = 99
-	state := &State{WeaponCatalog: append(weapons, variant)}
-	selected, ok := state.weaponByID("bow_rare")
-	if !ok || selected.Damage != 99 || selected.Type != entity.WeaponBow {
-		t.Fatalf("wrong weapon variant selected: %+v", selected)
+func TestCharacterBoxUsesInitialWeaponByType(t *testing.T) {
+	state := &State{}
+	for _, weaponType := range []entity.WeaponType{entity.WeaponBow, entity.WeaponStaff, entity.WeaponSpear, entity.WeaponSword, entity.WeaponAxe, entity.WeaponBlunt, entity.WeaponCrossbow, entity.WeaponShield} {
+		box := entity.NewCharacterBox("box", entity.Vector2{}, weaponType)
+		selected, ok := state.weaponForBox(box)
+		initial, initialOK := inventory.DefaultService().InitialWeapon(weaponType)
+		if !ok || !initialOK || selected.ID != initial.ID {
+			t.Fatalf("wrong initial weapon for %s: %+v", weaponType, selected)
+		}
 	}
 }
 
@@ -778,12 +780,11 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 	variant.ID = "bow_rare"
 	variant.Damage = 99
 	state.WeaponCatalog = append(state.WeaponCatalog, variant)
-	near.SquadLoadout[entity.WeaponBow] = variant.ID
 	state.Players[far.SessionID] = far
 	state.Players[near.SessionID] = near
 	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
-	if farWeapon, ok := state.weaponForBox(far, box); !ok || farWeapon.ID != "archer" {
-		t.Fatalf("far player's bow loadout was not used: %+v", farWeapon)
+	if boxWeapon, ok := state.weaponForBox(box); !ok || boxWeapon.ID != "archer" {
+		t.Fatalf("bow box did not use initial weapon: %+v", boxWeapon)
 	}
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
@@ -805,7 +806,7 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 		t.Fatalf("wrong player received box: far=%d near=%d version=%d", len(far.Characters), len(near.Characters), near.RosterVersion)
 	}
 	awarded := near.Characters[len(near.Characters)-1]
-	if awarded.Weapon.Type != entity.WeaponBow || awarded.Weapon.ID != variant.ID || awarded.MaxHealth != variant.Health || awarded.Damage != variant.Damage {
+	if awarded.Weapon.Type != entity.WeaponBow || awarded.Weapon.ID != "archer" || awarded.Damage == variant.Damage {
 		t.Fatalf("character did not receive weapon stats: %#v", awarded)
 	}
 	if _, exists := state.CharacterBoxes[box.ID]; exists || len(state.SpatialGrid.QueryCharacterBoxes(entity.Vector2{}, 1)) != 0 {

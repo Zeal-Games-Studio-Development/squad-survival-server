@@ -4,9 +4,9 @@ Survival và battle royale tạo bot ngay trong `MatchInit`. Bot dùng cùng `en
 
 ## Chọn vũ khí cho bot
 
-Nhân vật đầu tiên của mỗi bot chọn ngẫu nhiên đều một `weapon_id` từ toàn bộ catalog trong [`weapons.json`](../modules/game/core/entity/weapons.json), gồm cả các biến thể. Lựa chọn này độc lập với `squad_loadout` của bot.
+Nhân vật đầu tiên của mỗi bot chọn ngẫu nhiên đều một `weapon_id` từ tám ID trong [`initial_character_inventory.json`](../modules/game/inventory/initial_character_inventory.json).
 
-Bot không có inventory tài khoản. `squad_loadout` mặc định lấy `weapon_id` đầu tiên của mỗi `type` theo thứ tự trong catalog; nó không được random. Khi bot nhặt Character Box, `weapon_type` của box xác định slot, rồi server lấy `weapon_id` trong slot đó để tạo nhân vật mới. Vì vậy nhân vật đầu tiên có thể dùng biến thể, còn nhân vật nhận từ box dùng ID đã chọn sẵn trong loadout mặc định.
+Bot không có inventory tài khoản. Khi bot nhặt Character Box, server lấy character khởi đầu tương ứng với `weapon_type` của box từ cùng danh sách initial; box không mở khóa weapon ID trong inventory.
 
 ## Cấu hình
 

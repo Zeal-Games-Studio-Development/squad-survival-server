@@ -55,7 +55,7 @@ func findOrCreateRPC(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk r
 		}
 		if len(inventoryService) > 0 && inventoryService[0] != nil {
 			if _, err := inventoryService[0].Load(ctx, nk, userID); err != nil {
-				return "", fmt.Errorf("invalid squad loadout: %w", err)
+				return "", fmt.Errorf("invalid character inventory: %w", err)
 			}
 		}
 	} else if len(inventoryService) > 0 && inventoryService[0] != nil {
@@ -104,7 +104,7 @@ func matched(ctx context.Context, logger runtime.Logger, nk runtime.NakamaModule
 			}
 			seen[userID] = true
 			if _, err := service.Load(ctx, nk, userID); err != nil {
-				return "", fmt.Errorf("invalid squad loadout for user %s: %w", userID, err)
+				return "", fmt.Errorf("invalid character inventory for user %s: %w", userID, err)
 			}
 		}
 	}
