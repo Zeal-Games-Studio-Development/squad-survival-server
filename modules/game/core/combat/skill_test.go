@@ -27,7 +27,7 @@ func TestSwordSkillUsesLockedConeAndCurrentTargetPositions(t *testing.T) {
 	nearby := spatialCandidates(t, players)
 	simulation := NewSimulation()
 	random := rand.New(rand.NewSource(1))
-	start := findEvent(simulation.Step(players, nearby, 1, random), EventSkillStarted, character.ID)
+	start := findEvent(simulation.StepWithSkillActivations(players, nearby, 1, random, []SkillActivation{{SessionID: caster.SessionID, CharacterID: character.ID, SkillID: "sword_cone"}}, nil), EventSkillStarted, character.ID)
 	if start == nil || start.SkillID != "sword_cone" || start.ImpactTick != 3 || start.CompleteTick != 6 || start.Direction.X != 1 || start.Direction.Y != 0 || !entity.HasActionTag(start.Tags, entity.TagSkill) {
 		t.Fatalf("wrong skill start: %+v", start)
 	}
@@ -81,7 +81,7 @@ func TestSwordWeaponVariantsStartAndHitWithSwordCone(t *testing.T) {
 			nearby := allNearby(players)
 			simulation := NewSimulation()
 			random := rand.New(rand.NewSource(1))
-			if event := findEvent(simulation.Step(players, nearby, 1, random), EventSkillStarted, character.ID); event == nil || event.SkillID != "sword_cone" {
+			if event := findEvent(simulation.StepWithSkillActivations(players, nearby, 1, random, []SkillActivation{{SessionID: caster.SessionID, CharacterID: character.ID, SkillID: "sword_cone"}}, nil), EventSkillStarted, character.ID); event == nil || event.SkillID != "sword_cone" {
 				t.Fatalf("sword variant did not start sword_cone: %+v", event)
 			}
 			simulation.Step(players, nearby, 2, random)
@@ -92,7 +92,7 @@ func TestSwordWeaponVariantsStartAndHitWithSwordCone(t *testing.T) {
 	}
 }
 
-func TestReadySkillWaitsForTargetAndCurrentAttack(t *testing.T) {
+func TestReadySkillWaitsForTargetAndInterruptsCurrentAttack(t *testing.T) {
 	caster := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
 	character := caster.Characters[0]
 	if err := character.StartCooldown("sword_cone", entity.CooldownTicks, 30); err != nil {
@@ -101,7 +101,7 @@ func TestReadySkillWaitsForTargetAndCurrentAttack(t *testing.T) {
 	character.Cooldowns["sword_cone"].Progress = 30
 	simulation := NewSimulation()
 	random := rand.New(rand.NewSource(1))
-	if event := findEvent(simulation.Step(playerMap(caster), nil, 1, random), EventSkillStarted, character.ID); event != nil || !character.CooldownReady("sword_cone") {
+	if event := findEvent(simulation.StepWithSkillActivations(playerMap(caster), nil, 1, random, []SkillActivation{{SessionID: caster.SessionID, CharacterID: character.ID, SkillID: "sword_cone"}}, nil), EventSkillStarted, character.ID); event != nil || !character.CooldownReady("sword_cone") {
 		t.Fatal("skill consumed without a target")
 	}
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
@@ -111,11 +111,11 @@ func TestReadySkillWaitsForTargetAndCurrentAttack(t *testing.T) {
 	character.AttackSequence = 1
 	character.TargetUserID, character.TargetCharacterID = target.UserID, target.Characters[0].ID
 	character.AttackImpactTick, character.AttackCompleteTick = 4, 5
-	if event := findEvent(simulation.Step(players, nearby, 2, random), EventSkillStarted, character.ID); event != nil {
-		t.Fatal("skill interrupted basic attack")
+	if event := findEvent(simulation.StepWithSkillActivations(players, nearby, 2, random, []SkillActivation{{SessionID: caster.SessionID, CharacterID: character.ID, SkillID: "sword_cone"}}, nil), EventSkillStarted, character.ID); event == nil {
+		t.Fatal("skill did not interrupt basic attack")
 	}
-	if !character.CooldownReady("sword_cone") {
-		t.Fatal("basic attack consumed skill cooldown")
+	if character.TargetCharacterID != "" || character.CooldownReady("sword_cone") {
+		t.Fatal("basic attack was not cancelled or skill cooldown was not consumed")
 	}
 }
 
@@ -178,5 +178,88 @@ func TestSkillTargetRelationsOnlyUseCharactersFromCasterPlayer(t *testing.T) {
 	skill.Target.Relation = "enemy"
 	if target, ok := nearestSkillTarget(skill, owned, enemies); !ok || target.character != enemy.Characters[0] {
 		t.Fatalf("enemy selector chose wrong character: %+v", target)
+	}
+}
+
+func TestActiveSkillReadyTracksTargetsAndOwnership(t *testing.T) {
+	caster := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
+	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
+	target.Characters[0].AttackSpeed = 0
+	character := caster.Characters[0]
+	if err := character.StartCooldown("sword_cone", entity.CooldownTicks, 30); err != nil {
+		t.Fatal(err)
+	}
+	character.Cooldowns["sword_cone"].Progress = 30
+	players := playerMap(caster, target)
+	nearby := allNearby(players)
+	simulation := NewSimulation()
+	random := rand.New(rand.NewSource(1))
+	if event := findEvent(simulation.Step(players, nearby, 1, random), EventSkillStarted, character.ID); event != nil || len(character.ReadySkillIDs) != 1 || character.ReadySkillIDs[0] != "sword_cone" {
+		t.Fatalf("skill auto started or not ready: event=%+v ready=%v", event, character.ReadySkillIDs)
+	}
+	version := character.SkillStateVersion
+	target.Characters[0].Position = entity.Vector2{X: 10}
+	simulation.Step(players, nearby, 2, random)
+	if len(character.ReadySkillIDs) != 0 || character.SkillStateVersion <= version {
+		t.Fatalf("ready state did not clear when target left range: %+v", character)
+	}
+	target.Characters[0].Position = entity.Vector2{X: 1}
+	simulation.Step(players, nearby, 3, random)
+	if len(character.ReadySkillIDs) != 1 {
+		t.Fatal("ready state did not return with target")
+	}
+	commands := []SkillActivation{{SessionID: target.SessionID, CharacterID: character.ID, SkillID: "sword_cone"}}
+	if event := findEvent(simulation.StepWithSkillActivations(players, nearby, 4, random, commands, nil), EventSkillStarted, character.ID); event != nil {
+		t.Fatal("other player activated character skill")
+	}
+	caster.Direction = entity.Vector2{X: 1}
+	commands[0].SessionID = caster.SessionID
+	if event := findEvent(simulation.StepWithSkillActivations(players, nearby, 5, random, commands, nil), EventSkillStarted, character.ID); event == nil || len(character.ReadySkillIDs) != 0 {
+		t.Fatalf("moving player could not activate ready skill: %+v", event)
+	}
+}
+
+func TestActiveSkillCancelsUnemittedHitsButKeepsProjectile(t *testing.T) {
+	caster := combatPlayer("a", "a:1", entity.RangeRanged, entity.Vector2{}, 3, 0.5)
+	character := caster.Characters[0]
+	character.Weapon = entity.Weapon{Type: entity.WeaponBow, ID: "swordman", ProjectileSpeed: 1}
+	character.AttackSpeed = 5
+	character.AttackCount = 2
+	if err := character.StartCooldown("sword_cone", entity.CooldownTicks, 30); err != nil {
+		t.Fatal(err)
+	}
+	character.Cooldowns["sword_cone"].Progress = 30
+	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 2}, 2, 0.5)
+	target.Characters[0].AttackSpeed = 0
+	players := playerMap(caster, target)
+	nearby := allNearby(players)
+	simulation := NewSimulation()
+	random := rand.New(rand.NewSource(1))
+	simulation.Step(players, nearby, 1, random)
+	if event := findEvent(simulation.Step(players, nearby, 2, random), EventProjectileSpawned, character.ID); event == nil {
+		t.Fatal("expected first projectile")
+	}
+	command := []SkillActivation{{SessionID: caster.SessionID, CharacterID: character.ID, SkillID: "sword_cone"}}
+	if event := findEvent(simulation.StepWithSkillActivations(players, nearby, 3, random, command, nil), EventSkillStarted, character.ID); event == nil || len(simulation.Projectiles()) != 1 {
+		t.Fatalf("skill did not start or existing projectile vanished: %+v", event)
+	}
+	for tick := int64(4); tick <= 8; tick++ {
+		for _, event := range simulation.Step(players, nearby, tick, random) {
+			if event.Type == EventProjectileSpawned && event.AttackerCharacterID == character.ID {
+				t.Fatal("cancelled basic attack emitted another projectile")
+			}
+		}
+	}
+}
+
+func TestBotUsesReadySkill(t *testing.T) {
+	caster := combatPlayer("bot", "bot:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
+	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
+	caster.Characters[0].StartCooldown("sword_cone", entity.CooldownTicks, 30)
+	caster.Characters[0].Cooldowns["sword_cone"].Progress = 30
+	players := playerMap(caster, target)
+	events := NewSimulation().StepWithSkillActivations(players, allNearby(players), 1, rand.New(rand.NewSource(1)), nil, map[string]bool{caster.SessionID: true})
+	if findEvent(events, EventSkillStarted, caster.Characters[0].ID) == nil {
+		t.Fatal("bot did not activate ready skill")
 	}
 }

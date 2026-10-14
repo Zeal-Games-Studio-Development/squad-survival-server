@@ -9,3 +9,8 @@ message MovementInput {
   double y = 2;
   uint64 sequence = 3;
 }
+
+message ActivateSkillInput {
+  string character_id = 1;
+  string skill_id = 2;
+}

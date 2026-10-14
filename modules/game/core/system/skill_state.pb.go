@@ -79,6 +79,7 @@ type SkillState struct {
 	CharacterId   string                 `protobuf:"bytes,2,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
 	Version       uint64                 `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
 	Cooldowns     []*SkillCooldown       `protobuf:"bytes,4,rep,name=cooldowns,proto3" json:"cooldowns,omitempty"`
+	ReadySkillIds []string               `protobuf:"bytes,5,rep,name=ready_skill_ids,json=readySkillIds,proto3" json:"ready_skill_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -141,6 +142,13 @@ func (x *SkillState) GetCooldowns() []*SkillCooldown {
 	return nil
 }
 
+func (x *SkillState) GetReadySkillIds() []string {
+	if x != nil {
+		return x.ReadySkillIds
+	}
+	return nil
+}
+
 var File_modules_game_core_system_skill_state_proto protoreflect.FileDescriptor
 
 const file_modules_game_core_system_skill_state_proto_rawDesc = "" +
@@ -148,13 +156,14 @@ const file_modules_game_core_system_skill_state_proto_rawDesc = "" +
 	"*modules/game/core/system/skill_state.proto\x12\x10game.core.system\x1a%modules/game/core/system/roster.proto\"[\n" +
 	"\x0fSkillStateBatch\x12\x12\n" +
 	"\x04tick\x18\x01 \x01(\x03R\x04tick\x124\n" +
-	"\x06states\x18\x02 \x03(\v2\x1c.game.core.system.SkillStateR\x06states\"\xa1\x01\n" +
+	"\x06states\x18\x02 \x03(\v2\x1c.game.core.system.SkillStateR\x06states\"\xc9\x01\n" +
 	"\n" +
 	"SkillState\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
 	"\fcharacter_id\x18\x02 \x01(\tR\vcharacterId\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\x04R\aversion\x12=\n" +
-	"\tcooldowns\x18\x04 \x03(\v2\x1f.game.core.system.SkillCooldownR\tcooldownsB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
+	"\tcooldowns\x18\x04 \x03(\v2\x1f.game.core.system.SkillCooldownR\tcooldowns\x12&\n" +
+	"\x0fready_skill_ids\x18\x05 \x03(\tR\rreadySkillIdsB3Z1squad-survival-be/modules/game/core/system;systemb\x06proto3"
 
 var (
 	file_modules_game_core_system_skill_state_proto_rawDescOnce sync.Once

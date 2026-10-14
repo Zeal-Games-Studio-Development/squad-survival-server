@@ -16,4 +16,5 @@ message SkillState {
   string character_id = 2;
   uint64 version = 3;
   repeated SkillCooldown cooldowns = 4;
+  repeated string ready_skill_ids = 5;
 }

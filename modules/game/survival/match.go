@@ -385,19 +385,24 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 		return nil
 	}
 
+	activations := make([]combat.SkillActivation, 0)
 	for _, message := range messages {
-		if message.GetOpCode() != system.OpMovementInput {
-			continue
-		}
 		player, ok := state.Players[message.GetSessionId()]
 		if !ok || state.AIControllers[message.GetSessionId()] != nil || player.IsEliminated() {
 			continue
 		}
-		input, err := entity.DecodeMovementInput(message.GetData())
-		if err != nil {
-			continue
+		switch message.GetOpCode() {
+		case system.OpMovementInput:
+			input, err := entity.DecodeMovementInput(message.GetData())
+			if err == nil {
+				entity.ApplyMovementInput(player, input, tick)
+			}
+		case system.OpActivateSkillInput:
+			input, err := entity.DecodeActivateSkillInput(message.GetData())
+			if err == nil && input.CharacterId != "" && input.SkillId != "" {
+				activations = append(activations, combat.SkillActivation{SessionID: player.SessionID, CharacterID: input.CharacterId, SkillID: input.SkillId})
+			}
 		}
-		entity.ApplyMovementInput(player, input, tick)
 	}
 
 	for _, player := range state.Players {
@@ -436,7 +441,11 @@ func (m *Match) MatchLoop(_ context.Context, logger runtime.Logger, _ *sql.DB, _
 		state.Combat = combat.NewSimulation()
 	}
 	characterCounts := experience.CharacterCountsByUser(state.Players)
-	combatEvents := state.Combat.Step(state.Players, nearbyPlayers, tick, state.random)
+	autoSkillSessions := make(map[string]bool, len(state.AIControllers))
+	for sessionID := range state.AIControllers {
+		autoSkillSessions[sessionID] = true
+	}
+	combatEvents := state.Combat.StepWithSkillActivations(state.Players, nearbyPlayers, tick, state.random, activations, autoSkillSessions)
 	if state.Experience != nil {
 		experience.AwardKillExperience(state.Players, characterCounts, combatEvents, state.Experience.Config)
 		state.broadcastExperiencePackageEvents(logger, dispatcher, tick, collections)

@@ -49,6 +49,7 @@ type Character struct {
 	SkillImpacted      bool
 	Cooldowns          map[string]*Cooldown
 	SkillStateVersion  uint64
+	ReadySkillIDs      []string
 	LastCooldownTick   int64
 	CooldownTickSet    bool
 }
@@ -62,6 +63,7 @@ func CreateCharacter(random *rand.Rand, weapons []Weapon) *Character {
 func (c *Character) ApplyWeapon(weapon Weapon) {
 	c.Weapon = weapon
 	c.Cooldowns = nil
+	c.ReadySkillIDs = nil
 	for _, skill := range SkillsForWeapon(weapon.ID) {
 		if err := c.StartCooldown(skill.ID, skill.Cooldown.Mode, skill.Cooldown.Required); err != nil {
 			panic("invalid skill cooldown: " + err.Error())

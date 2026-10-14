@@ -5,6 +5,7 @@
 | Opcode | Hướng | Payload | Reliability | Tần suất |
 | --- | --- | --- | --- | --- |
 | `1` | Client → Server | `MovementInput` | Do client chọn | Theo input |
+| `2` | Client → Server | `ActivateSkillInput` | Reliable | Mỗi lần bấm skill |
 | `101` | Server → Client | `StateSnapshot` | Reliable | Join/leave |
 | `102` | Server → Client | `PlayerMovementSnapshot` | Unreliable | Mỗi tick |
 | `103` | Server → Client | `CombatEventBatch` | Reliable | Khi có event |
@@ -14,7 +15,7 @@
 | `107` | Server → Client | `MatchLifecycleState` | Reliable | Join và chuyển phase Survival/Battle Royale |
 | `108` | Server → Client | `PlayerProgressionBatch` | Reliable | Join/enter detection/progression changed |
 | `109` | Server → Client | `ExperiencePackageStateBatch` | Reliable | Experience package detect/lost/collected |
-| `110` | Server → Client | `SkillStateBatch` | Reliable | Cooldown hoặc trạng thái thi triển thay đổi |
+| `110` | Server → Client | `SkillStateBatch` | Reliable | Cooldown, trạng thái thi triển hoặc tập skill ready thay đổi |
 
 Ở cả Survival và Battle Royale, `MatchLifecycleState` gửi `phase`, `server_tick`, `phase_ends_at_tick` và `tick_rate` khi người chơi join hoặc phase thay đổi. Survival dùng `waiting → playing → ended`: waiting tối đa 30 giây hoặc đến khi đủ 3 người, playing 15 phút và ended giữ match thêm 1 phút. Client dùng `phase_ends_at_tick - server_tick` cùng `tick_rate` để hiển thị thời gian còn lại; khi waiting chưa có người, deadline bằng `0`. Survival vẫn nhận người chơi mới trong playing nếu chưa đủ 32 người.
 
@@ -40,7 +41,9 @@ Contract nằm trong các source schema:
 
 Combat event dùng `action_id` chung cho một lượt đánh hoặc skill và `hit_id` riêng cho từng hit/projectile. `AttackStarted` gửi `attack_count`; `SkillStarted` gửi `skill_id`, hướng và các mốc tick. Tags gồm `basic_attack`, `aoe`, `projectile`, `skill`. Hit của sword cone mang `skill`, `aoe`. Unity cần regenerate `Combat.cs`.
 
-Roster gửi `skill_cooldowns` ở field 17 của từng character khi join hoặc đi vào detection. Mỗi cooldown gồm `skill_id`, `mode`, `progress`, `required`, `active_action_id`, `complete_tick`; `active_action_id` chỉ có giá trị khi đang thi triển. Opcode `110` gửi `SkillStateBatch` khi state thay đổi, gồm `user_id`, `character_id`, `version` và danh sách cooldown. Client chỉ nhận state của character bản thân và các player trong spatial detection; khi player rời detection, dùng movement snapshot để loại state đã cache. Các số `progress` và `required` có thể là số lẻ do `cooldown_scale`.
+Roster gửi `skill_cooldowns` ở field 17 của từng character khi join hoặc đi vào detection. Mỗi cooldown gồm `skill_id`, `mode`, `progress`, `required`, `active_action_id`, `complete_tick`; `active_action_id` chỉ có giá trị khi đang thi triển. Opcode `110` gửi `SkillStateBatch` khi state thay đổi, gồm `user_id`, `character_id`, `version`, danh sách cooldown và `ready_skill_ids`. `ready_skill_ids` là snapshot đầy đủ các skill có thể bấm ngay; client thay thế danh sách đã cache cho character, kể cả khi danh sách mới rỗng. Client chỉ nhận state của character bản thân và các player trong spatial detection; khi player rời detection, dùng movement snapshot để loại state đã cache. Các số `progress` và `required` có thể là số lẻ do `cooldown_scale`.
+
+Unity gửi `ActivateSkillInput { character_id, skill_id }` qua opcode `2` reliable khi chủ sở hữu bấm skill. Server kiểm tra lại điều kiện tại tick nhận lệnh; `SkillStarted` trong opcode `103` xác nhận thành công. Nếu lệnh không hợp lệ, server bỏ qua và không gửi sự kiện từ chối. Client chỉ dùng `ready_skill_ids` của chính player để bật nút skill; state của observer dùng để hiển thị character khác. Generated `Input.cs` và `SkillState.cs` cần được copy sang Unity repo riêng sau khi generate.
 
 `CharacterRoster`, `AttackStarted` và `ProjectileSpawned` dùng `weapon_id` thay cho `weapon_name` tại cùng field number protobuf. `CharacterBoxValue` chỉ gửi `weapon_type` ở field 1; `weapon_id` được chọn theo loadout của người nhặt và xuất hiện trong roster của character mới. Client cần regenerate protobuf; client cũ có thể đọc ID thành `weapon_name`.
 
@@ -147,4 +150,4 @@ Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf ho�
 - Embedded `weapons.json`, `skills.json`, `strategies.json` và `pickup_delays.json`.
 - RPC `healthcheck` response.
 
-Realtime opcode `1`, `101`, `102`, `103`, `104`, `105`, `106`, `107`, `108`, `109`, `110` đều dùng Protobuf binary.
+Realtime opcode `1`, `2`, `101`, `102`, `103`, `104`, `105`, `106`, `107`, `108`, `109`, `110` đều dùng Protobuf binary.

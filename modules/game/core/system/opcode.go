@@ -2,6 +2,7 @@ package system
 
 const (
 	OpMovementInput              int64 = 1
+	OpActivateSkillInput         int64 = 2
 	OpStateSnapshot              int64 = 101
 	OpPlayerMovementSnapshot     int64 = 102
 	OpCombatEventBatch           int64 = 103

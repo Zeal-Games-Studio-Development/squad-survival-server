@@ -37,7 +37,7 @@ func SkillStateSnapshot(player *entity.Player, character *entity.Character) *Ski
 	if player == nil || character == nil || len(character.Cooldowns) == 0 {
 		return nil
 	}
-	return &SkillState{UserId: player.UserID, CharacterId: character.ID, Version: character.SkillStateVersion, Cooldowns: skillCooldownSnapshots(character)}
+	return &SkillState{UserId: player.UserID, CharacterId: character.ID, Version: character.SkillStateVersion, Cooldowns: skillCooldownSnapshots(character), ReadySkillIds: append([]string(nil), character.ReadySkillIDs...)}
 }
 
 func EncodeSkillStateBatch(tick int64, states []*SkillState) ([]byte, error) {

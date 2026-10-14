@@ -65,6 +65,9 @@ type Simulation struct {
 	projectiles map[string]*Projectile
 	config      Config
 }
+type SkillActivation struct {
+	SessionID, CharacterID, SkillID string
+}
 type ownedCharacter struct {
 	owner     *entity.Player
 	character *entity.Character
@@ -92,6 +95,10 @@ func (s *Simulation) Projectiles() []*Projectile {
 }
 
 func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[string][]*entity.Player, tick int64, random *rand.Rand) []Event {
+	return s.StepWithSkillActivations(players, nearbyPlayers, tick, random, nil, nil)
+}
+
+func (s *Simulation) StepWithSkillActivations(players map[string]*entity.Player, nearbyPlayers map[string][]*entity.Player, tick int64, random *rand.Rand, activations []SkillActivation, autoSkillSessions map[string]bool) []Event {
 	if s == nil {
 		return nil
 	}
@@ -115,6 +122,38 @@ func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[s
 	lookup := characterLookup(characters)
 	candidates := candidateCharactersBySession(nearbyPlayers)
 	intents, events := s.stepProjectiles(lookup, tick)
+	playersBySession := make(map[string]*entity.Player, len(players))
+	for _, player := range players {
+		if player != nil {
+			playersBySession[player.SessionID] = player
+		}
+	}
+	for _, activation := range activations {
+		player := playersBySession[activation.SessionID]
+		if player == nil || activation.CharacterID == "" || activation.SkillID == "" {
+			continue
+		}
+		for _, character := range player.Characters {
+			if character == nil || character.ID != activation.CharacterID {
+				continue
+			}
+			if event, ok := tryStartSkill(ownedCharacter{owner: player, character: character}, candidates[player.SessionID], tick, activation.SkillID); ok {
+				events = append(events, event)
+			}
+			break
+		}
+	}
+	for _, caster := range characters {
+		if !autoSkillSessions[caster.owner.SessionID] || caster.character.ActiveSkillID != "" {
+			continue
+		}
+		for _, skill := range entity.SkillsForWeapon(caster.character.Weapon.ID) {
+			if event, ok := tryStartSkill(caster, candidates[caster.owner.SessionID], tick, skill.ID); ok {
+				events = append(events, event)
+				break
+			}
+		}
+	}
 
 	for _, attacker := range characters {
 		character := attacker.character
@@ -194,13 +233,12 @@ func (s *Simulation) Step(players map[string]*entity.Player, nearbyPlayers map[s
 		if character.ActiveSkillID != "" || !canAttack(attacker, s.config.QueryBuffer) || character.TargetCharacterID != "" {
 			continue
 		}
-		if event, ok := tryStartSkill(attacker, candidates[attacker.owner.SessionID], tick); ok {
-			events = append(events, event)
-			continue
-		}
 		if target, ok := nearestTarget(attacker, candidates[attacker.owner.SessionID]); ok {
 			events = append(events, startAttack(attacker, target, tick))
 		}
+	}
+	for _, caster := range characters {
+		updateReadySkills(caster, candidates[caster.owner.SessionID])
 	}
 	return events
 }
@@ -251,14 +289,18 @@ func nearestSkillTarget(skill entity.SkillDefinition, caster ownedCharacter, ene
 	return selected, found
 }
 
-func tryStartSkill(caster ownedCharacter, enemies []ownedCharacter, tick int64) (Event, bool) {
+func tryStartSkill(caster ownedCharacter, enemies []ownedCharacter, tick int64, skillID string) (Event, bool) {
 	character := caster.character
 	for _, skill := range entity.SkillsForWeapon(character.Weapon.ID) {
-		if !character.CooldownReady(skill.ID) {
+		if skill.ID != skillID || !skillUsable(caster, skill) {
 			continue
 		}
 		target, ok := nearestSkillTarget(skill, caster, enemies)
-		if !ok || !character.ResetCooldown(skill.ID) {
+		if !ok {
+			continue
+		}
+		character.ResetAttack()
+		if !character.ResetCooldown(skill.ID) {
 			continue
 		}
 		character.AttackSequence++
@@ -288,6 +330,38 @@ func tryStartSkill(caster ownedCharacter, enemies []ownedCharacter, tick int64) 
 			CompleteTick: character.SkillCompleteTick, Tick: tick}, true
 	}
 	return Event{}, false
+}
+
+func skillUsable(caster ownedCharacter, skill entity.SkillDefinition) bool {
+	character := caster.character
+	return character != nil && character.ID != "" && character.Health > 0 && character.ActiveSkillID == "" && character.CooldownReady(skill.ID)
+}
+
+func updateReadySkills(caster ownedCharacter, enemies []ownedCharacter) {
+	character := caster.character
+	ready := make([]string, 0)
+	for _, skill := range entity.SkillsForWeapon(character.Weapon.ID) {
+		if skillUsable(caster, skill) {
+			if _, ok := nearestSkillTarget(skill, caster, enemies); ok {
+				ready = append(ready, skill.ID)
+			}
+		}
+	}
+	sort.Strings(ready)
+	if len(ready) == len(character.ReadySkillIDs) {
+		same := true
+		for i := range ready {
+			if ready[i] != character.ReadySkillIDs[i] {
+				same = false
+				break
+			}
+		}
+		if same {
+			return
+		}
+	}
+	character.ReadySkillIDs = ready
+	character.SkillStateVersion++
 }
 
 type skillEffectResult struct {
