@@ -30,7 +30,7 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 | `move_speed` | World units mỗi giây |
 | `attack_speed` | Số attack cycle mỗi giây |
 | `attack_range` | Bán kính khóa target |
-| `attack_count` | Số hit hoặc projectile trong một đòn đánh thường; spear dùng hệ số AoE thay thế |
+| `attack_count` | Số enemy character tối đa được khóa cho một đòn thường; mỗi target có một lượt melee, projectile ranged hoặc AoE spear |
 | `cooldown_scale` | Hệ số tăng tiến độ hồi cooldown theo tick, action đánh và action nhận damage |
 | `impact_ratio` | Vị trí impact trong attack cycle |
 | `projectile_speed` | World units mỗi giây; ranged phải lớn hơn 0 |

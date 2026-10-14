@@ -381,6 +381,7 @@ type AttackStarted struct {
 	WeaponId            string                 `protobuf:"bytes,10,opt,name=weapon_id,json=weaponId,proto3" json:"weapon_id,omitempty"`
 	AttackCount         int32                  `protobuf:"varint,11,opt,name=attack_count,json=attackCount,proto3" json:"attack_count,omitempty"`
 	Tags                []string               `protobuf:"bytes,12,rep,name=tags,proto3" json:"tags,omitempty"`
+	Targets             []*LockedAttackTarget  `protobuf:"bytes,13,rep,name=targets,proto3" json:"targets,omitempty"`
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -499,6 +500,73 @@ func (x *AttackStarted) GetTags() []string {
 	return nil
 }
 
+func (x *AttackStarted) GetTargets() []*LockedAttackTarget {
+	if x != nil {
+		return x.Targets
+	}
+	return nil
+}
+
+type LockedAttackTarget struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	CharacterId   string                 `protobuf:"bytes,2,opt,name=character_id,json=characterId,proto3" json:"character_id,omitempty"`
+	Direction     *Vector2               `protobuf:"bytes,3,opt,name=direction,proto3" json:"direction,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LockedAttackTarget) Reset() {
+	*x = LockedAttackTarget{}
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LockedAttackTarget) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LockedAttackTarget) ProtoMessage() {}
+
+func (x *LockedAttackTarget) ProtoReflect() protoreflect.Message {
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LockedAttackTarget.ProtoReflect.Descriptor instead.
+func (*LockedAttackTarget) Descriptor() ([]byte, []int) {
+	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *LockedAttackTarget) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *LockedAttackTarget) GetCharacterId() string {
+	if x != nil {
+		return x.CharacterId
+	}
+	return ""
+}
+
+func (x *LockedAttackTarget) GetDirection() *Vector2 {
+	if x != nil {
+		return x.Direction
+	}
+	return nil
+}
+
 type DamageApplied struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	ActionId            string                 `protobuf:"bytes,1,opt,name=action_id,json=actionId,proto3" json:"action_id,omitempty"`
@@ -519,7 +587,7 @@ type DamageApplied struct {
 
 func (x *DamageApplied) Reset() {
 	*x = DamageApplied{}
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[4]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -531,7 +599,7 @@ func (x *DamageApplied) String() string {
 func (*DamageApplied) ProtoMessage() {}
 
 func (x *DamageApplied) ProtoReflect() protoreflect.Message {
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[4]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -544,7 +612,7 @@ func (x *DamageApplied) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DamageApplied.ProtoReflect.Descriptor instead.
 func (*DamageApplied) Descriptor() ([]byte, []int) {
-	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{4}
+	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *DamageApplied) GetActionId() string {
@@ -648,7 +716,7 @@ type CharacterDied struct {
 
 func (x *CharacterDied) Reset() {
 	*x = CharacterDied{}
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[5]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -660,7 +728,7 @@ func (x *CharacterDied) String() string {
 func (*CharacterDied) ProtoMessage() {}
 
 func (x *CharacterDied) ProtoReflect() protoreflect.Message {
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[5]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -673,7 +741,7 @@ func (x *CharacterDied) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CharacterDied.ProtoReflect.Descriptor instead.
 func (*CharacterDied) Descriptor() ([]byte, []int) {
-	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{5}
+	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CharacterDied) GetActionId() string {
@@ -761,7 +829,7 @@ type ProjectileSpawned struct {
 
 func (x *ProjectileSpawned) Reset() {
 	*x = ProjectileSpawned{}
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[6]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -773,7 +841,7 @@ func (x *ProjectileSpawned) String() string {
 func (*ProjectileSpawned) ProtoMessage() {}
 
 func (x *ProjectileSpawned) ProtoReflect() protoreflect.Message {
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[6]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -786,7 +854,7 @@ func (x *ProjectileSpawned) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectileSpawned.ProtoReflect.Descriptor instead.
 func (*ProjectileSpawned) Descriptor() ([]byte, []int) {
-	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{6}
+	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ProjectileSpawned) GetProjectileId() string {
@@ -905,7 +973,7 @@ type ProjectileHit struct {
 
 func (x *ProjectileHit) Reset() {
 	*x = ProjectileHit{}
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[7]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -917,7 +985,7 @@ func (x *ProjectileHit) String() string {
 func (*ProjectileHit) ProtoMessage() {}
 
 func (x *ProjectileHit) ProtoReflect() protoreflect.Message {
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[7]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -930,7 +998,7 @@ func (x *ProjectileHit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectileHit.ProtoReflect.Descriptor instead.
 func (*ProjectileHit) Descriptor() ([]byte, []int) {
-	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{7}
+	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ProjectileHit) GetProjectileId() string {
@@ -1021,7 +1089,7 @@ type ProjectileExpired struct {
 
 func (x *ProjectileExpired) Reset() {
 	*x = ProjectileExpired{}
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[8]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1033,7 +1101,7 @@ func (x *ProjectileExpired) String() string {
 func (*ProjectileExpired) ProtoMessage() {}
 
 func (x *ProjectileExpired) ProtoReflect() protoreflect.Message {
-	mi := &file_modules_game_core_system_combat_proto_msgTypes[8]
+	mi := &file_modules_game_core_system_combat_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1046,7 +1114,7 @@ func (x *ProjectileExpired) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectileExpired.ProtoReflect.Descriptor instead.
 func (*ProjectileExpired) Descriptor() ([]byte, []int) {
-	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{8}
+	return file_modules_game_core_system_combat_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ProjectileExpired) GetProjectileId() string {
@@ -1151,7 +1219,7 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	" \x01(\x03R\n" +
 	"impactTick\x12#\n" +
 	"\rcomplete_tick\x18\v \x01(\x03R\fcompleteTick\x12\x12\n" +
-	"\x04tags\x18\f \x03(\tR\x04tags\"\xba\x03\n" +
+	"\x04tags\x18\f \x03(\tR\x04tags\"\xfa\x03\n" +
 	"\rAttackStarted\x12\x1b\n" +
 	"\taction_id\x18\x01 \x01(\tR\bactionId\x12(\n" +
 	"\x10attacker_user_id\x18\x02 \x01(\tR\x0eattackerUserId\x122\n" +
@@ -1168,7 +1236,12 @@ const file_modules_game_core_system_combat_proto_rawDesc = "" +
 	"\tweapon_id\x18\n" +
 	" \x01(\tR\bweaponId\x12!\n" +
 	"\fattack_count\x18\v \x01(\x05R\vattackCount\x12\x12\n" +
-	"\x04tags\x18\f \x03(\tR\x04tags\"\xa3\x03\n" +
+	"\x04tags\x18\f \x03(\tR\x04tags\x12>\n" +
+	"\atargets\x18\r \x03(\v2$.game.core.system.LockedAttackTargetR\atargets\"\x89\x01\n" +
+	"\x12LockedAttackTarget\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
+	"\fcharacter_id\x18\x02 \x01(\tR\vcharacterId\x127\n" +
+	"\tdirection\x18\x03 \x01(\v2\x19.game.core.system.Vector2R\tdirection\"\xa3\x03\n" +
 	"\rDamageApplied\x12\x1b\n" +
 	"\taction_id\x18\x01 \x01(\tR\bactionId\x12(\n" +
 	"\x10attacker_user_id\x18\x02 \x01(\tR\x0eattackerUserId\x122\n" +
@@ -1247,38 +1320,41 @@ func file_modules_game_core_system_combat_proto_rawDescGZIP() []byte {
 	return file_modules_game_core_system_combat_proto_rawDescData
 }
 
-var file_modules_game_core_system_combat_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_modules_game_core_system_combat_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_modules_game_core_system_combat_proto_goTypes = []any{
-	(*CombatEventBatch)(nil),  // 0: game.core.system.CombatEventBatch
-	(*CombatEvent)(nil),       // 1: game.core.system.CombatEvent
-	(*SkillStarted)(nil),      // 2: game.core.system.SkillStarted
-	(*AttackStarted)(nil),     // 3: game.core.system.AttackStarted
-	(*DamageApplied)(nil),     // 4: game.core.system.DamageApplied
-	(*CharacterDied)(nil),     // 5: game.core.system.CharacterDied
-	(*ProjectileSpawned)(nil), // 6: game.core.system.ProjectileSpawned
-	(*ProjectileHit)(nil),     // 7: game.core.system.ProjectileHit
-	(*ProjectileExpired)(nil), // 8: game.core.system.ProjectileExpired
-	(*Vector2)(nil),           // 9: game.core.system.Vector2
+	(*CombatEventBatch)(nil),   // 0: game.core.system.CombatEventBatch
+	(*CombatEvent)(nil),        // 1: game.core.system.CombatEvent
+	(*SkillStarted)(nil),       // 2: game.core.system.SkillStarted
+	(*AttackStarted)(nil),      // 3: game.core.system.AttackStarted
+	(*LockedAttackTarget)(nil), // 4: game.core.system.LockedAttackTarget
+	(*DamageApplied)(nil),      // 5: game.core.system.DamageApplied
+	(*CharacterDied)(nil),      // 6: game.core.system.CharacterDied
+	(*ProjectileSpawned)(nil),  // 7: game.core.system.ProjectileSpawned
+	(*ProjectileHit)(nil),      // 8: game.core.system.ProjectileHit
+	(*ProjectileExpired)(nil),  // 9: game.core.system.ProjectileExpired
+	(*Vector2)(nil),            // 10: game.core.system.Vector2
 }
 var file_modules_game_core_system_combat_proto_depIdxs = []int32{
 	1,  // 0: game.core.system.CombatEventBatch.events:type_name -> game.core.system.CombatEvent
 	3,  // 1: game.core.system.CombatEvent.attack_started:type_name -> game.core.system.AttackStarted
-	4,  // 2: game.core.system.CombatEvent.damage_applied:type_name -> game.core.system.DamageApplied
-	5,  // 3: game.core.system.CombatEvent.character_died:type_name -> game.core.system.CharacterDied
-	6,  // 4: game.core.system.CombatEvent.projectile_spawned:type_name -> game.core.system.ProjectileSpawned
-	7,  // 5: game.core.system.CombatEvent.projectile_hit:type_name -> game.core.system.ProjectileHit
-	8,  // 6: game.core.system.CombatEvent.projectile_expired:type_name -> game.core.system.ProjectileExpired
+	5,  // 2: game.core.system.CombatEvent.damage_applied:type_name -> game.core.system.DamageApplied
+	6,  // 3: game.core.system.CombatEvent.character_died:type_name -> game.core.system.CharacterDied
+	7,  // 4: game.core.system.CombatEvent.projectile_spawned:type_name -> game.core.system.ProjectileSpawned
+	8,  // 5: game.core.system.CombatEvent.projectile_hit:type_name -> game.core.system.ProjectileHit
+	9,  // 6: game.core.system.CombatEvent.projectile_expired:type_name -> game.core.system.ProjectileExpired
 	2,  // 7: game.core.system.CombatEvent.skill_started:type_name -> game.core.system.SkillStarted
-	9,  // 8: game.core.system.SkillStarted.direction:type_name -> game.core.system.Vector2
-	9,  // 9: game.core.system.ProjectileSpawned.position:type_name -> game.core.system.Vector2
-	9,  // 10: game.core.system.ProjectileSpawned.direction:type_name -> game.core.system.Vector2
-	9,  // 11: game.core.system.ProjectileHit.position:type_name -> game.core.system.Vector2
-	9,  // 12: game.core.system.ProjectileExpired.position:type_name -> game.core.system.Vector2
-	13, // [13:13] is the sub-list for method output_type
-	13, // [13:13] is the sub-list for method input_type
-	13, // [13:13] is the sub-list for extension type_name
-	13, // [13:13] is the sub-list for extension extendee
-	0,  // [0:13] is the sub-list for field type_name
+	10, // 8: game.core.system.SkillStarted.direction:type_name -> game.core.system.Vector2
+	4,  // 9: game.core.system.AttackStarted.targets:type_name -> game.core.system.LockedAttackTarget
+	10, // 10: game.core.system.LockedAttackTarget.direction:type_name -> game.core.system.Vector2
+	10, // 11: game.core.system.ProjectileSpawned.position:type_name -> game.core.system.Vector2
+	10, // 12: game.core.system.ProjectileSpawned.direction:type_name -> game.core.system.Vector2
+	10, // 13: game.core.system.ProjectileHit.position:type_name -> game.core.system.Vector2
+	10, // 14: game.core.system.ProjectileExpired.position:type_name -> game.core.system.Vector2
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_modules_game_core_system_combat_proto_init() }
@@ -1302,7 +1378,7 @@ func file_modules_game_core_system_combat_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_modules_game_core_system_combat_proto_rawDesc), len(file_modules_game_core_system_combat_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

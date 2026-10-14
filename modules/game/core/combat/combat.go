@@ -34,6 +34,7 @@ type Event struct {
 	HitIndex                                  int
 	Tags                                      []entity.ActionTag
 	AttackCount                               int
+	AttackTargets                             []entity.AttackTarget
 	AttackerUserID, AttackerCharacterID       string
 	TargetUserID, TargetCharacterID           string
 	WeaponType                                entity.WeaponType
@@ -179,36 +180,37 @@ func (s *Simulation) StepWithSkillActivations(players map[string]*entity.Player,
 			character.ResetAttack()
 			continue
 		}
-		if character.TargetCharacterID == "" {
-			continue
-		}
-		target, ok := lookup[targetKey(character.TargetUserID, character.TargetCharacterID)]
-		if !ok || !isCandidatePlayer(attacker.owner, target.owner, nearbyPlayers) || !validTarget(attacker, target) || !withinRange(character, target.character) {
-			character.ResetAttack()
+		if len(character.AttackTargets) == 0 {
 			continue
 		}
 		if character.AttackHitsEmitted < actionAttackCount(character) && tick >= character.AttackImpactTick+int64(character.AttackHitsEmitted)*BasicAttackHitDelayTicks {
+			slot := character.AttackHitsEmitted
+			locked := character.AttackTargets[slot]
+			target, ok := lookup[targetKey(locked.UserID, locked.CharacterID)]
 			character.AttackImpacted = true
+			character.AttackHitsEmitted++
+			if !ok || !isCandidatePlayer(attacker.owner, target.owner, nearbyPlayers) || !validTarget(attacker, target) || !withinRange(character, target.character) {
+				if tick >= character.AttackCompleteTick && character.AttackHitsEmitted >= actionAttackCount(character) {
+					character.ResetAttack()
+				}
+				continue
+			}
 			if character.RangeClass == entity.RangeRanged {
-				hit := character.AttackHitsEmitted + 1
+				hit := slot + 1
 				projectile, event := s.spawnProjectile(attacker, target, tick, hit, random)
 				s.projectiles[projectile.ID] = projectile
 				events = append(events, event)
-				character.AttackHitsEmitted++
 			} else if character.Weapon.Type == entity.WeaponSpear {
-				for index, candidate := range spearTargets(attacker, candidates[attacker.owner.SessionID]) {
+				for index, candidate := range spearTargets(attacker, candidates[attacker.owner.SessionID], locked.Direction) {
 					amount, critical := damage.RollAttackAgainst(character, candidate.character, random)
-					if actionAttackCount(character) > 1 {
-						amount *= 1.5 * float64(actionAttackCount(character))
-					}
-					intents = append(intents, newDamageIntent(attacker, candidate, attackID(character), index+1, "", actionTags(character), tick, amount, critical))
+					intent := newDamageIntent(attacker, candidate, attackID(character), slot+1, "", actionTags(character), tick, amount, critical)
+					intent.event.HitID = hitID(attackID(character), slot+1) + ":aoe:" + strconv.Itoa(index+1)
+					intents = append(intents, intent)
 				}
-				character.AttackHitsEmitted = actionAttackCount(character)
 			} else {
-				hit := character.AttackHitsEmitted + 1
+				hit := slot + 1
 				amount, critical := damage.RollAttackAgainst(character, target.character, random)
 				intents = append(intents, newDamageIntent(attacker, target, attackID(character), hit, "", actionTags(character), tick, amount, critical))
-				character.AttackHitsEmitted++
 			}
 		}
 		if tick >= character.AttackCompleteTick && character.AttackHitsEmitted >= actionAttackCount(character) {
@@ -222,19 +224,13 @@ func (s *Simulation) StepWithSkillActivations(players map[string]*entity.Player,
 		player.RemoveDeadCharacters()
 	}
 	characters = sortedCharacters(players)
-	lookup = characterLookup(characters)
 	for _, attacker := range characters {
 		character := attacker.character
-		if character.TargetCharacterID != "" {
-			if _, ok := lookup[targetKey(character.TargetUserID, character.TargetCharacterID)]; !ok {
-				character.ResetAttack()
-			}
-		}
-		if character.ActiveSkillID != "" || !canAttack(attacker, s.config.QueryBuffer) || character.TargetCharacterID != "" {
+		if character.ActiveSkillID != "" || !canAttack(attacker, s.config.QueryBuffer) || len(character.AttackTargets) != 0 {
 			continue
 		}
-		if target, ok := nearestTarget(attacker, candidates[attacker.owner.SessionID]); ok {
-			events = append(events, startAttack(attacker, target, tick))
+		if targets := nearestTargets(attacker, candidates[attacker.owner.SessionID]); len(targets) > 0 {
+			events = append(events, startAttack(attacker, targets, tick))
 		}
 	}
 	for _, caster := range characters {
@@ -503,7 +499,7 @@ func newDamageIntent(attacker, target ownedCharacter, attackID string, hitIndex 
 }
 
 func sortDamageIntents(intents []damageIntent) {
-	sort.Slice(intents, func(i, j int) bool {
+	sort.SliceStable(intents, func(i, j int) bool {
 		if intents[i].event.AttackerCharacterID == intents[j].event.AttackerCharacterID {
 			if intents[i].event.AttackID == intents[j].event.AttackID {
 				return intents[i].event.HitIndex < intents[j].event.HitIndex
@@ -539,8 +535,9 @@ func applyDamage(intents []damageIntent, tick int64, random *rand.Rand) []Event 
 	return events
 }
 
-func startAttack(attacker, target ownedCharacter, tick int64) Event {
+func startAttack(attacker ownedCharacter, targets []ownedCharacter, tick int64) Event {
 	character := attacker.character
+	target := targets[0]
 	cycleTicks := int64(math.Ceil(float64(entity.TickRate) / character.AttackSpeed))
 	if cycleTicks < 1 {
 		cycleTicks = 1
@@ -553,24 +550,30 @@ func startAttack(attacker, target ownedCharacter, tick int64) Event {
 		impactOffset = cycleTicks
 	}
 	character.AttackSequence++
-	character.AttackActionCount = character.AttackCount
-	if character.AttackActionCount < 1 {
-		character.AttackActionCount = 1
+	character.AttackActionCount = len(targets)
+	character.AttackTargets = make([]entity.AttackTarget, 0, len(targets))
+	for _, selected := range targets {
+		direction := directionTo(character.Position, selected.character.Position)
+		if direction == (entity.Vector2{}) && character.Weapon.Type == entity.WeaponSpear {
+			direction = entity.NormalizeDirection(attacker.owner.Facing)
+			if direction == (entity.Vector2{}) {
+				direction = entity.Vector2{X: 1}
+			}
+		}
+		character.AttackTargets = append(character.AttackTargets, entity.AttackTarget{UserID: selected.owner.UserID, CharacterID: selected.character.ID, Direction: direction})
 	}
-	character.AttackDirection = directionTo(character.Position, target.character.Position)
 	character.AttackHitsEmitted = 0
 	character.AdvanceCooldowns(entity.CooldownAttackActions, attackID(character))
 	character.TargetUserID, character.TargetCharacterID = target.owner.UserID, target.character.ID
 	character.AttackStartTick, character.AttackImpactTick = tick, tick+impactOffset
 	character.AttackCompleteTick, character.AttackImpacted = tick+cycleTicks, false
-	if character.Weapon.Type != entity.WeaponSpear {
-		lastHitTick := character.AttackImpactTick + int64(character.AttackActionCount-1)*BasicAttackHitDelayTicks
-		if lastHitTick > character.AttackCompleteTick {
-			character.AttackCompleteTick = lastHitTick
-		}
+	lastHitTick := character.AttackImpactTick + int64(character.AttackActionCount-1)*BasicAttackHitDelayTicks
+	if lastHitTick > character.AttackCompleteTick {
+		character.AttackCompleteTick = lastHitTick
 	}
 	return Event{
 		Type: EventAttackStarted, AttackID: attackID(character), Tags: actionTags(character), AttackCount: character.AttackActionCount,
+		AttackTargets:  append([]entity.AttackTarget(nil), character.AttackTargets...),
 		AttackerUserID: attacker.owner.UserID, AttackerCharacterID: character.ID,
 		TargetUserID: target.owner.UserID, TargetCharacterID: target.character.ID,
 		WeaponType: character.Weapon.Type, WeaponID: character.Weapon.ID,
@@ -579,19 +582,33 @@ func startAttack(attacker, target ownedCharacter, tick int64) Event {
 	}
 }
 
-func nearestTarget(attacker ownedCharacter, characters []ownedCharacter) (ownedCharacter, bool) {
-	var selected ownedCharacter
-	selectedDistance, found := math.Inf(1), false
+func nearestTargets(attacker ownedCharacter, characters []ownedCharacter) []ownedCharacter {
+	selected := make([]ownedCharacter, 0, len(characters))
+	seen := make(map[string]bool, len(characters))
 	for _, candidate := range characters {
 		if !validTarget(attacker, candidate) || !withinRange(attacker.character, candidate.character) {
 			continue
 		}
-		distance := distanceSquared(attacker.character.Position, candidate.character.Position)
-		if !found || distance < selectedDistance || distance == selectedDistance && targetLess(candidate, selected) {
-			selected, selectedDistance, found = candidate, distance, true
+		key := targetKey(candidate.owner.UserID, candidate.character.ID)
+		if seen[key] {
+			continue
 		}
+		seen[key] = true
+		selected = append(selected, candidate)
 	}
-	return selected, found
+	sort.Slice(selected, func(i, j int) bool {
+		left := distanceSquared(attacker.character.Position, selected[i].character.Position)
+		right := distanceSquared(attacker.character.Position, selected[j].character.Position)
+		return left < right || left == right && targetLess(selected[i], selected[j])
+	})
+	count := attacker.character.AttackCount
+	if count < 1 {
+		count = 1
+	}
+	if count < len(selected) {
+		selected = selected[:count]
+	}
+	return selected
 }
 
 func canAttack(attacker ownedCharacter, queryBuffer float64) bool {
@@ -730,15 +747,8 @@ func actionTags(character *entity.Character) []entity.ActionTag {
 	return tags
 }
 
-func spearTargets(attacker ownedCharacter, candidates []ownedCharacter) []ownedCharacter {
+func spearTargets(attacker ownedCharacter, candidates []ownedCharacter, direction entity.Vector2) []ownedCharacter {
 	character := attacker.character
-	direction := character.AttackDirection
-	if direction.X == 0 && direction.Y == 0 {
-		direction = attacker.owner.Facing
-		if direction.X == 0 && direction.Y == 0 {
-			direction = entity.Vector2{X: 1}
-		}
-	}
 	result := make([]ownedCharacter, 0)
 	for _, candidate := range candidates {
 		if !validTarget(attacker, candidate) {

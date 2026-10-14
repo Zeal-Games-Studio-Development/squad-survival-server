@@ -51,6 +51,13 @@ message AttackStarted {
   string weapon_id = 10;
   int32 attack_count = 11;
   repeated string tags = 12;
+  repeated LockedAttackTarget targets = 13;
+}
+
+message LockedAttackTarget {
+  string user_id = 1;
+  string character_id = 2;
+  Vector2 direction = 3;
 }
 
 message DamageApplied {

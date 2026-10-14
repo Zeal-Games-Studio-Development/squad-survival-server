@@ -15,7 +15,7 @@ func TestEncodeCombatEventBatch(t *testing.T) {
 			Type: corecombat.EventAttackStarted, AttackID: "a:1:1",
 			AttackerUserID: "a", AttackerCharacterID: "a:1", TargetUserID: "b", TargetCharacterID: "b:1",
 			WeaponType: entity.WeaponSword, StartTick: 10, ImpactTick: 12, CompleteTick: 15,
-			AttackCount: 2, Tags: []entity.ActionTag{entity.TagBasicAttack},
+			AttackCount: 2, Tags: []entity.ActionTag{entity.TagBasicAttack}, AttackTargets: []entity.AttackTarget{{UserID: "b", CharacterID: "b:1", Direction: entity.Vector2{X: 1}}, {UserID: "c", CharacterID: "c:1", Direction: entity.Vector2{Y: 1}}},
 		},
 		{
 			Type: corecombat.EventDamageApplied, AttackID: "a:1:1",
@@ -39,7 +39,7 @@ func TestEncodeCombatEventBatch(t *testing.T) {
 	if batch.Tick != 12 || len(batch.Events) != 3 {
 		t.Fatalf("unexpected combat batch: %+v", &batch)
 	}
-	if started := batch.Events[0].GetAttackStarted(); started == nil || started.ActionId != "a:1:1" || started.ImpactTick != 12 || started.AttackCount != 2 || len(started.Tags) != 1 || started.Tags[0] != "basic_attack" {
+	if started := batch.Events[0].GetAttackStarted(); started == nil || started.ActionId != "a:1:1" || started.ImpactTick != 12 || started.AttackCount != 2 || len(started.Tags) != 1 || started.Tags[0] != "basic_attack" || len(started.Targets) != 2 || started.Targets[0].CharacterId != "b:1" || started.Targets[0].Direction.X != 1 || started.Targets[1].CharacterId != "c:1" || started.Targets[1].Direction.Y != 1 {
 		t.Fatalf("unexpected attack started event: %+v", started)
 	}
 	if damage := batch.Events[1].GetDamageApplied(); damage == nil || damage.Damage != 11 || damage.RemainingHealth != 89 || !damage.Critical || damage.HitId != "a:1:1:hit:1" || damage.ActionId != "a:1:1" {

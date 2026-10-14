@@ -231,7 +231,9 @@ func TestActiveSkillCancelsUnemittedHitsButKeepsProjectile(t *testing.T) {
 	character.Cooldowns["sword_cone"].Progress = 30
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 2}, 2, 0.5)
 	target.Characters[0].AttackSpeed = 0
-	players := playerMap(caster, target)
+	second := combatPlayer("c", "c:1", entity.RangeMelee, entity.Vector2{X: 2.5}, 2, 0.5)
+	second.Characters[0].AttackSpeed = 0
+	players := playerMap(caster, target, second)
 	nearby := allNearby(players)
 	simulation := NewSimulation()
 	random := rand.New(rand.NewSource(1))

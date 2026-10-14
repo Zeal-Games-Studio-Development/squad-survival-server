@@ -39,7 +39,7 @@ type Character struct {
 	AttackImpacted     bool
 	AttackActionCount  int
 	AttackHitsEmitted  int
-	AttackDirection    Vector2
+	AttackTargets      []AttackTarget
 	ActiveSkillID      string
 	SkillActionID      string
 	SkillDirection     Vector2
@@ -52,6 +52,12 @@ type Character struct {
 	ReadySkillIDs      []string
 	LastCooldownTick   int64
 	CooldownTickSet    bool
+}
+
+type AttackTarget struct {
+	UserID      string
+	CharacterID string
+	Direction   Vector2
 }
 
 func CreateCharacter(random *rand.Rand, weapons []Weapon) *Character {
@@ -116,7 +122,7 @@ func (c *Character) ResetAttack() {
 	c.AttackImpacted = false
 	c.AttackActionCount = 0
 	c.AttackHitsEmitted = 0
-	c.AttackDirection = Vector2{}
+	c.AttackTargets = nil
 }
 
 func NewCharacter() *Character {

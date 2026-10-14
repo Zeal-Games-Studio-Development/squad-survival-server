@@ -36,11 +36,15 @@ func combatEventSnapshot(event corecombat.Event) (*CombatEvent, error) {
 			Tags: tagNames(event.Tags),
 		}}}, nil
 	case corecombat.EventAttackStarted:
+		targets := make([]*LockedAttackTarget, 0, len(event.AttackTargets))
+		for _, target := range event.AttackTargets {
+			targets = append(targets, &LockedAttackTarget{UserId: target.UserID, CharacterId: target.CharacterID, Direction: vectorSnapshot(target.Direction)})
+		}
 		return &CombatEvent{Event: &CombatEvent_AttackStarted{AttackStarted: &AttackStarted{
 			ActionId: event.AttackID, AttackerUserId: event.AttackerUserID, AttackerCharacterId: event.AttackerCharacterID,
 			TargetUserId: event.TargetUserID, TargetCharacterId: event.TargetCharacterID, WeaponType: string(event.WeaponType),
 			StartTick: event.StartTick, ImpactTick: event.ImpactTick, CompleteTick: event.CompleteTick, WeaponId: event.WeaponID,
-			AttackCount: int32(event.AttackCount), Tags: tagNames(event.Tags),
+			AttackCount: int32(event.AttackCount), Tags: tagNames(event.Tags), Targets: targets,
 		}}}, nil
 	case corecombat.EventDamageApplied:
 		return &CombatEvent{Event: &CombatEvent_DamageApplied{DamageApplied: &DamageApplied{

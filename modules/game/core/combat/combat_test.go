@@ -26,14 +26,64 @@ func TestMeleeLocksNearestTargetAndSchedulesAttack(t *testing.T) {
 
 func TestTargetTieBreaksByUserAndCharacterID(t *testing.T) {
 	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 3, 0.5)
+	attacker.Characters[0].AttackCount = 2
 	targetB2 := combatPlayer("b", "b:2", entity.RangeMelee, entity.Vector2{X: 1}, 1, 0.5)
 	targetB1 := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: -1}, 1, 0.5)
 
 	players := playerMap(attacker, targetB2, targetB1)
 	events := NewSimulation().Step(players, allNearby(players), 1, rand.New(rand.NewSource(1)))
 	started := findEvent(events, EventAttackStarted, "a:1")
-	if started == nil || started.TargetCharacterID != "b:1" {
+	if started == nil || started.TargetCharacterID != "b:1" || started.AttackCount != 2 || started.AttackTargets[0].CharacterID != "b:1" || started.AttackTargets[1].CharacterID != "b:2" {
 		t.Fatalf("expected deterministic target b:1, got %+v", started)
+	}
+}
+
+func TestAttackCountCapsAtAvailableTargets(t *testing.T) {
+	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 3, 0.5)
+	attacker.Characters[0].AttackCount = 3
+	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
+	target.Characters[0].AttackSpeed = 0
+	players := playerMap(attacker, target)
+	simulation := NewSimulation()
+	start := findEvent(simulation.Step(players, allNearby(players), 1, rand.New(rand.NewSource(1))), EventAttackStarted, "a:1")
+	if start == nil || start.AttackCount != 1 || len(start.AttackTargets) != 1 || start.AttackTargets[0].CharacterID != "b:1" {
+		t.Fatalf("attack count did not reflect locked targets: %+v", start)
+	}
+}
+
+func TestMissingLockedTargetSkipsOnlyItsSlot(t *testing.T) {
+	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 3, 0.5)
+	attacker.Characters[0].AttackSpeed = 10
+	attacker.Characters[0].AttackCount = 2
+	first := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
+	second := combatPlayer("c", "c:1", entity.RangeMelee, entity.Vector2{X: 1.5}, 2, 0.5)
+	unselected := combatPlayer("d", "d:1", entity.RangeMelee, entity.Vector2{X: 2}, 2, 0.5)
+	for _, target := range []*entity.Player{first, second, unselected} {
+		target.Characters[0].AttackSpeed = 0
+	}
+	players := playerMap(attacker, first, second, unselected)
+	nearby := allNearby(players)
+	simulation := NewSimulation()
+	random := rand.New(rand.NewSource(1))
+	start := findEvent(simulation.Step(players, nearby, 1, random), EventAttackStarted, "a:1")
+	if start == nil || start.AttackCount != 2 || start.AttackTargets[1].CharacterID != "c:1" {
+		t.Fatalf("wrong locked targets: %+v", start)
+	}
+	first.Characters[0].Health = 0
+	hitCount := 0
+	for tick := int64(2); tick <= 4; tick++ {
+		for _, event := range simulation.Step(players, nearby, tick, random) {
+			if event.Type != EventDamageApplied || event.AttackID != start.AttackID {
+				continue
+			}
+			hitCount++
+			if tick != 4 || event.TargetCharacterID != "c:1" || event.HitIndex != 2 {
+				t.Fatalf("skipped slot was retargeted or remaining slot was lost: %+v", event)
+			}
+		}
+	}
+	if hitCount != 1 {
+		t.Fatalf("expected one hit on the remaining locked target, got %d", hitCount)
 	}
 }
 
@@ -129,7 +179,7 @@ func TestProjectileExpiresWhenTargetDiesBeforeHit(t *testing.T) {
 	}
 }
 
-func TestLeavingRangeCancelsAndResetsAttack(t *testing.T) {
+func TestLeavingRangeSkipsLockedAttack(t *testing.T) {
 	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
 	random := rand.New(rand.NewSource(1))
@@ -139,12 +189,13 @@ func TestLeavingRangeCancelsAndResetsAttack(t *testing.T) {
 	simulation.Step(players, nearby, 1, random)
 	target.Characters[0].Position.X = 3
 
-	events := simulation.Step(players, nearby, 2, random)
-	if attacker.Characters[0].TargetCharacterID != "" || attacker.Characters[0].AttackStartTick != 0 {
-		t.Fatalf("attack was not reset: %+v", attacker.Characters[0])
+	for tick := int64(2); tick <= 6; tick++ {
+		if event := findEvent(simulation.Step(players, nearby, tick, random), EventDamageApplied, "a:1"); event != nil {
+			t.Fatalf("out-of-range target received damage: %+v", event)
+		}
 	}
-	if event := findEvent(events, EventDamageApplied, "a:1"); event != nil {
-		t.Fatalf("cancelled attack dealt damage: %+v", event)
+	if attacker.Characters[0].TargetCharacterID != "" || attacker.Characters[0].AttackStartTick != 0 {
+		t.Fatalf("finished attack was not reset: %+v", attacker.Characters[0])
 	}
 }
 
@@ -173,7 +224,7 @@ func TestMovementInputControlsAttackEligibility(t *testing.T) {
 	}
 }
 
-func TestTargetDeathBeforeImpactCancelsAttack(t *testing.T) {
+func TestTargetDeathBeforeImpactSkipsLockedAttack(t *testing.T) {
 	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
 	random := rand.New(rand.NewSource(1))
@@ -183,12 +234,13 @@ func TestTargetDeathBeforeImpactCancelsAttack(t *testing.T) {
 	simulation.Step(players, nearby, 1, random)
 	target.Characters[0].Health = 0
 
-	events := simulation.Step(players, nearby, 2, random)
-	if attacker.Characters[0].TargetCharacterID != "" {
-		t.Fatalf("dead target remained locked: %+v", attacker.Characters[0])
+	for tick := int64(2); tick <= 6; tick++ {
+		if event := findEvent(simulation.Step(players, nearby, tick, random), EventDamageApplied, "a:1"); event != nil {
+			t.Fatalf("dead target received damage: %+v", event)
+		}
 	}
-	if event := findEvent(events, EventDamageApplied, "a:1"); event != nil {
-		t.Fatalf("dead target received damage: %+v", event)
+	if attacker.Characters[0].TargetCharacterID != "" {
+		t.Fatalf("finished attack retained dead target: %+v", attacker.Characters[0])
 	}
 }
 
@@ -264,7 +316,7 @@ func TestCombatQueryCoversOpposingFiveByFiveFormationCorners(t *testing.T) {
 	}
 }
 
-func TestTargetOutsideCandidateSetIsNotAcquiredAndActiveAttackResets(t *testing.T) {
+func TestTargetOutsideCandidateSetIsNotAcquiredAndLockedHitIsSkipped(t *testing.T) {
 	attacker := combatPlayer("a", "a:1", entity.RangeMelee, entity.Vector2{}, 2, 0.5)
 	target := combatPlayer("b", "b:1", entity.RangeMelee, entity.Vector2{X: 1}, 2, 0.5)
 	players := playerMap(attacker, target)
@@ -274,8 +326,13 @@ func TestTargetOutsideCandidateSetIsNotAcquiredAndActiveAttackResets(t *testing.
 	if findEvent(simulation.Step(players, nearby, 1, random), EventAttackStarted, "a:1") == nil {
 		t.Fatal("expected initial attack")
 	}
-	if events := simulation.Step(players, map[string][]*entity.Player{}, 2, random); findEvent(events, EventDamageApplied, "a:1") != nil || attacker.Characters[0].TargetCharacterID != "" {
-		t.Fatalf("attack continued after target left candidate set: events=%+v character=%+v", events, attacker.Characters[0])
+	for tick := int64(2); tick <= 6; tick++ {
+		if events := simulation.Step(players, map[string][]*entity.Player{}, tick, random); findEvent(events, EventDamageApplied, "a:1") != nil {
+			t.Fatalf("target outside candidate set received hit: %+v", events)
+		}
+	}
+	if attacker.Characters[0].TargetCharacterID != "" {
+		t.Fatalf("finished attack retained target: %+v", attacker.Characters[0])
 	}
 }
 
