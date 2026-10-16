@@ -32,6 +32,8 @@ Ví dụ speed `5` đi `0.5 world unit/tick`.
 
 ## World
 
+Character có bán kính va chạm mặc định `0.4 world units`. Chỉ character của các player khác nhau mới soft collide; character cùng player vẫn theo slot formation bình thường. Khi đường đi tới slot gặp character đối thủ, character trượt sang phía còn trống trong giới hạn tốc độ mỗi tick. Nếu cách slot quá `8 world units`, character dịch chuyển tới slot hoặc vị trí trống gần slot nhất. Character đang thi triển skill chờ skill kết thúc trước khi dịch chuyển.
+
 | Constant | Giá trị |
 | --- | --- |
 | `PlayAreaRadius` | `500` |

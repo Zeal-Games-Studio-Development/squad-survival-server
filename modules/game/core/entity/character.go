@@ -3,12 +3,13 @@ package entity
 import "math/rand"
 
 const (
-	DefaultHealth         = 100.0
-	DefaultDamage         = 10.0
-	DefaultMoveSpeed      = 5.0
-	DefaultAttackSpeed    = 1.2
-	DefaultRegenRate      = 0.0
-	DefaultCritMultiplier = 1.5
+	DefaultHealth          = 100.0
+	DefaultDamage          = 10.0
+	DefaultMoveSpeed       = 5.0
+	DefaultCharacterRadius = 0.4
+	DefaultAttackSpeed     = 1.2
+	DefaultRegenRate       = 0.0
+	DefaultCritMultiplier  = 1.5
 )
 
 type Character struct {
@@ -21,6 +22,7 @@ type Character struct {
 	MaxHealth          float64
 	Damage             float64
 	MoveSpeed          float64 // World units per second.
+	Radius             float64 // Collision radius in world units.
 	AttackSpeed        float64
 	AttackCount        int
 	CooldownScale      float64
@@ -131,6 +133,7 @@ func NewCharacter() *Character {
 		MaxHealth:      DefaultHealth,
 		Damage:         DefaultDamage,
 		MoveSpeed:      DefaultMoveSpeed,
+		Radius:         DefaultCharacterRadius,
 		AttackSpeed:    DefaultAttackSpeed,
 		AttackCount:    1,
 		CooldownScale:  1,

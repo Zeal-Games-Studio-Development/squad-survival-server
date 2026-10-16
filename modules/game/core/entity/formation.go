@@ -10,6 +10,7 @@ import (
 )
 
 const CharacterFollowSpeedMultiplier = 1.5
+const CharacterSnapDistance = 8.0
 
 var (
 	ErrNilCharacter     = errors.New("character is nil")
@@ -148,6 +149,31 @@ func StepCharacters(player *Player) error {
 }
 
 func StepCharactersAtTick(player *Player, tick int64) error {
+	return StepAllCharacters(map[string]*Player{player.SessionID: player}, tick)
+}
+
+// StepAllCharacters moves every formation in a stable order so collision
+// results do not depend on Go map iteration order.
+func StepAllCharacters(players map[string]*Player, tick int64) error {
+	ids := make([]string, 0, len(players))
+	for id := range players {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		if err := AssignCharacterTargets(players[id]); err != nil {
+			return err
+		}
+	}
+	for _, id := range ids {
+		if err := stepCharactersWithCollisions(players[id], players, ids, tick); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func stepCharactersWithCollisions(player *Player, players map[string]*Player, ids []string, tick int64) error {
 	if err := AssignCharacterTargets(player); err != nil {
 		return err
 	}
@@ -156,12 +182,18 @@ func StepCharactersAtTick(player *Player, tick int64) error {
 		if character == nil || character.ActiveSkillID != "" && tick >= 0 && tick <= character.SkillCompleteTick || !isFinite(character.MoveSpeed) || character.MoveSpeed <= 0 {
 			continue
 		}
-		character.Position = moveTowards(
-			character.Position,
-			character.TargetPosition,
-			character.MoveSpeed*CharacterFollowSpeedMultiplier*deltaSeconds,
-		)
-		character.Position = world.ClampToPlayArea(character.Position)
+		obstacles := make([]*Character, 0)
+		for _, id := range ids {
+			if players[id] == player {
+				continue
+			}
+			for _, other := range players[id].Characters {
+				if other != nil && other.Health > 0 {
+					obstacles = append(obstacles, other)
+				}
+			}
+		}
+		character.Position = moveCharacterWithCollisions(character, obstacles, character.MoveSpeed*CharacterFollowSpeedMultiplier*deltaSeconds)
 	}
 	return nil
 }

@@ -57,7 +57,7 @@ func TestEqualRangeClassKeepsCharacterIndexAndRotatesWithFacing(t *testing.T) {
 }
 
 func TestStepCharactersMovesSoftlyWithoutOvershoot(t *testing.T) {
-	player := newTestPlayer(Vector2{X: 10})
+	player := newTestPlayer(Vector2{X: 7})
 	character := player.Characters[0]
 	character.Position = Vector2{}
 	character.MoveSpeed = 5
@@ -83,7 +83,7 @@ func TestCastingCharacterHoldsPositionThenReturnsToFormation(t *testing.T) {
 	character := player.Characters[0]
 	character.ActiveSkillID = "sword_cone"
 	character.SkillCompleteTick = 5
-	player.Position = Vector2{X: 10}
+	player.Position = Vector2{X: 7}
 	initial := character.Position
 	for tick := int64(2); tick <= 5; tick++ {
 		if err := StepCharactersAtTick(player, tick); err != nil {
