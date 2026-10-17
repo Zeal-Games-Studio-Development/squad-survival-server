@@ -35,13 +35,24 @@ func TestOwnedSelectionFiltersIDTypeAndRarity(t *testing.T) {
 	if _, ok := Choose(nil, matches); ok {
 		t.Fatal("nil RNG selected a weapon")
 	}
-	if types := SpawnTypes(catalog, [][]entity.Weapon{owned}); !reflect.DeepEqual(types, []entity.WeaponType{entity.WeaponBow, entity.WeaponSword}) {
+	if types := SpawnTypes(catalog, [][]entity.Weapon{owned}, entity.RarityCommon); !reflect.DeepEqual(types, []entity.WeaponType{entity.WeaponBow, entity.WeaponSword}) {
 		t.Fatalf("wrong type pool: %v", types)
 	}
-	if types := SpawnTypes(catalog, [][]entity.Weapon{{catalog[3]}}); len(types) != 0 {
+	if types := SpawnTypes(catalog, [][]entity.Weapon{{catalog[3]}}, entity.RarityCommon); len(types) != 0 {
 		t.Fatalf("rare entered spawn pool: %v", types)
 	}
-	if types := SpawnTypes(catalog, nil); len(types) != 0 {
+	if types := SpawnTypes(catalog, nil, entity.RarityCommon); len(types) != 0 {
 		t.Fatal("empty inventories entered pool")
+	}
+}
+
+func TestSpawnTypesFiltersEachRarity(t *testing.T) {
+	catalog := entity.DefaultWeaponCatalog()
+	owned := Owned(catalog, []string{"archer", "archer_uncommon", "bruiser_rare"})
+	for rarity, want := range map[entity.Rarity]entity.WeaponType{entity.RarityCommon: entity.WeaponBow, entity.RarityUncommon: entity.WeaponBow, entity.RarityRare: entity.WeaponBlunt} {
+		got := SpawnTypes(catalog, [][]entity.Weapon{owned, owned}, rarity)
+		if !reflect.DeepEqual(got, []entity.WeaponType{want}) {
+			t.Fatalf("wrong %s types: %v", rarity, got)
+		}
 	}
 }

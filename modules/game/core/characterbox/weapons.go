@@ -39,16 +39,16 @@ func Choose(random *rand.Rand, weapons []entity.Weapon) (entity.Weapon, bool) {
 }
 
 // SpawnTypes preserves catalog order so map iteration cannot affect gameplay RNG.
-func SpawnTypes(catalog []entity.Weapon, inventories [][]entity.Weapon) []entity.WeaponType {
+func SpawnTypes(catalog []entity.Weapon, inventories [][]entity.Weapon, rarity entity.Rarity) []entity.WeaponType {
 	eligible := make(map[entity.WeaponType]bool)
 	for _, weapons := range inventories {
-		for _, weapon := range Filter(weapons, "", entity.RarityCommon) {
+		for _, weapon := range Filter(weapons, "", rarity) {
 			eligible[weapon.Type] = true
 		}
 	}
 	var types []entity.WeaponType
 	for _, weapon := range catalog {
-		if weapon.Rarity == entity.RarityCommon && eligible[weapon.Type] {
+		if weapon.Rarity == rarity && eligible[weapon.Type] {
 			types = append(types, weapon.Type)
 			delete(eligible, weapon.Type)
 		}

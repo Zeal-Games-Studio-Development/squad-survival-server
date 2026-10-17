@@ -657,8 +657,12 @@ func (s *State) spawnCharacterBoxes(target int) []system.CharacterBoxEvent {
 			inventories = append(inventories, s.OwnedWeapons[sessionID])
 		}
 	}
-	weaponTypes := characterbox.SpawnTypes(s.WeaponCatalog, inventories)
-	if len(weaponTypes) == 0 {
+	pools := make(map[entity.Rarity][]entity.WeaponType, 3)
+	for _, rarity := range []entity.Rarity{entity.RarityCommon, entity.RarityUncommon, entity.RarityRare} {
+		pools[rarity] = characterbox.SpawnTypes(s.WeaponCatalog, inventories, rarity)
+	}
+	rarities := characterbox.SpawnRarities(s.random, target-len(s.CharacterBoxes), pools)
+	if len(rarities) == 0 {
 		return nil
 	}
 	events := make([]system.CharacterBoxEvent, 0, target-len(s.CharacterBoxes))
@@ -668,8 +672,10 @@ func (s *State) spawnCharacterBoxes(target int) []system.CharacterBoxEvent {
 			break
 		}
 		s.NextCharacterBoxID++
+		rarity := rarities[len(events)]
+		weaponTypes := pools[rarity]
 		weaponType := weaponTypes[s.random.Intn(len(weaponTypes))]
-		box := entity.NewCharacterBox("box:"+strconv.FormatUint(s.NextCharacterBoxID, 10), position, weaponType, entity.RarityCommon)
+		box := entity.NewCharacterBox("box:"+strconv.FormatUint(s.NextCharacterBoxID, 10), position, weaponType, rarity)
 		if err := s.SpatialGrid.InsertCharacterBox(box); err != nil {
 			continue
 		}

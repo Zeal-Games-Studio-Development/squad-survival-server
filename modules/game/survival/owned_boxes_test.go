@@ -122,8 +122,20 @@ func TestOwnedBoxSpawnPoolAndJoinRarity(t *testing.T) {
 	player := entity.NewPlayerWithWeapon("pool", "pool", "Pool", entity.Vector2{X: 100}, state.WeaponCatalog[0])
 	state.Players[player.SessionID] = player
 	state.OwnedWeapons[player.SessionID] = characterbox.Owned(state.WeaponCatalog, []string{"archer_rare", "novice_mage_uncommon"})
-	if len(state.spawnCharacterBoxes(4)) != 0 {
-		t.Fatal("spawned from non-common inventory")
+	if events := state.spawnCharacterBoxes(3); len(events) != 3 {
+		t.Fatal("failed to spawn from uncommon/rare inventory")
+	}
+	counts := map[entity.Rarity]int{}
+	for id, box := range state.CharacterBoxes {
+		counts[box.Rarity()]++
+		if len(state.weaponsForBox(box, player.SessionID)) == 0 {
+			t.Fatal("spawned unowned type/rarity")
+		}
+		state.SpatialGrid.RemoveCharacterBox(id)
+		delete(state.CharacterBoxes, id)
+	}
+	if counts[entity.RarityUncommon] != 2 || counts[entity.RarityRare] != 1 {
+		t.Fatalf("wrong fallback counts: %v", counts)
 	}
 	state.OwnedWeapons[player.SessionID] = characterbox.Owned(state.WeaponCatalog, []string{"archer", "archer_rare"})
 	if len(state.spawnCharacterBoxes(4)) != 4 {

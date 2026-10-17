@@ -45,7 +45,7 @@ Roster gửi `skill_cooldowns` ở field 17 của từng character khi join ho�
 
 Unity gửi `ActivateSkillInput { character_id, skill_id }` qua opcode `2` reliable khi chủ sở hữu bấm skill. Server kiểm tra lại điều kiện tại tick nhận lệnh; `SkillStarted` trong opcode `103` xác nhận thành công. Nếu lệnh không hợp lệ, server bỏ qua và không gửi sự kiện từ chối. Client chỉ dùng `ready_skill_ids` của chính player để bật nút skill; state của observer dùng để hiển thị character khác. Generated `Input.cs` và `SkillState.cs` cần được copy sang Unity repo riêng sau khi generate.
 
-`CharacterRoster`, `AttackStarted` và `ProjectileSpawned` dùng `weapon_id` thay cho `weapon_name` tại cùng field number protobuf. `CharacterBoxValue` gửi `weapon_type` ở field 1 và `string rarity` ở field 2 (`common`, `uncommon`, `rare`); hiện mọi box spawn có rarity `common`. Rarity lấy từ box cho cả event spawn và snapshot join; `weapon_id` được chọn từ inventory snapshot của người nhặt, khớp type/rarity và xuất hiện trong roster của character mới. Client cần regenerate protobuf; client cũ có thể đọc ID thành `weapon_name`.
+`CharacterRoster`, `AttackStarted` và `ProjectileSpawned` dùng `weapon_id` thay cho `weapon_name` tại cùng field number protobuf. `CharacterBoxValue` gửi `weapon_type` ở field 1 và `string rarity` ở field 2 (`common`, `uncommon`, `rare`); box có thể spawn ở cả ba rarity theo phân bổ số lượng 7:2:1. Rarity lấy từ box cho cả event spawn và snapshot join; `weapon_id` được chọn từ inventory snapshot của người nhặt, khớp type/rarity và xuất hiện trong roster của character mới. Client cần regenerate protobuf; client cũ có thể đọc ID thành `weapon_name`.
 
 ## Packet Flow
 
