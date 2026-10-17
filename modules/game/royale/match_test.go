@@ -61,21 +61,18 @@ func TestInventoryGatesBattleRoyaleJoin(t *testing.T) {
 		t.Fatalf("player did not join with one character: %+v", player)
 	}
 	weapon := player.Characters[0].Weapon
-	initial, ok := service.InitialWeapon(weapon.Type)
-	if !ok || initial.ID != weapon.ID {
-		t.Fatalf("starter not selected from initial list: %+v", weapon)
+	if weapon.ID != "archer" || weapon.Rarity != entity.RarityCommon {
+		t.Fatalf("starter not selected from owned common weapons: %+v", weapon)
 	}
 }
 
-func TestCharacterBoxUsesInitialWeaponByType(t *testing.T) {
-	state := &State{}
-	service := inventory.DefaultService()
-	for _, weaponType := range []entity.WeaponType{entity.WeaponBow, entity.WeaponStaff, entity.WeaponSpear, entity.WeaponSword, entity.WeaponAxe, entity.WeaponBlunt, entity.WeaponCrossbow, entity.WeaponShield} {
-		box := entity.NewCharacterBox("box", entity.Vector2{}, weaponType)
-		selected, ok := state.weaponForBox(box)
-		initial, initialOK := service.InitialWeapon(weaponType)
-		if !ok || !initialOK || selected.ID != initial.ID {
-			t.Fatalf("wrong initial weapon for %s: %+v", weaponType, selected)
+func TestCharacterBoxUsesOwnedWeaponByType(t *testing.T) {
+	state := &State{OwnedWeapons: map[string][]entity.Weapon{"player": commonTestWeapons()}}
+	for _, weapon := range commonTestWeapons() {
+		box := entity.NewCharacterBox("box", entity.Vector2{}, weapon.Type, entity.RarityCommon)
+		matches := state.weaponsForBox(box, "player")
+		if len(matches) != 1 || matches[0].ID != weapon.ID {
+			t.Fatalf("wrong owned weapon: %+v", matches)
 		}
 	}
 }
@@ -111,6 +108,10 @@ func TestExperiencePickupOnlyRunsWhilePlaying(t *testing.T) {
 	}
 	player := entity.NewPlayer("user", "session", "", item.Position, rand.New(rand.NewSource(99)))
 	state.Players[player.SessionID] = player
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[player.SessionID] = commonTestWeapons()
 	state.Presences[player.SessionID] = testPresence{userID: player.UserID, sessionID: player.SessionID}
 	if err := state.SpatialGrid.Insert(player); err != nil {
 		t.Fatal(err)
@@ -133,7 +134,7 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 	match, state := newTestMatchState(t)
 	dispatcher := &testDispatcher{}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
-	match.MatchJoin(context.Background(), nil, nil, nil, dispatcher, 10, state, []runtime.Presence{presence})
+	match.MatchJoin(context.Background(), nil, nil, commonInventoryModule(), dispatcher, 10, state, []runtime.Presence{presence})
 
 	if state.WaitingEndsAtTick != 10+waitingDurationTicks {
 		t.Fatalf("unexpected waiting deadline: %d", state.WaitingEndsAtTick)
@@ -142,7 +143,7 @@ func TestWaitingStartsOnFirstJoinAndPausesGameplay(t *testing.T) {
 
 	player := state.Players[presence.sessionID]
 	player.Level = 2
-	box := entity.NewCharacterBox("waiting-box", player.Position, entity.WeaponBow)
+	box := entity.NewCharacterBox("waiting-box", player.Position, entity.WeaponBow, entity.RarityCommon)
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
@@ -177,6 +178,10 @@ func TestWaitingStartsImmediatelyWhenFull(t *testing.T) {
 	for i := 0; i < MaxPlayers; i++ {
 		player := entity.NewPlayer(fmt.Sprintf("user-%d", i), fmt.Sprintf("session-%d", i), "", entity.Vector2{X: float64(i)}, rand.New(rand.NewSource(int64(i+1))))
 		state.Players[player.SessionID] = player
+		if state.OwnedWeapons == nil {
+			state.OwnedWeapons = make(map[string][]entity.Weapon)
+		}
+		state.OwnedWeapons[player.SessionID] = commonTestWeapons()
 		if err := state.SpatialGrid.Insert(player); err != nil {
 			t.Fatal(err)
 		}
@@ -364,3 +369,17 @@ func (testLogger) Error(string, ...interface{})                       {}
 func (l testLogger) WithField(string, interface{}) runtime.Logger     { return l }
 func (l testLogger) WithFields(map[string]interface{}) runtime.Logger { return l }
 func (testLogger) Fields() map[string]interface{}                     { return nil }
+
+func commonTestWeapons() []entity.Weapon {
+	var weapons []entity.Weapon
+	for _, weapon := range entity.DefaultWeaponCatalog() {
+		if weapon.Rarity == entity.RarityCommon {
+			weapons = append(weapons, weapon)
+		}
+	}
+	return weapons
+}
+
+func commonInventoryModule() inventoryTestModule {
+	return inventoryTestModule{value: `{"weapon_ids":["archer","novice_mage","farmer","swordman","axeman","bruiser","hunter","shieldbearer"]}`}
+}

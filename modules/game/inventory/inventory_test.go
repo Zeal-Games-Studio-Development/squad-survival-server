@@ -3,7 +3,6 @@ package inventory
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"reflect"
 	"testing"
 
@@ -73,7 +72,7 @@ func TestInventoryValidationAllowsPartialOwnership(t *testing.T) {
 func TestInitialCharactersRequireOneWeaponPerType(t *testing.T) {
 	weapons := entity.DefaultWeaponCatalog()
 	initial := []string{"archer", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"}
-	for _, ids := range [][]string{initial[:7], append(append([]string(nil), initial[:7]...), "bow_swift"), append(append([]string(nil), initial[:7]...), "wand")} {
+	for _, ids := range [][]string{initial[:7], append(append([]string(nil), initial[:7]...), "archer_uncommon"), append(append([]string(nil), initial[:7]...), "wand")} {
 		if _, err := NewService(weapons, ids); err == nil {
 			t.Fatalf("invalid initial list accepted: %v", ids)
 		}
@@ -82,24 +81,9 @@ func TestInitialCharactersRequireOneWeaponPerType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range initial {
-		var found bool
-		for _, weaponType := range requiredTypes {
-			weapon, ok := service.InitialWeapon(weaponType)
-			if ok && weapon.ID == id {
-				found = true
-			}
-		}
-		if !found {
-			t.Fatalf("initial weapon %s not found by type", id)
-		}
-	}
-	random := rand.New(rand.NewSource(3))
-	for i := 0; i < 100; i++ {
-		weapon, err := service.Starter(random)
-		if err != nil || !containsID(initial, weapon.ID) {
-			t.Fatalf("starter outside initial list: %+v %v", weapon, err)
-		}
+	data, err := service.InitialData()
+	if err != nil || !reflect.DeepEqual(data.WeaponIDs, initial) {
+		t.Fatalf("wrong bootstrap data: %+v %v", data, err)
 	}
 }
 
@@ -110,4 +94,17 @@ func containsID(ids []string, id string) bool {
 		}
 	}
 	return false
+}
+
+func TestCatalogServiceDoesNotRequireBootstrapInventory(t *testing.T) {
+	service, err := NewCatalogService(entity.DefaultWeaponCatalog())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.Validate(Data{WeaponIDs: []string{"archer_rare"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.InitialData(); err == nil {
+		t.Fatal("catalog-only service allowed account initialization")
+	}
 }

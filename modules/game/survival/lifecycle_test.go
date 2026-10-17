@@ -23,7 +23,7 @@ func TestSurvivalWaitingStartsOnFirstJoinAndTimesOut(t *testing.T) {
 		t.Fatal("waiting deadline started before first join")
 	}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
-	match.MatchJoin(nil, nil, nil, nil, dispatcher, 10, state, []runtime.Presence{presence})
+	match.MatchJoin(nil, nil, nil, commonInventoryModule(), dispatcher, 10, state, []runtime.Presence{presence})
 	if state.WaitingEndsAtTick != 10+waitingDurationTicks {
 		t.Fatalf("wrong waiting deadline: %d", state.WaitingEndsAtTick)
 	}
@@ -45,7 +45,7 @@ func TestSurvivalWaitingStartsOnFirstJoinAndTimesOut(t *testing.T) {
 	if _, allowed, reason := match.MatchJoinAttempt(nil, nil, nil, nil, nil, startTick+1, state, late, nil); !allowed {
 		t.Fatalf("playing join rejected: %s", reason)
 	}
-	match.MatchJoin(nil, nil, nil, nil, dispatcher, startTick+1, state, []runtime.Presence{late})
+	match.MatchJoin(nil, nil, nil, commonInventoryModule(), dispatcher, startTick+1, state, []runtime.Presence{late})
 	assertSurvivalLifecycle(t, dispatcher, system.MatchPhase_MATCH_PHASE_PLAYING, startTick+1, state.PlayingEndsAtTick, true)
 }
 
@@ -64,7 +64,7 @@ func TestSurvivalWaitingCapacityAndThreePlayerStart(t *testing.T) {
 	}
 	for index := 1; index <= WaitingPlayerLimit; index++ {
 		presence := testPresence{userID: fmt.Sprintf("user-%d", index), sessionID: fmt.Sprintf("session-%d", index)}
-		match.MatchJoin(nil, nil, nil, nil, dispatcher, 12, state, []runtime.Presence{presence})
+		match.MatchJoin(nil, nil, nil, commonInventoryModule(), dispatcher, 12, state, []runtime.Presence{presence})
 	}
 	if state.Phase != PhasePlaying || state.PlayingEndsAtTick != 12+playingDurationTicks || state.label() != `{"mode":"survival","status":"playing","player_count":3,"max_players":32,"available_slots":29,"joinable":true}` {
 		t.Fatalf("three players did not start playing: phase=%s label=%s", state.Phase, state.label())
@@ -79,7 +79,7 @@ func TestSurvivalEndedStopsGameplayAndTerminatesAfterGracePeriod(t *testing.T) {
 	match, state := newAITestMatch(t)
 	dispatcher := &testDispatcher{}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
-	match.MatchJoin(nil, nil, nil, nil, dispatcher, 1, state, []runtime.Presence{presence})
+	match.MatchJoin(nil, nil, nil, commonInventoryModule(), dispatcher, 1, state, []runtime.Presence{presence})
 	state.startPlaying(nil, dispatcher, 2)
 	player := state.Players[presence.sessionID]
 	position := player.Position
@@ -102,7 +102,7 @@ func TestSurvivalEndedStopsGameplayAndTerminatesAfterGracePeriod(t *testing.T) {
 	if _, allowed, _ := match.MatchJoinAttempt(nil, nil, nil, nil, nil, endTick+1, state, late, nil); allowed {
 		t.Fatal("ended match accepted a new join")
 	}
-	match.MatchJoin(nil, nil, nil, nil, dispatcher, endTick+1, state, []runtime.Presence{late})
+	match.MatchJoin(nil, nil, nil, commonInventoryModule(), dispatcher, endTick+1, state, []runtime.Presence{late})
 	if state.Players[late.sessionID] != nil {
 		t.Fatal("ended match created a new player")
 	}
@@ -152,7 +152,7 @@ func TestSurvivalWaitingAndPlayingEmptyMatchPolicy(t *testing.T) {
 
 	state.EmptyTicks = playingEmptyTTLSeconds*tickRate - 1
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
-	match.MatchJoin(nil, nil, nil, nil, &testDispatcher{}, 3, state, []runtime.Presence{presence})
+	match.MatchJoin(nil, nil, nil, commonInventoryModule(), &testDispatcher{}, 3, state, []runtime.Presence{presence})
 	if state.EmptyTicks != 0 {
 		t.Fatal("joining player did not reset empty playing TTL")
 	}

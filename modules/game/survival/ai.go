@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"squad-survival-be/modules/game/core/ai"
+	"squad-survival-be/modules/game/core/characterbox"
 	"squad-survival-be/modules/game/core/entity"
 )
 
@@ -17,17 +18,23 @@ func (s *State) spawnAI() {
 	if namespace == "" {
 		namespace = "local-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	}
+	if s.OwnedWeapons == nil {
+		s.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	catalog := s.catalog()
+	common := characterbox.Filter(catalog, "", entity.RarityCommon)
 	usedNames := make(map[string]struct{}, count)
 	for index := 1; index <= count; index++ {
 		userID, sessionID := ai.IDs(namespace, index)
-		weapon, err := s.initialWeaponService().Starter(s.random)
-		if err != nil {
-			panic("could not choose AI initial character: " + err.Error())
+		weapon, ok := characterbox.Choose(s.random, common)
+		if !ok {
+			panic("could not choose AI common character")
 		}
 		player := entity.NewPlayerWithWeapon(userID, sessionID, config.Name(s.aiRandom, usedNames), s.randomPlayerSpawn(), weapon)
 		if err := s.SpatialGrid.Insert(player); err != nil {
 			panic("could not initialize AI player: " + err.Error())
 		}
+		s.OwnedWeapons[sessionID] = append([]entity.Weapon(nil), catalog...)
 		s.Players[sessionID] = player
 		s.AIControllers[sessionID] = ai.NewControllerWithConfig(player, config)
 	}

@@ -22,7 +22,7 @@ func TestControllerPrioritiesAndMissingTargets(t *testing.T) {
 	if err := grid.Insert(enemy); err != nil {
 		t.Fatal(err)
 	}
-	box := entity.NewCharacterBox("box", entity.Vector2{X: 10}, entity.WeaponBow)
+	box := entity.NewCharacterBox("box", entity.Vector2{X: 10}, entity.WeaponBow, entity.RarityCommon)
 	item := entity.NewExperiencePackage("xp", entity.Vector2{Y: 5}, entity.ExperiencePackageTier_EXPERIENCE_PACKAGE_TIER_SMALL, 1)
 	if err := grid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
@@ -67,7 +67,7 @@ func TestControllerSkipsFullRosterAndMaxLevelXP(t *testing.T) {
 	random := rand.New(rand.NewSource(1))
 	player := entity.NewPlayer("bot", "bot-session", "Bot", entity.Vector2{}, random)
 	grid := spatial.NewGrid(20)
-	if err := grid.InsertCharacterBox(entity.NewCharacterBox("box", entity.Vector2{X: 2}, entity.WeaponBow)); err != nil {
+	if err := grid.InsertCharacterBox(entity.NewCharacterBox("box", entity.Vector2{X: 2}, entity.WeaponBow, entity.RarityCommon)); err != nil {
 		t.Fatal(err)
 	}
 	if err := grid.InsertExperiencePackage(entity.NewExperiencePackage("xp", entity.Vector2{Y: 2}, entity.ExperiencePackageTier_EXPERIENCE_PACKAGE_TIER_SMALL, 1)); err != nil {
@@ -189,7 +189,7 @@ func TestControllerPrefersNearestEligibleOpponent(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := grid.InsertCharacterBox(entity.NewCharacterBox("box", entity.Vector2{X: 2}, entity.WeaponBow)); err != nil {
+			if err := grid.InsertCharacterBox(entity.NewCharacterBox("box", entity.Vector2{X: 2}, entity.WeaponBow, entity.RarityCommon)); err != nil {
 				t.Fatal(err)
 			}
 			if err := grid.InsertExperiencePackage(entity.NewExperiencePackage("xp", entity.Vector2{Y: 1}, entity.ExperiencePackageTier_EXPERIENCE_PACKAGE_TIER_SMALL, 1)); err != nil {
@@ -248,7 +248,7 @@ func TestControllerRetainsOrDropsOpponent(t *testing.T) {
 			if err := grid.Insert(enemy); err != nil {
 				t.Fatal(err)
 			}
-			if err := grid.InsertCharacterBox(entity.NewCharacterBox("box", entity.Vector2{X: 2}, entity.WeaponBow)); err != nil {
+			if err := grid.InsertCharacterBox(entity.NewCharacterBox("box", entity.Vector2{X: 2}, entity.WeaponBow, entity.RarityCommon)); err != nil {
 				t.Fatal(err)
 			}
 			if err := grid.InsertExperiencePackage(entity.NewExperiencePackage("xp", entity.Vector2{Y: 1}, entity.ExperiencePackageTier_EXPERIENCE_PACKAGE_TIER_SMALL, 1)); err != nil {
@@ -291,7 +291,7 @@ func TestControllerCollectsOrWandersAgainstStrongerOpponent(t *testing.T) {
 	if err := grid.Insert(enemy); err != nil {
 		t.Fatal(err)
 	}
-	if err := grid.InsertCharacterBox(entity.NewCharacterBox("box", entity.Vector2{X: 2}, entity.WeaponBow)); err != nil {
+	if err := grid.InsertCharacterBox(entity.NewCharacterBox("box", entity.Vector2{X: 2}, entity.WeaponBow, entity.RarityCommon)); err != nil {
 		t.Fatal(err)
 	}
 	if err := grid.InsertExperiencePackage(entity.NewExperiencePackage("xp", entity.Vector2{Y: 1}, entity.ExperiencePackageTier_EXPERIENCE_PACKAGE_TIER_SMALL, 1)); err != nil {

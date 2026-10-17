@@ -4,9 +4,9 @@ Survival và battle royale tạo bot ngay trong `MatchInit`. Bot dùng cùng `en
 
 ## Chọn vũ khí cho bot
 
-Nhân vật đầu tiên của mỗi bot chọn ngẫu nhiên đều một `weapon_id` từ tám ID trong [`initial_character_inventory.json`](../modules/game/inventory/initial_character_inventory.json).
+Mỗi bot có inventory giả lập trong match, gồm toàn bộ weapon từ `weapons.json` ở cả ba rarity common, uncommon và rare. Starter được chọn ngẫu nhiên đều trong tập common đang sở hữu; bot được khởi tạo trước đợt spawn Character Box đầu tiên.
 
-Bot không có inventory tài khoản. Khi bot nhặt Character Box, server lấy character khởi đầu tương ứng với `weapon_type` của box từ cùng danh sách initial; box không mở khóa weapon ID trong inventory.
+Bot không có inventory tài khoản trong Storage. Khi nhặt Character Box, bot dùng cùng logic với người chơi: chỉ nhận weapon ID sở hữu trong inventory giả lập, khớp type và rarity của box. Bot góp các common sở hữu vào pool spawn khi chưa bị loại. Không sử dụng `initial_character_inventory.json` và không mở khóa ID vào Storage.
 
 ## Cấu hình
 

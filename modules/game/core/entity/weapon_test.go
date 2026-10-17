@@ -9,8 +9,8 @@ import (
 
 func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 	weapons := DefaultWeaponCatalog()
-	if len(weapons) != 32 {
-		t.Fatalf("expected 32 weapons, got %d", len(weapons))
+	if len(weapons) != 24 {
+		t.Fatalf("expected 24 weapons, got %d", len(weapons))
 	}
 
 	counts := make(map[WeaponType]int, 8)
@@ -30,21 +30,21 @@ func TestDefaultWeaponCatalogContainsAllWeaponTypes(t *testing.T) {
 		WeaponBow, WeaponStaff, WeaponSpear,
 		WeaponSword, WeaponAxe, WeaponBlunt, WeaponCrossbow, WeaponShield,
 	} {
-		if counts[weaponType] != 4 {
-			t.Fatalf("weapon type %q has %d ids, want 4", weaponType, counts[weaponType])
+		if counts[weaponType] != 3 {
+			t.Fatalf("weapon type %q has %d ids, want 3", weaponType, counts[weaponType])
 		}
 	}
 }
 
 func TestParseWeaponCatalogRejectsRemovedWandType(t *testing.T) {
-	data := []byte(`{"weapons":[{"type":"wand","weapon_id":"wand","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)
+	data := []byte(`{"weapons":[{"type":"wand","weapon_id":"wand","rarity":"common","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)
 	if _, err := ParseWeaponCatalog(data); err == nil || !strings.Contains(err.Error(), "unsupported weapon type") {
 		t.Fatalf("removed wand type was accepted: %v", err)
 	}
 }
 
 func TestParseWeaponCatalogAllowsVariantOfSupportedType(t *testing.T) {
-	data := []byte(`{"weapons":[{"type":"bow","weapon_id":"bow","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10},{"type":"bow","weapon_id":"bow_rare","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)
+	data := []byte(`{"weapons":[{"type":"bow","weapon_id":"bow","rarity":"common","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10},{"type":"bow","weapon_id":"bow_rare","rarity":"common","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)
 	weapons, err := ParseWeaponCatalog(data)
 	if err != nil || len(weapons) != 2 {
 		t.Fatalf("supported type variant was rejected: weapons=%+v err=%v", weapons, err)
@@ -52,7 +52,7 @@ func TestParseWeaponCatalogAllowsVariantOfSupportedType(t *testing.T) {
 }
 
 func TestParseWeaponCatalogRejectsDuplicateWeaponID(t *testing.T) {
-	data := []byte(`{"weapons":[{"type":"bow","weapon_id":"same","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10},{"type":"crossbow","weapon_id":"same","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)
+	data := []byte(`{"weapons":[{"type":"bow","weapon_id":"same","rarity":"common","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10},{"type":"crossbow","weapon_id":"same","rarity":"common","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)
 	if _, err := ParseWeaponCatalog(data); err == nil || !strings.Contains(err.Error(), "duplicate weapon id") {
 		t.Fatalf("expected duplicate weapon id error, got %v", err)
 	}
@@ -81,21 +81,21 @@ func TestWeaponReplacesAllCharacterStats(t *testing.T) {
 }
 
 func TestParseWeaponCatalogRejectsInvalidRangeClass(t *testing.T) {
-	_, err := ParseWeaponCatalog([]byte(`{"weapons":[{"type":"sword","name":"sword","range_class":"short","attack_speed":1,"impact_ratio":0.5}]}`))
+	_, err := ParseWeaponCatalog([]byte(`{"weapons":[{"type":"sword","name":"sword","rarity":"common","range_class":"short","attack_speed":1,"impact_ratio":0.5}]}`))
 	if err == nil {
 		t.Fatal("expected invalid range class to be rejected")
 	}
 }
 
 func TestParseWeaponCatalogRejectsMediumRangeClass(t *testing.T) {
-	_, err := ParseWeaponCatalog([]byte(`{"weapons":[{"type":"spear","name":"spear","range_class":"medium","attack_speed":1,"impact_ratio":0.5}]}`))
+	_, err := ParseWeaponCatalog([]byte(`{"weapons":[{"type":"spear","name":"spear","rarity":"common","range_class":"medium","attack_speed":1,"impact_ratio":0.5}]}`))
 	if err == nil {
 		t.Fatal("expected medium range class to be rejected")
 	}
 }
 
 func TestParseWeaponCatalogRejectsRemovedReachRangeClass(t *testing.T) {
-	_, err := ParseWeaponCatalog([]byte(`{"weapons":[{"type":"spear","name":"spear","range_class":"reach","attack_speed":1,"impact_ratio":0.5}]}`))
+	_, err := ParseWeaponCatalog([]byte(`{"weapons":[{"type":"spear","name":"spear","rarity":"common","range_class":"reach","attack_speed":1,"impact_ratio":0.5}]}`))
 	if err == nil {
 		t.Fatal("expected removed reach range class to be rejected")
 	}
@@ -103,9 +103,9 @@ func TestParseWeaponCatalogRejectsRemovedReachRangeClass(t *testing.T) {
 
 func TestParseWeaponCatalogRejectsInvalidAttackTiming(t *testing.T) {
 	tests := []string{
-		`{"weapons":[{"type":"sword","name":"sword","range_class":"melee","attack_speed":0,"impact_ratio":0.5}]}`,
-		`{"weapons":[{"type":"sword","name":"sword","range_class":"melee","attack_speed":1,"impact_ratio":0}]}`,
-		`{"weapons":[{"type":"sword","name":"sword","range_class":"melee","attack_speed":1,"impact_ratio":1.1}]}`,
+		`{"weapons":[{"type":"sword","name":"sword","rarity":"common","range_class":"melee","attack_speed":0,"impact_ratio":0.5}]}`,
+		`{"weapons":[{"type":"sword","name":"sword","rarity":"common","range_class":"melee","attack_speed":1,"impact_ratio":0}]}`,
+		`{"weapons":[{"type":"sword","name":"sword","rarity":"common","range_class":"melee","attack_speed":1,"impact_ratio":1.1}]}`,
 	}
 	for _, data := range tests {
 		if _, err := ParseWeaponCatalog([]byte(data)); err == nil {
@@ -115,14 +115,14 @@ func TestParseWeaponCatalogRejectsInvalidAttackTiming(t *testing.T) {
 }
 
 func TestParseWeaponCatalogRejectsRangedWeaponWithoutProjectileSpeed(t *testing.T) {
-	data := `{"weapons":[{"type":"bow","name":"bow","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":0}]}`
+	data := `{"weapons":[{"type":"bow","name":"bow","rarity":"common","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":0}]}`
 	if _, err := ParseWeaponCatalog([]byte(data)); err == nil {
 		t.Fatal("expected ranged weapon without projectile speed to be rejected")
 	}
 }
 
 func TestParseWeaponCatalogRejectsInvalidAttackRange(t *testing.T) {
-	data := `{"weapons":[{"type":"sword","name":"sword","range_class":"melee","attack_speed":1,"attack_range":-1,"impact_ratio":0.5,"projectile_speed":0}]}`
+	data := `{"weapons":[{"type":"sword","name":"sword","rarity":"common","range_class":"melee","attack_speed":1,"attack_range":-1,"impact_ratio":0.5,"projectile_speed":0}]}`
 	if _, err := ParseWeaponCatalog([]byte(data)); err == nil {
 		t.Fatal("expected negative attack range to fail")
 	}
@@ -174,7 +174,7 @@ func TestWeaponAttackAndCooldownStats(t *testing.T) {
 		}
 	}
 	for _, field := range []string{`"attack_count":0`, `"attack_count":-1`, `"cooldown_scale":0`, `"cooldown_scale":-1`} {
-		data := fmt.Sprintf(`{"weapons":[{"type":"sword","weapon_id":"sword","range_class":"melee","attack_speed":1,"impact_ratio":0.5,%s}]}`, field)
+		data := fmt.Sprintf(`{"weapons":[{"type":"sword","weapon_id":"sword","rarity":"common","range_class":"melee","attack_speed":1,"impact_ratio":0.5,%s}]}`, field)
 		if _, err := ParseWeaponCatalog([]byte(data)); err == nil {
 			t.Fatalf("invalid stat accepted: %s", field)
 		}
@@ -201,10 +201,29 @@ func TestParseWeaponCatalogValidatesDamageStats(t *testing.T) {
 		{"negative damage", `"damage":-1`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			data := fmt.Sprintf(`{"weapons":[{"type":"sword","name":"sword","range_class":"melee","attack_speed":1,"impact_ratio":0.5,%s}]}`, test.field)
+			data := fmt.Sprintf(`{"weapons":[{"type":"sword","name":"sword","rarity":"common","range_class":"melee","attack_speed":1,"impact_ratio":0.5,%s}]}`, test.field)
 			if _, err := ParseWeaponCatalog([]byte(data)); err == nil {
 				t.Fatalf("invalid stat accepted: %s", test.field)
 			}
 		})
+	}
+}
+
+func TestWeaponRarityDistributionAndValidation(t *testing.T) {
+	counts := map[Rarity]int{}
+	for _, weapon := range DefaultWeaponCatalog() {
+		counts[weapon.Rarity]++
+	}
+	if counts[RarityCommon] != 8 || counts[RarityUncommon] != 8 || counts[RarityRare] != 8 {
+		t.Fatalf("wrong rarity allocation: %v", counts)
+	}
+	for _, rarity := range []string{"", "legendary"} {
+		data := []byte(fmt.Sprintf(`{"weapons":[{"type":"bow","weapon_id":"test","rarity":%q,"range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`, rarity))
+		if _, err := ParseWeaponCatalog(data); err == nil {
+			t.Fatalf("accepted rarity %q", rarity)
+		}
+	}
+	if _, err := ParseWeaponCatalog([]byte(`{"weapons":[{"type":"bow","weapon_id":"test","range_class":"ranged","attack_speed":1,"impact_ratio":0.5,"projectile_speed":10}]}`)); err == nil {
+		t.Fatal("accepted missing rarity")
 	}
 }

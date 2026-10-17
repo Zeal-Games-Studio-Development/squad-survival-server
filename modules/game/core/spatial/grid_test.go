@@ -114,10 +114,10 @@ func TestRemoveAndLifecycleErrors(t *testing.T) {
 func TestQueryCharacterBoxesFiltersRadiusSortsAndRemoves(t *testing.T) {
 	grid := NewGrid(20)
 	boxes := []*entity.CharacterBox{
-		entity.NewCharacterBox("box:b", entity.Vector2{X: 0.6, Y: 0.8}, entity.WeaponBow),
-		entity.NewCharacterBox("box:a", entity.Vector2{X: -0.6, Y: -0.8}, entity.WeaponSword),
-		entity.NewCharacterBox("box:outside", entity.Vector2{X: 1.01}, entity.WeaponAxe),
-		entity.NewCharacterBox("box:negative", entity.Vector2{X: -0.1}, entity.WeaponCrossbow),
+		entity.NewCharacterBox("box:b", entity.Vector2{X: 0.6, Y: 0.8}, entity.WeaponBow, entity.RarityCommon),
+		entity.NewCharacterBox("box:a", entity.Vector2{X: -0.6, Y: -0.8}, entity.WeaponSword, entity.RarityCommon),
+		entity.NewCharacterBox("box:outside", entity.Vector2{X: 1.01}, entity.WeaponAxe, entity.RarityCommon),
+		entity.NewCharacterBox("box:negative", entity.Vector2{X: -0.1}, entity.WeaponCrossbow, entity.RarityCommon),
 	}
 	for _, box := range boxes {
 		if err := grid.InsertCharacterBox(box); err != nil {
@@ -150,7 +150,7 @@ func TestCharacterBoxLifecycleErrors(t *testing.T) {
 	if err := grid.InsertCharacterBox(&entity.CharacterBox{}); !errors.Is(err, ErrEmptyBoxID) {
 		t.Fatalf("expected empty box ID error, got %v", err)
 	}
-	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow, entity.RarityCommon)
 	if err := grid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
 	}

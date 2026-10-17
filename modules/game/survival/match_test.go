@@ -40,7 +40,7 @@ func (m inventoryTestModule) UsersGetId(_ context.Context, _ []string, _ []strin
 	return nil, nil
 }
 
-func TestInventoryGatesJoinAndProvidesInitialStarter(t *testing.T) {
+func TestInventoryGatesJoinAndProvidesOwnedStarter(t *testing.T) {
 	service := inventory.DefaultService()
 	match := &Match{inventory: service}
 	presence := testPresence{userID: "user-1", sessionID: "session-1"}
@@ -67,20 +67,18 @@ func TestInventoryGatesJoinAndProvidesInitialStarter(t *testing.T) {
 		t.Fatalf("player did not join with one character: %+v", player)
 	}
 	weapon := player.Characters[0].Weapon
-	initial, ok := service.InitialWeapon(weapon.Type)
-	if !ok || initial.ID != weapon.ID {
-		t.Fatalf("starter not selected from initial list: %+v", weapon)
+	if weapon.ID != "archer" || weapon.Rarity != entity.RarityCommon {
+		t.Fatalf("starter not selected from owned common weapons: %+v", weapon)
 	}
 }
 
-func TestCharacterBoxUsesInitialWeaponByType(t *testing.T) {
-	state := &State{}
-	for _, weaponType := range []entity.WeaponType{entity.WeaponBow, entity.WeaponStaff, entity.WeaponSpear, entity.WeaponSword, entity.WeaponAxe, entity.WeaponBlunt, entity.WeaponCrossbow, entity.WeaponShield} {
-		box := entity.NewCharacterBox("box", entity.Vector2{}, weaponType)
-		selected, ok := state.weaponForBox(box)
-		initial, initialOK := inventory.DefaultService().InitialWeapon(weaponType)
-		if !ok || !initialOK || selected.ID != initial.ID {
-			t.Fatalf("wrong initial weapon for %s: %+v", weaponType, selected)
+func TestCharacterBoxUsesOwnedWeaponByType(t *testing.T) {
+	state := &State{OwnedWeapons: map[string][]entity.Weapon{"player": commonTestWeapons()}}
+	for _, weapon := range commonTestWeapons() {
+		box := entity.NewCharacterBox("box", entity.Vector2{}, weapon.Type, entity.RarityCommon)
+		matches := state.weaponsForBox(box, "player")
+		if len(matches) != 1 || matches[0].ID != weapon.ID {
+			t.Fatalf("wrong owned weapon: %+v", matches)
 		}
 	}
 }
@@ -127,7 +125,7 @@ func TestJoinAndLeaveUpdateCapacityLabel(t *testing.T) {
 		random:       rand.New(rand.NewSource(1)),
 	}
 
-	match.MatchJoin(nil, nil, nil, nil, dispatcher, 0, state, []runtime.Presence{presence})
+	match.MatchJoin(nil, nil, nil, commonInventoryModule(), dispatcher, 0, state, []runtime.Presence{presence})
 	if state.Players[presence.sessionID].DisplayName != presence.userID {
 		t.Fatalf("expected username fallback, got %q", state.Players[presence.sessionID].DisplayName)
 	}
@@ -183,7 +181,7 @@ func TestJoinAndLeaveUpdateActiveMatchRegistry(t *testing.T) {
 		random:       rand.New(rand.NewSource(1)),
 	}
 
-	match.MatchJoin(nil, nil, nil, nil, dispatcher, 0, state, []runtime.Presence{presence})
+	match.MatchJoin(nil, nil, nil, commonInventoryModule(), dispatcher, 0, state, []runtime.Presence{presence})
 	if matchID, ok := registry.MatchForUser(presence.userID); !ok || matchID != state.MatchID {
 		t.Fatalf("unexpected active match: %q, %v", matchID, ok)
 	}
@@ -738,6 +736,8 @@ func TestMatchLoopSendsReliableCombatEventsToRelevantViewers(t *testing.T) {
 
 func TestCharacterBoxInitialSpawnIsValid(t *testing.T) {
 	state := characterBoxTestState(7)
+	state.Players["pool"] = entity.NewPlayer("pool", "pool", "Pool", entity.Vector2{X: 500}, state.random)
+	state.OwnedWeapons = map[string][]entity.Weapon{"pool": commonTestWeapons()}
 	events := state.spawnCharacterBoxes(80)
 	if len(events) != 80 || len(state.CharacterBoxes) != 80 {
 		t.Fatalf("unexpected box count: events=%d boxes=%d", len(events), len(state.CharacterBoxes))
@@ -781,10 +781,18 @@ func TestCharacterBoxCollisionAwardsNearestPlayerAndDespawnsGlobally(t *testing.
 	variant.Damage = 99
 	state.WeaponCatalog = append(state.WeaponCatalog, variant)
 	state.Players[far.SessionID] = far
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[far.SessionID] = commonTestWeapons()
 	state.Players[near.SessionID] = near
-	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
-	if boxWeapon, ok := state.weaponForBox(box); !ok || boxWeapon.ID != "archer" {
-		t.Fatalf("bow box did not use initial weapon: %+v", boxWeapon)
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[near.SessionID] = commonTestWeapons()
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow, entity.RarityCommon)
+	if boxWeapon, ok := characterbox.Choose(state.random, state.weaponsForBox(box, near.SessionID)); !ok || boxWeapon.ID != "archer" {
+		t.Fatalf("bow box did not use owned common weapon: %+v", boxWeapon)
 	}
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
@@ -830,7 +838,11 @@ func TestCharacterBoxRemainsWhenPlayerIsAtCapacity(t *testing.T) {
 		}
 	}
 	state.Players[player.SessionID] = player
-	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe)
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[player.SessionID] = commonTestWeapons()
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe, entity.RarityCommon)
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
@@ -848,7 +860,11 @@ func TestCharacterBoxPickupCancelsOutsideRadiusAndAllowsRetry(t *testing.T) {
 	player := entity.NewPlayer("user-1", "session-1", "Player", entity.Vector2{}, rand.New(rand.NewSource(2)))
 	player.Level = 2
 	state.Players[player.SessionID] = player
-	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe)
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[player.SessionID] = commonTestWeapons()
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe, entity.RarityCommon)
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
@@ -874,7 +890,11 @@ func TestCharacterBoxPickupCancelsWhenRuntimeCapacityIsReached(t *testing.T) {
 	player := entity.NewPlayer("user-1", "session-1", "Player", entity.Vector2{}, rand.New(rand.NewSource(2)))
 	player.Level = 2
 	state.Players[player.SessionID] = player
-	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe)
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[player.SessionID] = commonTestWeapons()
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponAxe, entity.RarityCommon)
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
@@ -901,8 +921,12 @@ func TestCharacterBoxPickupAllowsOnlyOneClaimPerPlayer(t *testing.T) {
 	player := entity.NewPlayer("user-1", "session-1", "Player", entity.Vector2{}, rand.New(rand.NewSource(2)))
 	player.Level = 2
 	state.Players[player.SessionID] = player
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[player.SessionID] = commonTestWeapons()
 	for _, id := range []string{"box:1", "box:2"} {
-		box := entity.NewCharacterBox(id, entity.Vector2{}, entity.WeaponAxe)
+		box := entity.NewCharacterBox(id, entity.Vector2{}, entity.WeaponAxe, entity.RarityCommon)
 		state.CharacterBoxes[id] = box
 		if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 			t.Fatal(err)
@@ -921,14 +945,22 @@ func TestEliminatedPlayerCannotCollectCharacterBoxButRemainsInWorld(t *testing.T
 	eliminated.RemoveDeadCharacters()
 	detector := entity.NewPlayer("user-alive", "session-alive", "Alive", entity.Vector2{X: 0.5}, rand.New(rand.NewSource(3)))
 	state.Players[eliminated.SessionID] = eliminated
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[eliminated.SessionID] = commonTestWeapons()
 	state.Players[detector.SessionID] = detector
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[detector.SessionID] = commonTestWeapons()
 	if err := state.SpatialGrid.Insert(eliminated); err != nil {
 		t.Fatal(err)
 	}
 	if err := state.SpatialGrid.Insert(detector); err != nil {
 		t.Fatal(err)
 	}
-	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow)
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponBow, entity.RarityCommon)
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
@@ -958,8 +990,16 @@ func TestCharacterBoxCollisionTieBreaksBySessionID(t *testing.T) {
 	playerA.Level = 2
 	playerB.Level = 2
 	state.Players[playerB.SessionID] = playerB
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[playerB.SessionID] = commonTestWeapons()
 	state.Players[playerA.SessionID] = playerA
-	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponStaff)
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[playerA.SessionID] = commonTestWeapons()
+	box := entity.NewCharacterBox("box:1", entity.Vector2{}, entity.WeaponStaff, entity.RarityCommon)
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
@@ -976,6 +1016,8 @@ func TestCharacterBoxCollisionTieBreaksBySessionID(t *testing.T) {
 
 func TestCharacterBoxRefillAndJoinSnapshot(t *testing.T) {
 	state := characterBoxTestState(4)
+	state.Players["pool"] = entity.NewPlayer("pool", "pool", "Pool", entity.Vector2{X: 500}, state.random)
+	state.OwnedWeapons = map[string][]entity.Weapon{"pool": commonTestWeapons()}
 	state.spawnCharacterBoxes(60)
 	state.ensureCharacterBoxState(10)
 	boxIDs := make([]string, 0, len(state.CharacterBoxes))
@@ -1159,4 +1201,18 @@ func (d *testDispatcher) MatchKick([]runtime.Presence) error { return nil }
 func (d *testDispatcher) MatchLabelUpdate(label string) error {
 	d.label = label
 	return nil
+}
+
+func commonTestWeapons() []entity.Weapon {
+	var weapons []entity.Weapon
+	for _, weapon := range entity.DefaultWeaponCatalog() {
+		if weapon.Rarity == entity.RarityCommon {
+			weapons = append(weapons, weapon)
+		}
+	}
+	return weapons
+}
+
+func commonInventoryModule() inventoryTestModule {
+	return inventoryTestModule{value: `{"weapon_ids":["archer","novice_mage","farmer","swordman","axeman","bruiser","hunter","shieldbearer"]}`}
 }

@@ -45,7 +45,7 @@ Roster gửi `skill_cooldowns` ở field 17 của từng character khi join ho�
 
 Unity gửi `ActivateSkillInput { character_id, skill_id }` qua opcode `2` reliable khi chủ sở hữu bấm skill. Server kiểm tra lại điều kiện tại tick nhận lệnh; `SkillStarted` trong opcode `103` xác nhận thành công. Nếu lệnh không hợp lệ, server bỏ qua và không gửi sự kiện từ chối. Client chỉ dùng `ready_skill_ids` của chính player để bật nút skill; state của observer dùng để hiển thị character khác. Generated `Input.cs` và `SkillState.cs` cần được copy sang Unity repo riêng sau khi generate.
 
-`CharacterRoster`, `AttackStarted` và `ProjectileSpawned` dùng `weapon_id` thay cho `weapon_name` tại cùng field number protobuf. `CharacterBoxValue` chỉ gửi `weapon_type` ở field 1; `weapon_id` được chọn theo loadout của người nhặt và xuất hiện trong roster của character mới. Client cần regenerate protobuf; client cũ có thể đọc ID thành `weapon_name`.
+`CharacterRoster`, `AttackStarted` và `ProjectileSpawned` dùng `weapon_id` thay cho `weapon_name` tại cùng field number protobuf. `CharacterBoxValue` gửi `weapon_type` ở field 1 và `string rarity` ở field 2 (`common`, `uncommon`, `rare`); hiện mọi box spawn có rarity `common`. Rarity lấy từ box cho cả event spawn và snapshot join; `weapon_id` được chọn từ inventory snapshot của người nhặt, khớp type/rarity và xuất hiện trong roster của character mới. Client cần regenerate protobuf; client cũ có thể đọc ID thành `weapon_name`.
 
 ## Packet Flow
 
@@ -151,3 +151,5 @@ Unity cần Nakama SDK và `Google.Protobuf` runtime, không cần cài Buf ho�
 - RPC `healthcheck` response.
 
 Realtime opcode `1`, `2`, `101`, `102`, `103`, `104`, `105`, `106`, `107`, `108`, `109`, `110` đều dùng Protobuf binary.
+
+Sau khi chạy `buf generate`, copy `clients/unity/Generated/Protobuf/CharacterBox.cs` sang Unity repo để đọc `Value.Rarity`. Thư mục generated client được gitignore theo quy ước của repo. Field mới giữ nguyên các field number hiện có; roster không thay đổi trong refactor rarity.

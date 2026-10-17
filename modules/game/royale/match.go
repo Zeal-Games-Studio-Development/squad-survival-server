@@ -82,7 +82,7 @@ type State struct {
 	BoxClaims           map[string]characterbox.Claim
 	ClaimedBoxBySession map[string]string
 	BoxPickupDelays     map[int]int64
-	initialInventory    *inventory.Service
+	OwnedWeapons        map[string][]entity.Weapon
 	random              *rand.Rand // Gameplay RNG: spawn, weapon, combat, and damage.
 	aiRandom            *rand.Rand
 }
@@ -100,6 +100,13 @@ func NewMatchHandler(registry *matchregistry.Registry, inventoryService ...*inve
 		match := &Match{registry: registry}
 		if len(inventoryService) > 0 {
 			match.inventory = inventoryService[0]
+		}
+		if match.inventory == nil {
+			service, err := inventory.NewCatalogService(entity.DefaultWeaponCatalog())
+			if err != nil {
+				return nil, err
+			}
+			match.inventory = service
 		}
 		return match, nil
 	}
@@ -130,10 +137,11 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		BoxClaims:           make(map[string]characterbox.Claim),
 		ClaimedBoxBySession: make(map[string]string),
 		BoxPickupDelays:     characterbox.DefaultDelays(),
-		initialInventory:    m.inventory,
+		OwnedWeapons:        make(map[string][]entity.Weapon),
 		random:              rand.New(rand.NewSource(randomSeed)),
 		aiRandom:            rand.New(rand.NewSource(randomSeed + 2)),
 	}
+	state.spawnAI()
 	initialBoxTarget := state.randomCharacterBoxTarget()
 	state.spawnCharacterBoxes(initialBoxTarget)
 	if len(state.CharacterBoxes) < initialBoxTarget {
@@ -143,7 +151,6 @@ func (m *Match) MatchInit(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 	if spawned := state.Experience.SpawnMissing(state.Players); spawned < state.Experience.TargetCount() {
 		logger.Warn("Could not place all initial experience packages: spawned=%d target=%d", spawned, state.Experience.TargetCount())
 	}
-	state.spawnAI()
 	logger.Info("Battle royale match initialized: mode=%s max_players=%d ai_count=%d", state.Mode, MaxPlayers, len(state.AIControllers))
 	return state, tickRate, state.label()
 }
@@ -165,7 +172,7 @@ func (m *Match) MatchJoinAttempt(ctx context.Context, _ runtime.Logger, _ *sql.D
 		return state, false, "match is full"
 	}
 	if m.inventory != nil {
-		if _, err := m.inventory.Load(ctx, nk, presence.GetUserId()); err != nil {
+		if data, err := m.inventory.Load(ctx, nk, presence.GetUserId()); err != nil || len(characterbox.Filter(characterbox.Owned(state.catalog(), data.WeaponIDs), "", entity.RarityCommon)) == 0 {
 			return state, false, "invalid character inventory"
 		}
 	}
@@ -187,8 +194,23 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 		if _, exists := state.Players[presence.GetSessionId()]; exists {
 			continue
 		}
-		if m.inventory != nil {
-			_, loadErr := m.inventory.Load(ctx, nk, presence.GetUserId())
+		var owned []entity.Weapon
+		if nk != nil {
+			service := m.inventory
+			if service == nil {
+				var serviceErr error
+				service, serviceErr = inventory.NewCatalogService(state.catalog())
+				if serviceErr != nil {
+					if logger != nil {
+						logger.Error("Could not initialize inventory catalog: %v", serviceErr)
+					}
+					if kickErr := dispatcher.MatchKick([]runtime.Presence{presence}); kickErr != nil && logger != nil {
+						logger.Error("Could not kick presence: %v", kickErr)
+					}
+					continue
+				}
+			}
+			data, loadErr := service.Load(ctx, nk, presence.GetUserId())
 			if loadErr != nil {
 				if logger != nil {
 					logger.Error("Could not load character inventory: user_id=%s error=%v", presence.GetUserId(), loadErr)
@@ -198,11 +220,12 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 				}
 				continue
 			}
+			owned = characterbox.Owned(state.catalog(), data.WeaponIDs)
 		}
-		starter, starterErr := state.initialWeaponService().Starter(state.random)
-		if starterErr != nil {
+		starter, starterOK := characterbox.Choose(state.random, characterbox.Filter(owned, "", entity.RarityCommon))
+		if !starterOK {
 			if logger != nil {
-				logger.Error("Could not choose initial character: user_id=%s error=%v", presence.GetUserId(), starterErr)
+				logger.Error("Could not choose initial character: user_id=%s", presence.GetUserId())
 			}
 			if kickErr := dispatcher.MatchKick([]runtime.Presence{presence}); kickErr != nil && logger != nil {
 				logger.Error("Could not kick presence without initial character: %v", kickErr)
@@ -228,6 +251,10 @@ func (m *Match) MatchJoin(ctx context.Context, logger runtime.Logger, _ *sql.DB,
 			}
 			continue
 		}
+		if state.OwnedWeapons == nil {
+			state.OwnedWeapons = make(map[string][]entity.Weapon)
+		}
+		state.OwnedWeapons[presence.GetSessionId()] = owned
 		state.Players[presence.GetSessionId()] = player
 		state.Presences[presence.GetSessionId()] = presence
 		if state.Phase == PhaseWaiting && state.WaitingEndsAtTick == 0 {
@@ -288,6 +315,7 @@ func (m *Match) MatchLeave(_ context.Context, logger runtime.Logger, _ *sql.DB, 
 			logger.Error("Could not remove player from spatial grid: session_id=%s", presence.GetSessionId())
 		}
 		delete(state.Players, presence.GetSessionId())
+		delete(state.OwnedWeapons, presence.GetSessionId())
 		delete(state.Presences, presence.GetSessionId())
 		state.removeRosterTracking(presence.GetSessionId())
 		state.removeProgressionTracking(presence.GetSessionId())
@@ -623,13 +651,15 @@ func (s *State) spawnCharacterBoxes(target int) []system.CharacterBoxEvent {
 	if target <= len(s.CharacterBoxes) || len(s.WeaponCatalog) == 0 {
 		return nil
 	}
-	weaponTypes := make([]entity.WeaponType, 0, len(s.WeaponCatalog))
-	seenTypes := make(map[entity.WeaponType]bool, len(s.WeaponCatalog))
-	for _, weapon := range s.WeaponCatalog {
-		if !seenTypes[weapon.Type] {
-			weaponTypes = append(weaponTypes, weapon.Type)
-			seenTypes[weapon.Type] = true
+	var inventories [][]entity.Weapon
+	for sessionID, player := range s.Players {
+		if player != nil && !player.IsEliminated() {
+			inventories = append(inventories, s.OwnedWeapons[sessionID])
 		}
+	}
+	weaponTypes := characterbox.SpawnTypes(s.WeaponCatalog, inventories)
+	if len(weaponTypes) == 0 {
+		return nil
 	}
 	events := make([]system.CharacterBoxEvent, 0, target-len(s.CharacterBoxes))
 	for len(s.CharacterBoxes) < target {
@@ -639,7 +669,7 @@ func (s *State) spawnCharacterBoxes(target int) []system.CharacterBoxEvent {
 		}
 		s.NextCharacterBoxID++
 		weaponType := weaponTypes[s.random.Intn(len(weaponTypes))]
-		box := entity.NewCharacterBox("box:"+strconv.FormatUint(s.NextCharacterBoxID, 10), position, weaponType)
+		box := entity.NewCharacterBox("box:"+strconv.FormatUint(s.NextCharacterBoxID, 10), position, weaponType, entity.RarityCommon)
 		if err := s.SpatialGrid.InsertCharacterBox(box); err != nil {
 			continue
 		}
@@ -711,7 +741,7 @@ func (s *State) collectCharacterBoxes(tick int64, logger runtime.Logger) []syste
 		claim := s.BoxClaims[boxID]
 		box := s.CharacterBoxes[boxID]
 		player := s.Players[claim.SessionID]
-		valid := box != nil && player != nil && !player.IsEliminated() && player.CharacterCount() < player.MaxCharacters() && distanceSquared(player.Position, box.Position) <= entity.CharacterBoxCollisionRadius*entity.CharacterBoxCollisionRadius
+		valid := box != nil && player != nil && len(s.weaponsForBox(box, player.SessionID)) > 0 && !player.IsEliminated() && player.CharacterCount() < player.MaxCharacters() && distanceSquared(player.Position, box.Position) <= entity.CharacterBoxCollisionRadius*entity.CharacterBoxCollisionRadius
 		if !valid {
 			events = append(events, s.cancelBoxClaim(boxID)...)
 			continue
@@ -719,10 +749,10 @@ func (s *State) collectCharacterBoxes(tick int64, logger runtime.Logger) []syste
 		if tick < claim.CompletesAtTick {
 			continue
 		}
-		weapon, ok := s.weaponForBox(box)
+		weapon, ok := characterbox.Choose(s.random, s.weaponsForBox(box, player.SessionID))
 		if !ok {
 			if logger != nil {
-				logger.Error("Character box has no initial weapon: box_id=%s user_id=%s weapon_type=%s", box.ID, player.UserID, box.WeaponType())
+				logger.Error("Character box has no owned weapon: box_id=%s user_id=%s weapon_type=%s", box.ID, player.UserID, box.WeaponType())
 			}
 			events = append(events, s.cancelBoxClaim(boxID)...)
 			continue
@@ -761,7 +791,7 @@ func (s *State) collectCharacterBoxes(tick int64, logger runtime.Logger) []syste
 			return collisions[i].distanceSquared < collisions[j].distanceSquared
 		})
 		for _, collision := range collisions {
-			if collision.player.CharacterCount() >= collision.player.MaxCharacters() {
+			if collision.player.CharacterCount() >= collision.player.MaxCharacters() || len(s.weaponsForBox(box, collision.player.SessionID)) == 0 {
 				continue
 			}
 			if _, claimed := s.ClaimedBoxBySession[collision.player.SessionID]; claimed {
@@ -815,18 +845,18 @@ func (s *State) cancelAllBoxClaims() []system.CharacterBoxEvent {
 	return events
 }
 
-func (s *State) initialWeaponService() *inventory.Service {
-	if s.initialInventory == nil {
-		s.initialInventory = inventory.DefaultService()
+func (s *State) catalog() []entity.Weapon {
+	if len(s.WeaponCatalog) == 0 {
+		s.WeaponCatalog = entity.DefaultWeaponCatalog()
 	}
-	return s.initialInventory
+	return s.WeaponCatalog
 }
 
-func (s *State) weaponForBox(box *entity.CharacterBox) (entity.Weapon, bool) {
+func (s *State) weaponsForBox(box *entity.CharacterBox, sessionID string) []entity.Weapon {
 	if box == nil {
-		return entity.Weapon{}, false
+		return nil
 	}
-	return s.initialWeaponService().InitialWeapon(box.WeaponType())
+	return characterbox.Filter(s.OwnedWeapons[sessionID], box.WeaponType(), box.Rarity())
 }
 
 func (s *State) sendCurrentCharacterBoxes(logger runtime.Logger, dispatcher runtime.MatchDispatcher, tick int64, presence runtime.Presence) {

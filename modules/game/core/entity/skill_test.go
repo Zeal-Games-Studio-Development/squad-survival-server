@@ -7,7 +7,7 @@ import (
 
 func TestDefaultSkillCatalogAndWeaponBinding(t *testing.T) {
 	skills := DefaultSkillCatalog()
-	if len(skills) != 1 || skills[0].ID != "sword_cone" || len(skills[0].WeaponIDs) != 4 {
+	if len(skills) != 1 || skills[0].ID != "sword_cone" || len(skills[0].WeaponIDs) != 3 {
 		t.Fatalf("unexpected default skills: %+v", skills)
 	}
 	for _, weapon := range DefaultWeaponCatalog() {
@@ -33,9 +33,9 @@ func TestDefaultSkillCatalogAndWeaponBinding(t *testing.T) {
 
 func TestParseSkillCatalogRejectsInvalidWeaponBindings(t *testing.T) {
 	for _, change := range []struct{ old, replacement string }{
-		{`"sword_sturdy"`, `"missing"`},
-		{`"sword_sturdy"`, `"swordman"`},
-		{`"sword_sturdy"`, `""`},
+		{`"swordman_rare"`, `"missing"`},
+		{`"swordman_rare"`, `"swordman"`},
+		{`"swordman_rare"`, `""`},
 	} {
 		data := strings.Replace(string(defaultSkillJSON), change.old, change.replacement, 1)
 		if _, err := ParseSkillCatalog([]byte(data), DefaultWeaponCatalog()); err == nil {

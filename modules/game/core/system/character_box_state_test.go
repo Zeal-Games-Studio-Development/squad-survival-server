@@ -9,7 +9,7 @@ import (
 )
 
 func TestEncodeCharacterBoxStateBatch(t *testing.T) {
-	box := entity.NewCharacterBox("box:1", entity.Vector2{X: 3, Y: -4}, entity.WeaponCrossbow)
+	box := entity.NewCharacterBox("box:1", entity.Vector2{X: 3, Y: -4}, entity.WeaponCrossbow, entity.RarityCommon)
 	data, err := EncodeCharacterBoxStateBatch(42, []CharacterBoxEvent{
 		SpawnedCharacterBox(box),
 		CharacterBoxPickupStarted(box.ID, "session-1", 42, 52),
@@ -27,7 +27,7 @@ func TestEncodeCharacterBoxStateBatch(t *testing.T) {
 		t.Fatalf("unexpected batch: %+v", &batch)
 	}
 	spawned := batch.Events[0]
-	if spawned.EventType != CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_SPAWNED || spawned.BoxId != box.ID || spawned.Position.X != 3 || spawned.Position.Y != -4 || spawned.Value.WeaponType != "crossbow" {
+	if spawned.EventType != CharacterBoxEventType_CHARACTER_BOX_EVENT_TYPE_SPAWNED || spawned.BoxId != box.ID || spawned.Position.X != 3 || spawned.Position.Y != -4 || spawned.Value.WeaponType != "crossbow" || spawned.Value.Rarity != "common" {
 		t.Fatalf("unexpected spawn event: %+v", spawned)
 	}
 	started := batch.Events[1]
@@ -56,5 +56,25 @@ func TestEncodeCharacterBoxStateBatchRejectsInvalidEvents(t *testing.T) {
 	}
 	if _, err := EncodeCharacterBoxStateBatch(1, []CharacterBoxEvent{CharacterBoxPickupCancelled("", "session-1")}); err == nil {
 		t.Fatal("expected invalid pickup cancelled error")
+	}
+}
+
+func TestBoxSnapshotPreservesRarity(t *testing.T) {
+	for _, rarity := range []entity.Rarity{entity.RarityCommon, entity.RarityUncommon, entity.RarityRare} {
+		data, err := EncodeCharacterBoxStateBatch(1, []CharacterBoxEvent{SpawnedCharacterBox(entity.NewCharacterBox("box", entity.Vector2{}, entity.WeaponBow, rarity))})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var batch CharacterBoxStateBatch
+		if err := proto.Unmarshal(data, &batch); err != nil {
+			t.Fatal(err)
+		}
+		if batch.Events[0].Value.Rarity != string(rarity) {
+			t.Fatalf("lost rarity %s", rarity)
+		}
+	}
+	box := entity.NewCharacterBox("invalid", entity.Vector2{}, entity.WeaponBow, entity.Rarity("invalid"))
+	if _, err := EncodeCharacterBoxStateBatch(1, []CharacterBoxEvent{SpawnedCharacterBox(box)}); err == nil {
+		t.Fatal("accepted invalid rarity")
 	}
 }

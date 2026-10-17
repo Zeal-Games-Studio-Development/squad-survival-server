@@ -51,10 +51,17 @@ func TestAIInitUsesConfiguredPopulation(t *testing.T) {
 		if player.Characters[0].ID != player.UserID+":1" {
 			t.Fatal("character identity does not belong to bot")
 		}
+		if len(state.OwnedWeapons[sessionID]) != len(state.WeaponCatalog) {
+			t.Fatal("bot inventory missing catalog weapons")
+		}
+		for index, owned := range state.OwnedWeapons[sessionID] {
+			if owned != state.WeaponCatalog[index] {
+				t.Fatalf("bot inventory differs from catalog at index %d: %+v", index, owned)
+			}
+		}
 		weapon := player.Characters[0].Weapon
-		initial, ok := state.initialWeaponService().InitialWeapon(weapon.Type)
-		if !ok || initial.ID != weapon.ID {
-			t.Fatalf("AI starter is outside initial list: %+v", weapon)
+		if weapon.Rarity != entity.RarityCommon {
+			t.Fatalf("AI starter is outside common catalog: %+v", weapon)
 		}
 		found := false
 		for _, visible := range state.SpatialGrid.QueryPlayers(&entity.Player{SessionID: "probe", Position: player.Position, DetectionRadius: 0.001}) {
@@ -82,7 +89,7 @@ func TestAILeavesAllHumanSlotsAvailable(t *testing.T) {
 		if _, allowed, reason := match.MatchJoinAttempt(nil, nil, nil, nil, dispatcher, 1, state, presence, nil); !allowed {
 			t.Fatalf("human %d rejected: %s", i, reason)
 		}
-		match.MatchJoin(nil, nil, nil, nil, dispatcher, 1, state, []runtime.Presence{presence})
+		match.MatchJoin(nil, nil, nil, commonInventoryModule(), dispatcher, 1, state, []runtime.Presence{presence})
 		if i == WaitingPlayerLimit-1 {
 			match.MatchLoop(nil, aiTestLogger{}, nil, nil, dispatcher, 1, state, nil)
 		}
@@ -116,7 +123,7 @@ func TestAIVisibleToHumansWithoutNetworkObservers(t *testing.T) {
 	match, state := newAITestMatch(t)
 	dispatcher := &testDispatcher{}
 	presence := testPresence{userID: "human", sessionID: "human-session"}
-	match.MatchJoin(nil, nil, nil, nil, dispatcher, 1, state, []runtime.Presence{presence})
+	match.MatchJoin(nil, nil, nil, commonInventoryModule(), dispatcher, 1, state, []runtime.Presence{presence})
 	human := state.Players[presence.sessionID]
 	var bot *entity.Player
 	for _, controller := range state.AIControllers {
@@ -213,7 +220,7 @@ func TestAIUsesNormalPickupProgressionAndCombat(t *testing.T) {
 	if err := state.SpatialGrid.Move(bot); err != nil {
 		t.Fatal(err)
 	}
-	box := entity.NewCharacterBox("ai-box", bot.Position, entity.WeaponBow)
+	box := entity.NewCharacterBox("ai-box", bot.Position, entity.WeaponBow, entity.RarityCommon)
 	state.CharacterBoxes[box.ID] = box
 	if err := state.SpatialGrid.InsertCharacterBox(box); err != nil {
 		t.Fatal(err)
@@ -251,6 +258,10 @@ func TestAIUsesNormalPickupProgressionAndCombat(t *testing.T) {
 		}
 	}
 	state.Players[opponent.SessionID] = opponent
+	if state.OwnedWeapons == nil {
+		state.OwnedWeapons = make(map[string][]entity.Weapon)
+	}
+	state.OwnedWeapons[opponent.SessionID] = commonTestWeapons()
 	state.AIControllers[opponent.SessionID] = ai.NewController(opponent)
 	if err := state.SpatialGrid.Insert(opponent); err != nil {
 		t.Fatal(err)

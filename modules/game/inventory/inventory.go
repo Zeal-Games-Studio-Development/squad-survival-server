@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand"
 
 	"squad-survival-be/modules/game/core/entity"
 
@@ -43,16 +42,16 @@ type Store interface {
 }
 
 type Service struct {
-	byID          map[string]entity.Weapon
-	initialIDs    []string
-	initialByType map[entity.WeaponType]entity.Weapon
+	byID       map[string]entity.Weapon
+	initialIDs []string
 }
 
-func NewService(weapons []entity.Weapon, initialIDs []string) (*Service, error) {
+// NewCatalogService validates stored inventories without loading account bootstrap data.
+func NewCatalogService(weapons []entity.Weapon) (*Service, error) {
 	if len(weapons) == 0 {
 		return nil, errors.New("weapon catalog is empty")
 	}
-	service := &Service{byID: make(map[string]entity.Weapon, len(weapons)), initialIDs: append([]string(nil), initialIDs...), initialByType: make(map[entity.WeaponType]entity.Weapon, len(requiredTypes))}
+	service := &Service{byID: make(map[string]entity.Weapon, len(weapons))}
 	types := make(map[entity.WeaponType]bool)
 	for _, weapon := range weapons {
 		if weapon.ID == "" || weapon.Type == "" {
@@ -72,18 +71,28 @@ func NewService(weapons []entity.Weapon, initialIDs []string) (*Service, error) 
 			return nil, fmt.Errorf("missing weapon type %q", weaponType)
 		}
 	}
+	return service, nil
+}
+
+func NewService(weapons []entity.Weapon, initialIDs []string) (*Service, error) {
+	service, err := NewCatalogService(weapons)
+	if err != nil {
+		return nil, err
+	}
+	service.initialIDs = append([]string(nil), initialIDs...)
 	if len(initialIDs) != len(requiredTypes) {
 		return nil, fmt.Errorf("initial inventory must contain exactly %d weapon ids", len(requiredTypes))
 	}
+	initialTypes := make(map[entity.WeaponType]bool)
 	for _, id := range initialIDs {
 		weapon, ok := service.byID[id]
 		if !ok {
 			return nil, fmt.Errorf("initial inventory has unknown weapon id %q", id)
 		}
-		if _, exists := service.initialByType[weapon.Type]; exists {
+		if initialTypes[weapon.Type] {
 			return nil, fmt.Errorf("initial inventory has duplicate weapon type %q", weapon.Type)
 		}
-		service.initialByType[weapon.Type] = weapon
+		initialTypes[weapon.Type] = true
 	}
 	if err := service.Validate(Data{WeaponIDs: initialIDs}); err != nil {
 		return nil, err
@@ -106,6 +115,9 @@ func DefaultService() *Service {
 }
 
 func (s *Service) InitialData() (Data, error) {
+	if len(s.initialIDs) == 0 {
+		return Data{}, errors.New("initial inventory is not configured")
+	}
 	return Data{WeaponIDs: append([]string(nil), s.initialIDs...)}, nil
 }
 
@@ -121,18 +133,6 @@ func (s *Service) Validate(data Data) error {
 		owned[id] = true
 	}
 	return nil
-}
-
-func (s *Service) Starter(random *rand.Rand) (entity.Weapon, error) {
-	if random == nil {
-		return entity.Weapon{}, errors.New("starter random source is required")
-	}
-	return s.byID[s.initialIDs[random.Intn(len(s.initialIDs))]], nil
-}
-
-func (s *Service) InitialWeapon(weaponType entity.WeaponType) (entity.Weapon, bool) {
-	weapon, ok := s.initialByType[weaponType]
-	return weapon, ok
 }
 
 func (s *Service) Load(ctx context.Context, store Store, userID string) (Data, error) {

@@ -10,6 +10,18 @@ import (
 
 type WeaponType string
 
+type Rarity string
+
+const (
+	RarityCommon   Rarity = "common"
+	RarityUncommon Rarity = "uncommon"
+	RarityRare     Rarity = "rare"
+)
+
+func (r Rarity) Valid() bool {
+	return r == RarityCommon || r == RarityUncommon || r == RarityRare
+}
+
 type RangeClass string
 
 const (
@@ -29,6 +41,7 @@ const (
 )
 
 type Weapon struct {
+	Rarity          Rarity     `json:"rarity"`
 	Type            WeaponType `json:"type"`
 	ID              string     `json:"weapon_id"`
 	RangeClass      RangeClass `json:"range_class"`
@@ -90,6 +103,9 @@ func ParseWeaponCatalog(data []byte) ([]Weapon, error) {
 			return nil, fmt.Errorf("duplicate weapon id %q", weapon.ID)
 		}
 		seenIDs[weapon.ID] = struct{}{}
+		if !weapon.Rarity.Valid() {
+			return nil, fmt.Errorf("weapon %q rarity must be common, uncommon or rare", weapon.ID)
+		}
 		if !weapon.RangeClass.Valid() {
 			return nil, errors.New("weapon range class must be melee or ranged")
 		}

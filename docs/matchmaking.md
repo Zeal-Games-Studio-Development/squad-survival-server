@@ -30,7 +30,7 @@ Nếu user đã join một authoritative match, RPC trả lại chính `match_id
 
 `mode` mặc định là `survival` và chỉ nhận 1-32 ký tự chữ, số, `_` hoặc `-`.
 
-Server chỉ tìm/tạo match khi tài khoản có character inventory với ít nhất một `weapon_id` hợp lệ, không trùng; không yêu cầu sở hữu đủ tám weapon type. Callback matchmaker kiểm tra từng thành viên trước khi trả match ID; `MatchJoinAttempt` và lúc tạo player kiểm tra lại để chặn join trực tiếp hoặc dữ liệu đã thay đổi. RPC vẫn trả match đang tham gia với `already_joined=true` mà không tìm match mới.
+Server chỉ tìm/tạo match khi tài khoản có character inventory với ít nhất một `weapon_id` hợp lệ, không trùng; không yêu cầu sở hữu đủ tám weapon type. Callback matchmaker kiểm tra từng thành viên trước khi trả match ID; `MatchJoinAttempt` và lúc tạo player kiểm tra lại inventory, đồng thời yêu cầu ít nhất một weapon common để chọn starter; inventory chỉ có uncommon/rare bị chặn join. Snapshot sở hữu được giữ theo session cho gameplay và xóa khi rời trận. RPC vẫn trả match đang tham gia với `already_joined=true` mà không tìm match mới.
 
 ## Find Or Create
 
