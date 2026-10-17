@@ -80,20 +80,6 @@ func NewService(weapons []entity.Weapon, initialIDs []string) (*Service, error) 
 		return nil, err
 	}
 	service.initialIDs = append([]string(nil), initialIDs...)
-	if len(initialIDs) != len(requiredTypes) {
-		return nil, fmt.Errorf("initial inventory must contain exactly %d weapon ids", len(requiredTypes))
-	}
-	initialTypes := make(map[entity.WeaponType]bool)
-	for _, id := range initialIDs {
-		weapon, ok := service.byID[id]
-		if !ok {
-			return nil, fmt.Errorf("initial inventory has unknown weapon id %q", id)
-		}
-		if initialTypes[weapon.Type] {
-			return nil, fmt.Errorf("initial inventory has duplicate weapon type %q", weapon.Type)
-		}
-		initialTypes[weapon.Type] = true
-	}
 	if err := service.Validate(Data{WeaponIDs: initialIDs}); err != nil {
 		return nil, err
 	}

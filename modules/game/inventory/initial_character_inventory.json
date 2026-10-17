@@ -1,3 +1,28 @@
 {
-  "weapon_ids": ["archer", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"]
+  "weapon_ids": [
+    "archer",
+    "novice_mage",
+    "farmer",
+    "swordman",
+    "axeman",
+    "bruiser",
+    "hunter",
+    "shieldbearer",
+    "archer_uncommon",
+    "novice_mage_uncommon",
+    "farmer_uncommon",
+    "swordman_uncommon",
+    "axeman_uncommon",
+    "bruiser_uncommon",
+    "hunter_uncommon",
+    "shieldbearer_uncommon",
+    "archer_rare",
+    "novice_mage_rare",
+    "farmer_rare",
+    "swordman_rare",
+    "axeman_rare",
+    "bruiser_rare",
+    "hunter_rare",
+    "shieldbearer_rare"
+  ]
 }

@@ -27,7 +27,7 @@ Các hook `AfterAuthenticate*` chỉ chạy khởi tạo khi Nakama trả `sessi
 | Nơi lưu | Dữ liệu khởi tạo |
 | --- | --- |
 | Nakama wallet | `gold: 1000`, `gem: 50` theo `modules/economy/currency.json`; ghi ledger với sự kiện cấp tiền ban đầu. |
-| Nakama Storage `character_inventory/inventory` | JSON `weapon_ids` gồm `archer`, `novice_mage`, `farmer`, `swordman`, `axeman`, `bruiser`, `hunter`, `shieldbearer` theo `modules/game/inventory/initial_character_inventory.json`. Object thuộc user mới, có Owner Read (`permission_read=1`) và No Write (`permission_write=0`). |
+| Nakama Storage `character_inventory/inventory` | JSON `weapon_ids` cấp cho user mới gồm 24 ID: tám common (`archer`, `novice_mage`, `farmer`, `swordman`, `axeman`, `bruiser`, `hunter`, `shieldbearer`) cùng các biến thể `<id>_uncommon` và `<id>_rare`, khai báo tường minh theo `modules/game/inventory/initial_character_inventory.json`. Object thuộc user mới, có Owner Read (`permission_read=1`) và No Write (`permission_write=0`). |
 
 Đăng nhập lại không cấp thêm tiền hoặc ghi lại inventory. Hook không tự khởi tạo dữ liệu cho tài khoản cũ.
 
