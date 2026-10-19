@@ -21,7 +21,7 @@
     },
     {
       "type": "staff",
-      "weapon_id": "novice_mage",
+      "weapon_id": "mage",
       "rarity": "common",
       "range_class": "ranged",
       "health": 105,
@@ -192,7 +192,7 @@
     },
     {
       "type": "staff",
-      "weapon_id": "novice_mage_uncommon",
+      "weapon_id": "mage_uncommon",
       "rarity": "uncommon",
       "range_class": "ranged",
       "health": 100,
@@ -211,7 +211,7 @@
     },
     {
       "type": "staff",
-      "weapon_id": "novice_mage_rare",
+      "weapon_id": "mage_rare",
       "rarity": "rare",
       "range_class": "ranged",
       "health": 115,

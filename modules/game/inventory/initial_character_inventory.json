@@ -1,7 +1,7 @@
 {
   "weapon_ids": [
     "archer",
-    "novice_mage",
+    "mage",
     "farmer",
     "swordman",
     "axeman",
@@ -9,7 +9,7 @@
     "hunter",
     "shieldbearer",
     "archer_uncommon",
-    "novice_mage_uncommon",
+    "mage_uncommon",
     "farmer_uncommon",
     "swordman_uncommon",
     "axeman_uncommon",
@@ -17,7 +17,7 @@
     "hunter_uncommon",
     "shieldbearer_uncommon",
     "archer_rare",
-    "novice_mage_rare",
+    "mage_rare",
     "farmer_rare",
     "swordman_rare",
     "axeman_rare",

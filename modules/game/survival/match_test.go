@@ -1214,5 +1214,5 @@ func commonTestWeapons() []entity.Weapon {
 }
 
 func commonInventoryModule() inventoryTestModule {
-	return inventoryTestModule{value: `{"weapon_ids":["archer","novice_mage","farmer","swordman","axeman","bruiser","hunter","shieldbearer"]}`}
+	return inventoryTestModule{value: `{"weapon_ids":["archer","mage","farmer","swordman","axeman","bruiser","hunter","shieldbearer"]}`}
 }

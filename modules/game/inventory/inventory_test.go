@@ -46,7 +46,7 @@ func TestInitialInventoryStoresOnlyWeaponIDs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	bases := []string{"archer", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"}
+	bases := []string{"archer", "mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"}
 	var want []string
 	for _, suffix := range []string{"", "_uncommon", "_rare"} {
 		for _, name := range bases {
@@ -108,7 +108,7 @@ func TestInitialInventoryAllowsPartialAndMultipleWeaponsPerType(t *testing.T) {
 	for _, initial := range [][]string{
 		{"archer"},
 		{"archer", "archer_uncommon", "archer_rare"},
-		{"archer", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"},
+		{"archer", "mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"},
 	} {
 		service, err := NewService(weapons, initial)
 		if err != nil {

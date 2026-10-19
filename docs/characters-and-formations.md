@@ -37,7 +37,7 @@ Catalog mặc định nằm tại [`weapons.json`](../modules/game/core/entity/w
 | `projectile_speed` | World units mỗi giây; ranged phải lớn hơn 0 |
 | `regen_rate` | Stat đã có, chưa có regen system |
 
-Catalog gồm 24 weapon: tám ID cơ bản (`archer`, `novice_mage`, `farmer`, `swordman`, `axeman`, `bruiser`, `hunter`, `shieldbearer`) là common; mỗi ID có thêm biến thể `<id>_uncommon` và `<id>_rare`. Ví dụ: `archer`, `archer_uncommon`, `archer_rare`. Mỗi rarity có tám weapon. Common giữ nguyên chỉ số; uncommon kế thừa bộ chỉ số swift cũ, rare kế thừa bộ chỉ số heavy cũ.
+Catalog gồm 24 weapon: tám ID cơ bản (`archer`, `mage`, `farmer`, `swordman`, `axeman`, `bruiser`, `hunter`, `shieldbearer`) là common; mỗi ID có thêm biến thể `<id>_uncommon` và `<id>_rare`. Ví dụ: `archer`, `archer_uncommon`, `archer_rare`. Mỗi rarity có tám weapon. Common giữ nguyên chỉ số; uncommon kế thừa bộ chỉ số swift cũ, rare kế thừa bộ chỉ số heavy cũ.
 
 `spear`, `sword`, `axe`, `blunt`, `shield` là melee. `bow`, `staff`, `crossbow` là ranged.
 

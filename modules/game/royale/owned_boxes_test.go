@@ -32,7 +32,7 @@ func TestOwnedInventoryControlsStarterSnapshotAndLeave(t *testing.T) {
 	variant.ID = "owned_common_variant"
 	state.WeaponCatalog = append(state.WeaponCatalog, variant)
 	// A different bootstrap list must not affect gameplay selection.
-	initial := []string{"archer_uncommon", "novice_mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"}
+	initial := []string{"archer_uncommon", "mage", "farmer", "swordman", "axeman", "bruiser", "hunter", "shieldbearer"}
 	service, err := inventory.NewService(state.WeaponCatalog, initial)
 	if err != nil {
 		t.Fatal(err)
@@ -121,7 +121,7 @@ func TestOwnedBoxSpawnPoolAndJoinRarity(t *testing.T) {
 	}
 	player := entity.NewPlayerWithWeapon("pool", "pool", "Pool", entity.Vector2{X: 100}, state.WeaponCatalog[0])
 	state.Players[player.SessionID] = player
-	state.OwnedWeapons[player.SessionID] = characterbox.Owned(state.WeaponCatalog, []string{"archer_rare", "novice_mage_uncommon"})
+	state.OwnedWeapons[player.SessionID] = characterbox.Owned(state.WeaponCatalog, []string{"archer_rare", "mage_uncommon"})
 	if events := state.spawnCharacterBoxes(3); len(events) != 3 {
 		t.Fatal("failed to spawn from uncommon/rare inventory")
 	}

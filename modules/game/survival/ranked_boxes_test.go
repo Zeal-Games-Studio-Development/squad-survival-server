@@ -14,7 +14,7 @@ func TestRankedBoxSpawnAndRefill(t *testing.T) {
 	state := ownedBoxState()
 	player := entity.NewPlayerWithWeapon("owner", "owner", "Owner", entity.Vector2{X: 100}, state.WeaponCatalog[0])
 	state.Players[player.SessionID] = player
-	state.OwnedWeapons[player.SessionID] = characterbox.Owned(state.WeaponCatalog, []string{"archer", "novice_mage_uncommon", "bruiser_rare"})
+	state.OwnedWeapons[player.SessionID] = characterbox.Owned(state.WeaponCatalog, []string{"archer", "mage_uncommon", "bruiser_rare"})
 	events := state.spawnCharacterBoxes(60)
 	assertRankedBoxEvents(t, state, player.SessionID, events, [3]int{42, 12, 6})
 	// Remove only common boxes: refill must allocate the new 20, not rebalance the map.
