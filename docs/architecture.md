@@ -18,7 +18,7 @@
 | `modules/game/core/world` | Tọa độ, spawn và world boundary |
 | `modules/account` | Khóa client profile updates và RPC đổi display name có kiểm duyệt |
 
-`InitModule` đăng ký account hooks, match `survival`, match `battle-royale`, RPC `change_display_name`, `find_or_create_match`, matchmaker callback và RPC `healthcheck`.
+`InitModule` đăng ký account hooks, match `survival`, match `battle-royale`, RPC `change_display_name`, `find_or_create_match`, matchmaker callback và RPC `healthcheck`. Quy tắc và cấu hình phí đổi tên được mô tả trong [Tài khoản và đổi tên hiển thị](account.md).
 
 ## Khởi Tạo Tài Khoản Mới
 

@@ -19,12 +19,15 @@ import (
 
 func InitModule(_ context.Context, logger runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, initializer runtime.Initializer) error {
 	entity.DefaultSkillCatalog()
-	if err := account.Register(initializer); err != nil {
-		return err
-	}
-
 	economyService, err := economy.NewService(economy.DefaultCurrencies())
 	if err != nil {
+		return err
+	}
+	economyConfig, err := economyService.DefaultGeneralConfig()
+	if err != nil {
+		return err
+	}
+	if err := account.Register(initializer, economyService, economyConfig); err != nil {
 		return err
 	}
 	inventoryService := inventory.DefaultService()

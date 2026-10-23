@@ -11,6 +11,7 @@ const (
 	EventInitialCurrencyGrant = "initial_currency_grant"
 	EventPayment              = "payment"
 	EventCurrencyGrant        = "currency_grant"
+	EventChangeDisplayName    = "change_display_name"
 )
 
 var ErrInvalidAmount = errors.New("currency amount must be greater than zero")
@@ -48,11 +49,11 @@ func NewService(currencies []Currency) (*Service, error) {
 // Pay atomically subtracts the requested amounts from a Nakama wallet.
 // Nakama rejects the complete update when any resulting balance is negative.
 func (s *Service) Pay(ctx context.Context, wallet WalletUpdater, userID string, costs map[string]int64, metadata map[string]interface{}) (map[string]int64, error) {
-	changeset, err := s.changeset(costs, -1)
+	update, err := s.PaymentUpdate(userID, costs, metadata)
 	if err != nil {
 		return nil, err
 	}
-	updated, _, err := wallet.WalletUpdate(ctx, userID, changeset, withEvent(metadata, EventPayment), true)
+	updated, _, err := wallet.WalletUpdate(ctx, update.UserID, update.Changeset, update.Metadata, true)
 	return updated, err
 }
 
@@ -115,11 +116,15 @@ func (s *Service) changeset(amounts map[string]int64, sign int64) (map[string]in
 	return changeset, nil
 }
 
-func withEvent(metadata map[string]interface{}, event string) map[string]interface{} {
+// withEvent preserves a feature event supplied by the caller, otherwise using
+// the default event for the wallet operation. Caller metadata is never mutated.
+func withEvent(metadata map[string]interface{}, defaultEvent string) map[string]interface{} {
 	result := make(map[string]interface{}, len(metadata)+1)
 	for key, value := range metadata {
 		result[key] = value
 	}
-	result[LedgerEventKey] = event
+	if event, ok := result[LedgerEventKey].(string); !ok || event == "" {
+		result[LedgerEventKey] = defaultEvent
+	}
 	return result
 }

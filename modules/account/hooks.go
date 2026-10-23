@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"squad-survival-be/modules/economy"
+
 	goaway "github.com/TwiN/go-away"
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -17,7 +19,7 @@ const (
 
 // Register installs client-facing account restrictions. Server-side account
 // updates made through NakamaModule do not pass through these API hooks.
-func Register(initializer runtime.Initializer) error {
+func Register(initializer runtime.Initializer, economyService *economy.Service, config economy.GeneralConfig) error {
 	if err := initializer.RegisterBeforeUpdateAccount(beforeUpdateAccount); err != nil {
 		return err
 	}
@@ -48,7 +50,7 @@ func Register(initializer runtime.Initializer) error {
 	if err := initializer.RegisterBeforeAuthenticateSteam(beforeAuthenticateSteam); err != nil {
 		return err
 	}
-	return initializer.RegisterRpc(ChangeDisplayNameRPC, NewChangeDisplayNameRPC(goaway.IsProfane))
+	return initializer.RegisterRpc(ChangeDisplayNameRPC, NewChangeDisplayNameRPC(goaway.IsProfane, economyService, config.Costs[economy.CostChangeDisplayName]))
 }
 
 func beforeUpdateAccount(_ context.Context, _ runtime.Logger, _ *sql.DB, _ runtime.NakamaModule, in *api.UpdateAccountRequest) (*api.UpdateAccountRequest, error) {

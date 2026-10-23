@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"reflect"
+	"squad-survival-be/modules/economy"
 	"testing"
 
 	"github.com/heroiclabs/nakama-common/api"
@@ -160,7 +161,7 @@ func (i *recordingInitializer) RegisterRpc(id string, _ func(context.Context, ru
 
 func TestRegisterInstallsAllHooks(t *testing.T) {
 	initializer := &recordingInitializer{}
-	if err := Register(initializer); err != nil {
+	if err := Register(initializer, nil, economy.GeneralConfig{}); err != nil {
 		t.Fatalf("register hooks: %v", err)
 	}
 	want := []string{"update_account", "apple", "custom", "device", "email", "facebook", "facebook_instant_game", "game_center", "google", "steam", "rpc:" + ChangeDisplayNameRPC}
@@ -172,7 +173,7 @@ func TestRegisterInstallsAllHooks(t *testing.T) {
 func TestRegisterReturnsRPCRegistrationError(t *testing.T) {
 	wantErr := errors.New("rpc registration failed")
 	initializer := &recordingInitializer{failAt: "rpc:" + ChangeDisplayNameRPC, err: wantErr}
-	if err := Register(initializer); !errors.Is(err, wantErr) {
+	if err := Register(initializer, nil, economy.GeneralConfig{}); !errors.Is(err, wantErr) {
 		t.Fatalf("expected RPC registration error, got %v", err)
 	}
 }
@@ -180,7 +181,7 @@ func TestRegisterReturnsRPCRegistrationError(t *testing.T) {
 func TestRegisterReturnsRegistrationError(t *testing.T) {
 	wantErr := errors.New("registration failed")
 	initializer := &recordingInitializer{failAt: "google", err: wantErr}
-	if err := Register(initializer); !errors.Is(err, wantErr) {
+	if err := Register(initializer, nil, economy.GeneralConfig{}); !errors.Is(err, wantErr) {
 		t.Fatalf("expected registration error, got %v", err)
 	}
 	wantCalls := []string{"update_account", "apple", "custom", "device", "email", "facebook", "facebook_instant_game", "game_center", "google"}

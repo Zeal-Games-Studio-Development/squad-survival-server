@@ -39,6 +39,7 @@ Tài liệu này mô tả trạng thái đã triển khai của Squad Survival S
 9. [Battle Royale lifecycle](battle-royale.md)
 10. [AI player và cấu hình bot](ai-players.md)
 11. [Plan skill theo weapon ID](plans/skill-system.md)
+12. [Tài khoản, đổi tên và cấu hình phí](account.md)
 
 ## Planned
 

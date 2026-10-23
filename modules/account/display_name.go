@@ -2,12 +2,16 @@ package account
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"squad-survival-be/modules/economy"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 	"golang.org/x/text/unicode/norm"
@@ -29,6 +33,10 @@ const (
 	invalidArgumentCode      = 3
 	internalCode             = 13
 	unauthenticatedCode      = 16
+	operationCollection      = "account_operations"
+	maxChangeAttempts        = 3
+	conflictMessage          = "display name change conflicted; retry"
+	insufficientGemMessage   = "insufficient gem"
 )
 
 type ChangeDisplayNameRequest struct {
@@ -41,7 +49,7 @@ type ChangeDisplayNameResponse struct {
 
 type profanityChecker func(string) bool
 
-func NewChangeDisplayNameRPC(isProfane profanityChecker) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule, string) (string, error) {
+func NewChangeDisplayNameRPC(isProfane profanityChecker, economyService *economy.Service, costs map[string]int64) func(context.Context, runtime.Logger, *sql.DB, runtime.NakamaModule, string) (string, error) {
 	return func(ctx context.Context, logger runtime.Logger, _ *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
 		userID, _ := ctx.Value(runtime.RUNTIME_CTX_USER_ID).(string)
 		if userID == "" {
@@ -62,7 +70,11 @@ func NewChangeDisplayNameRPC(isProfane profanityChecker) func(context.Context, r
 		if err != nil {
 			return "", err
 		}
-		if err := nk.AccountUpdateId(ctx, userID, "", nil, displayName, "", "", "", ""); err != nil {
+		if err := changeDisplayName(ctx, nk, economyService, costs, userID, displayName); err != nil {
+			var runtimeErr *runtime.Error
+			if errors.As(err, &runtimeErr) {
+				return "", runtimeErr
+			}
 			if logger != nil {
 				logger.Error("Could not update display name for user %s: %v", userID, err)
 			}
@@ -75,6 +87,58 @@ func NewChangeDisplayNameRPC(isProfane profanityChecker) func(context.Context, r
 		}
 		return string(response), nil
 	}
+}
+
+// Read the operation version before the account snapshot. The conditional write
+// prevents a stale snapshot from receiving another free rename, across nodes.
+func changeDisplayName(ctx context.Context, nk runtime.NakamaModule, economyService *economy.Service, costs map[string]int64, userID, displayName string) error {
+	for attempt := 0; attempt < maxChangeAttempts; attempt++ {
+		objects, err := nk.StorageRead(ctx, []*runtime.StorageRead{{Collection: operationCollection, Key: ChangeDisplayNameRPC, UserID: userID}})
+		if err != nil {
+			return err
+		}
+		version := "*"
+		if len(objects) > 0 {
+			version = objects[0].Version
+		}
+		account, err := nk.AccountGetId(ctx, userID)
+		if err != nil {
+			return err
+		}
+		if account == nil || account.User == nil {
+			return errors.New("account lookup returned no user")
+		}
+		currentName := account.User.GetDisplayName()
+		if norm.NFC.String(strings.TrimSpace(currentName)) == displayName {
+			return nil
+		}
+		var walletUpdates []*runtime.WalletUpdate
+		if currentName != "" {
+			payment, err := economyService.PaymentUpdate(userID, costs, map[string]interface{}{economy.LedgerEventKey: economy.EventChangeDisplayName})
+			if err != nil {
+				return err
+			}
+			walletUpdates = []*runtime.WalletUpdate{payment}
+		}
+		// A fresh nonce changes the storage version even when revisiting an old name.
+		value, err := json.Marshal(map[string]string{"nonce": rand.Text()})
+		if err != nil {
+			return err
+		}
+		_, _, err = nk.MultiUpdate(ctx,
+			[]*runtime.AccountUpdate{{UserID: userID, DisplayName: displayName}},
+			[]*runtime.StorageWrite{{Collection: operationCollection, Key: ChangeDisplayNameRPC, UserID: userID, Value: string(value), Version: version, PermissionRead: 0, PermissionWrite: 0}},
+			nil, walletUpdates, true)
+		if errors.Is(err, runtime.ErrStorageRejectedVersion) {
+			continue
+		}
+		var negative *runtime.WalletNegativeError
+		if errors.As(err, &negative) {
+			return runtime.NewError(insufficientGemMessage, 9)
+		}
+		return err
+	}
+	return runtime.NewError(conflictMessage, 10)
 }
 
 func validateDisplayName(input string, isProfane profanityChecker) (string, error) {
